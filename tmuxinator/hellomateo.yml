@@ -1,0 +1,5 @@
+name: hellomateo
+root: ~/Developer/hellomateo
+windows:
+  - Vim: vim
+  - Terminal: clear 

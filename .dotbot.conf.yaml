@@ -1,0 +1,27 @@
+- defaults:
+    link:
+      relink: true
+
+- clean: ["~"]
+
+- link:
+    ~/.ack: ack
+    ~/.ag: ag
+    ~/.config/base16-shell: .base16-shell
+    ~/.config/nvim: nvim
+    ~/.config/starship.toml: starship.toml
+    ~/.config/tmuxinator: tmuxinator
+    ~/.gitconfig: gitconfig
+    ~/.gitignore: gitignore
+    ~/.ripgreprc: ripgrep
+    ~/.tmux.conf: tmux.conf
+    ~/.wget: wget
+    ~/.zshrc: zshrc
+    ~/Library/Application Support/lazygit/config.yml: lazygit.yml
+
+- shell:
+    - [git submodule update --init --recursive, Installing submodules]
+    - [
+        ~/.tmux/plugins/tpm/scripts/install_plugins.sh >/dev/null 2>&1,
+        Installing tmux plugins,
+      ]
