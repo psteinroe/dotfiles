@@ -14,6 +14,8 @@ brew "lua"
 brew "luarocks"
 # A dynamic, open source programming language with a focus on simplicity and productivity.
 brew "ruby"
+# Perl is a highly capable, feature-rich programming language with over 30 years of development.
+brew "perl"
 
 # ---- Comamnd Line Tools ----
 # Clone of cat(1) with syntax highlighting and Git integration
@@ -24,8 +26,6 @@ brew "diff-so-fancy"
 brew "openssl"
 # Get a file from an HTTP, HTTPS or FTP server
 brew "curl"
-# Pack, ship and run any application as a lightweight container
-brew "docker"
 # Modern replacement for 'ls'
 brew "exa"
 # Simple, fast and user-friendly alternative to find
@@ -78,6 +78,10 @@ brew "supabase"
 brew "cmake"
 # Rust toolchain installer
 brew "rustup-init"
+# Terraform
+brew "terraform"
+# PostgreSQL
+brew "postgresql@14"
 
 # --- Cask ---
 # Cross-platform, fast, feature-rich, GPU based terminal
@@ -114,3 +118,5 @@ cask "font-fira-code-nerd-font"
 cask "visual-studio-code"
 # Logitech Options for MX Products
 cask  "logitech-options"
+# Docker Desktop
+cask "docker"
