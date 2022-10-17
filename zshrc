@@ -38,6 +38,9 @@ export RBENV_ROOT="$HOME/.rbenv/"
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" # This loads nvm
 
+# neovim managed by bob
+export PATH="$HOME/Library/Application Support/neovim/bin:$PATH"
+
 # Rancher
 export PATH="$HOME/.rd/bin:$PATH"
 
@@ -107,7 +110,7 @@ load-nvmrc
 # *** *** Plugins *** ***
 
 # Load Antidote plugin manager
-source ${ZDOTDIR:-~}/.antidote/antidote.zsh
+source $(brew --prefix)/opt/antidote/share/antidote/antidote.zsh
 
 # initialize plugins statically with ${ZDOTDIR:-~}/.zsh_plugins.txt
 antidote load

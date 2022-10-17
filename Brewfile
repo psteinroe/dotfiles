@@ -1,11 +1,11 @@
 tap "homebrew/bundle"
 tap "homebrew/cask"
+tap "supabase/tap"
+tap "ms-jpq/sad"
+tap "homebrew/cask-fonts"
+tap "homebrew/cask-drivers"
 
 # ---- Programming Languages and their Package Managers ----
-# Interpreted, interactive, object-oriented programming language
-brew "python@3.9"
-# Platform built on V8 to build network applications
-brew "node"
 # Fast, disk space efficient package manager
 brew "pnpm"
 # Powerful, lightweight programming language
@@ -48,8 +48,6 @@ brew "lunchy"
 brew "navi"
 # Mac App Store command-line interface
 brew "mas"
-# Ambitious Vim-fork focused on extensibility and agility
-brew "neovim"
 # Search tool like grep and The Silver Searcher
 brew "ripgrep"
 # Cross-shell prompt for astronauts
@@ -73,13 +71,17 @@ brew "zsh-syntax-highlighting"
 # Plugin manager for zsh
 brew "antidote"
 # Search and replace | Space Age seD
-brew "ms-jpq/sad/sad"
+brew "sad"
 # Supabase CLI
-brew "supabase/tap/supabase"
+brew "supabase"
+# Cross-platform make
+brew "cmake"
+# Rust toolchain installer
+brew "rustup-init"
 
 # --- Cask ---
-# A cross-platform, OpenGL terminal emulator.
-cask "alacritty"
+# Cross-platform, fast, feature-rich, GPU based terminal
+cask "kitty"
 # Web browser
 cask "google-chrome"
 # Utility to fix grammar errors and style issues in text
@@ -106,3 +108,9 @@ cask "raycast"
 cask "slack"
 # Music streaming service
 cask "spotify"
+# Font
+cask "font-fira-code-nerd-font"
+# Visual Studio Code
+cask "visual-studio-code"
+# Logitech Options for MX Products
+cask  "logitech-options"

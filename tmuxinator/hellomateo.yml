@@ -1,5 +1,8 @@
 name: hellomateo
 root: ~/Developer/hellomateo
 windows:
-  - Vim: vim
-  - Terminal: clear 
+  - editor:
+    Layout: main-horizontal
+    Panes:
+      - nvim
+      - clear

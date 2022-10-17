@@ -8,7 +8,3 @@ export PYENV_ROOT="$HOME/.pyenv"
 export PATH="$PYENV_ROOT/bin:$PATH"
 eval "$(pyenv init --path)"
 eval "$(pyenv virtualenv-init -)"
-
-pyenv install 3.10.1
-
-pip install -r ~/.dotfiles/python/pip-requirements.txt
