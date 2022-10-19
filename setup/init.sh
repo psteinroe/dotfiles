@@ -3,6 +3,9 @@
 # Install Xcode Developer Tools
 xcode-select --install
 
+# Install Rosetta 2
+softwareupdate --install-rosetta --agree-to-license
+
 # Install TMUX Plugin Manager
 git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
 
@@ -22,6 +25,10 @@ source ./brew.sh
 # Installing Node.js
 cd "$parent_path"
 source ./nvm.sh
+
+# Installing Global Dependencies
+cd "$parent_path"
+source ./pnpm.sh
 
 # Installing Python version manager
 cd "$parent_path"

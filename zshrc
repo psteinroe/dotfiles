@@ -38,6 +38,10 @@ export RBENV_ROOT="$HOME/.rbenv/"
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" # This loads nvm
 
+# PNPM
+export PNPM_HOME="/Users/psteinroe/Library/pnpm"
+export PATH="$PNPM_HOME:$PATH"
+
 # neovim managed by bob
 export PATH="$HOME/Library/Application Support/neovim/bin:$PATH"
 
@@ -88,8 +92,6 @@ bindkey -M viins '^z' fzf-cd-widget      # (z) jump
 # Get OS X Software Updates, Homebrew, pnpm, and their installed packages
 function update () {
   brew update && brew outdated && brew upgrade && brew cleanup
-  pip install --upgrade pip
-  pip list -o --format columns|  cut -d' ' -f1|xargs -n1 pip install -U
   nvim -c 'autocmd User PackerComplete quitall' -c 'PackerSync'
   nvim +Mason +15sleep +qall
   sudo softwareupdate -i -a

@@ -82,6 +82,8 @@ brew "rustup-init"
 brew "terraform"
 # PostgreSQL
 brew "postgresql@14"
+# JQ
+brew "jq"
 
 # --- Cask ---
 # Cross-platform, fast, feature-rich, GPU based terminal
@@ -120,3 +122,7 @@ cask "visual-studio-code"
 cask  "logitech-options"
 # Docker Desktop
 cask "docker"
+# Knowledge base that works on top of a local folder of plain text Markdown files
+cask "obsidian"
+
+mas "Xcode", id: 497799835
