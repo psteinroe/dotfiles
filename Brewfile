@@ -2,6 +2,7 @@ tap "homebrew/bundle"
 tap "homebrew/cask"
 tap "supabase/tap"
 tap "ms-jpq/sad"
+tap "fsouza/prettierd"
 tap "homebrew/cask-fonts"
 tap "homebrew/cask-drivers"
 
@@ -16,6 +17,10 @@ brew "luarocks"
 brew "ruby"
 # Perl is a highly capable, feature-rich programming language with over 30 years of development.
 brew "perl"
+# Prettier, but fast
+brew "prettierd"
+# Golang
+brew "golang"
 
 # ---- Comamnd Line Tools ----
 # Clone of cat(1) with syntax highlighting and Git integration
@@ -84,6 +89,8 @@ brew "terraform"
 brew "postgresql@14"
 # JQ
 brew "jq"
+# A modern runtime for JavaScript and TypeScript
+brew "deno"
 
 # --- Cask ---
 # Cross-platform, fast, feature-rich, GPU based terminal

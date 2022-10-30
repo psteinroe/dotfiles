@@ -92,9 +92,29 @@ bindkey -M viins '^z' fzf-cd-widget      # (z) jump
 # Get OS X Software Updates, Homebrew, pnpm, and their installed packages
 function update () {
   brew update && brew outdated && brew upgrade && brew cleanup
+  pnpm -g update --latest
   nvim -c 'autocmd User PackerComplete quitall' -c 'PackerSync'
   nvim +Mason +15sleep +qall
   sudo softwareupdate -i -a
+}
+
+# Open the Pull Request URL for your current directory's branch (base branch defaults to main)
+function openpr() {
+  github_url=`git remote -v | awk '/fetch/{print $2}' | sed -Ee 's#(git@|git://)#https://#' -e 's@com:@com/@' -e 's%\.git$%%' | awk '/github/'`;
+  branch_name=`git symbolic-ref HEAD | cut -d"/" -f 3,4`;
+  pr_url=$github_url"/compare/main..."$branch_name
+  open $pr_url;
+}
+ 
+# Run git push and then immediately open the Pull Request URL
+function gpr() {
+  git push origin HEAD
+ 
+  if [ $? -eq 0 ]; then
+    openpr
+  else
+    echo 'failed to push commits and open a pull request.';
+  fi
 }
 
 # Auto change the nvm version based on a .nvmrc file based on the current directory.

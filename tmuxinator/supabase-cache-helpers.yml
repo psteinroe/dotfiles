@@ -1,5 +1,5 @@
-name: hellomateo
-root: ~/Developer/hellomateo
+name: supabase-cache-helpers
+root: ~/Developer/supabase-cache-helpers
 windows:
   - editor: 
       layout: main-vertical

@@ -1,14 +1,24 @@
 local M = {}
 
 M.treesitter = {
-    ensure_installed = {"vim", "lua", "html", "css", "typescript", "c"}
+    ensure_installed = { "vim", "lua", "html", "css", "typescript", "c" }
 }
 
 M.mason = {
     ensure_installed = { -- lua stuff
-    "lua-language-server", "stylua", -- web dev stuff
-    "css-lsp", "html-lsp", "typescript-language-server", "deno", "elixir-ls", "prettierd", -- shell
-    "shfmt", "shellcheck"}
+        "lua-language-server",
+        "stylua", -- web dev stuff
+        "css-lsp",
+        "html-lsp",
+        "typescript-language-server",
+        "deno",
+        "elixir-ls",
+        "prettierd", -- shell
+        "shfmt",
+        "shellcheck",
+        "sqlls"
+    }
+
 }
 
 -- git support in nvimtree
