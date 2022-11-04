@@ -346,6 +346,14 @@ M.nvterm = {
 
     -- new
 
+    ["<leader>i"] = {
+      function()
+        require("nvterm.terminal").toggle "float"
+      end,
+      "toggle floating term",
+    },
+
+
     ["<leader>h"] = {
       function()
         require("nvterm.terminal").new "horizontal"

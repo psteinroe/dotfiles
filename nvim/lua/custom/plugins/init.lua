@@ -64,21 +64,10 @@ return {
         end
     },
 
-    -- Toggle terminal
-    ["akinsho/toggleterm.nvim"] = {
-        config = function()
-            require("toggleterm").setup({
-                hide_numbers = false, -- hide the number column in toggleterm buffers
-                open_mapping = [[<c-\>]],
-                insert_mappings = true, -- whether or not the open mapping applies in insert mode
-                terminal_mappings = true, -- whether or not the open mapping applies in the opened terminals
-                direction = 'vertical'
-            })
-        end
-    },
-
     -- Load .env files
     ["tpope/vim-dotenv"] = {},
+
+    ["kdheepak/lazygit.nvim"] = {},
 
     -- DB Support
     ["tpope/vim-dadbod"] = {},

@@ -102,7 +102,7 @@ function update () {
 function openpr() {
   github_url=`git remote -v | awk '/fetch/{print $2}' | sed -Ee 's#(git@|git://)#https://#' -e 's@com:@com/@' -e 's%\.git$%%' | awk '/github/'`;
   branch_name=`git symbolic-ref HEAD | cut -d"/" -f 3,4`;
-  pr_url=$github_url"/compare/main..."$branch_name
+  pr_url=$github_url"/compare/dev..."$branch_name
   open $pr_url;
 }
  
@@ -115,6 +115,13 @@ function gpr() {
   else
     echo 'failed to push commits and open a pull request.';
   fi
+}
+
+# Resets git by checking out the main branch and removing all merged branches but prod|staging|dev|main
+function rg() {
+  git checkout "$(git remote show origin | grep 'HEAD branch' | cut -d' ' -f5)"
+  git pull
+  git branch --merged | egrep -v \"(^\\*|prod|staging|dev|main)\" | xargs git branch -d
 }
 
 # Auto change the nvm version based on a .nvmrc file based on the current directory.
@@ -167,8 +174,11 @@ alias mux="tmuxinator"
 # Bat
 alias cat="bat"
 
-# Dotfiles folder
+# Directory shortcuts
 alias dotfiles="cd $HOME/.dotfiles"
+alias hellomateo="cd $HOME/Developer/hellomateo"
+alias supabase-cache-helpers="cd $HOME/Developer/supabase-cache-helpers"
+alias monorepo="cd $HOME/Developer/monorepo"
 
 # Get week number
 alias week='date +%V'
@@ -185,3 +195,7 @@ alias emptytrash="sudo rm -rfv /Volumes/*/.Trashes; sudo rm -rfv ~/.Trash; sudo 
 
 # Supabase CLI
 alias sb="supabase"
+
+# Git
+alias gc="git commit -m"
+alias gp="git push"

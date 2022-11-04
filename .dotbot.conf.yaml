@@ -25,6 +25,7 @@
     ~/.gitconfig: gitconfig
     ~/.ripgreprc: ripgrep
     ~/.tmux.conf: tmux.conf
+    ~/.pg_format: pg_format
     ~/.wget: wget
     ~/.zshrc: zshrc
     ~/Library/Application Support/lazygit/config.yml: 

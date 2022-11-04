@@ -8,6 +8,11 @@ M.general = {
             opts = {
                 nowait = true
             }
+        },
+        ["<leader>gg"] = {
+            ":LazyGit <CR>",
+            "open lazygit",
+            opts = { nowait = true }
         }
     }
 }

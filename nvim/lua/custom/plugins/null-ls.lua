@@ -11,6 +11,8 @@ local sources = {
 
   b.formatting.prettierd,
 
+  b.formatting.pg_format,
+
   b.diagnostics.write_good,
 
   -- Lua

@@ -14,10 +14,10 @@ autocmd("VimEnter", {
 })
 
 -- Open db files with DBUI
-autocmd("FileType", {
-    pattern = "sql,psql,pg",
-    command = "DBUIFindBuffer",
-})
+-- autocmd("FileType", {
+--     pattern = "sql,psql,pg",
+--     command = "DBUIFindBuffer",
+-- })
 
 function _G.set_terminal_keymaps()
     local opts = { buffer = 0 }

@@ -91,6 +91,8 @@ brew "postgresql@14"
 brew "jq"
 # A modern runtime for JavaScript and TypeScript
 brew "deno"
+# Flyctl is a command-line utility that lets you work with the Fly.io platform
+brew "flyctl"
 
 # --- Cask ---
 # Cross-platform, fast, feature-rich, GPU based terminal
