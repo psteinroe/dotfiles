@@ -93,6 +93,8 @@ brew "jq"
 brew "deno"
 # Flyctl is a command-line utility that lets you work with the Fly.io platform
 brew "flyctl"
+# PostgreSQL syntax beautifier
+brew "pgformatter"
 
 # --- Cask ---
 # Cross-platform, fast, feature-rich, GPU based terminal
@@ -133,5 +135,7 @@ cask  "logitech-options"
 cask "docker"
 # Knowledge base that works on top of a local folder of plain text Markdown files
 cask "obsidian"
+# Video communication and virtual meeting platform
+cask "zoom"
 
 mas "Xcode", id: 497799835
