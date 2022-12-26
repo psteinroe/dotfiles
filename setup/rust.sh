@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Install Rust
-curl https://sh.rustup.rs -sSf | sh -s -- -y
+rustup-init
 
 # Lua formatter
 cargo install stylua

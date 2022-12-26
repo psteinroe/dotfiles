@@ -1,9 +1,6 @@
 local overrides = require "custom.plugins.overrides"
 
 return {
-
-    -- ["goolord/alpha-nvim"] = { disable = false } -- enables dashboard
-
     -- Override plugin definition options
     ["neovim/nvim-lspconfig"] = {
         config = function()
@@ -22,12 +19,9 @@ return {
                 { name = "path" },
                 { name = "vim-dadbod-completion" }
             }
-
         }
-
     },
 
-    -- overrde plugin configs
     ["nvim-treesitter/nvim-treesitter"] = {
         override_options = overrides.treesitter
     },
@@ -64,6 +58,8 @@ return {
         end
     },
 
+    ["mbbill/undotree"] = {},
+
     -- Load .env files
     ["tpope/vim-dotenv"] = {},
 
@@ -72,5 +68,19 @@ return {
     -- DB Support
     ["tpope/vim-dadbod"] = {},
     ["kristijanhusak/vim-dadbod-ui"] = {},
-    ["kristijanhusak/vim-dadbod-completion"] = {}
+    ["kristijanhusak/vim-dadbod-completion"] = {},
+
+    -- Trouble
+    ["folke/trouble.nvim"] = {
+        requires = "kyazdani42/nvim-web-devicons",
+        config = function()
+            require "custom.plugins.trouble"
+        end
+    },
+
+    ["kylechui/nvim-surround"] = {
+        config = function()
+            require("nvim-surround").setup()
+        end
+    }
 }

@@ -12,12 +12,11 @@ local servers = {
   "dockerls",
   "elixirls",
   "eslint",
-  "graphql",
   "gopls",
   "pylsp",
   "luau_lsp",
   "marksman",
-  "sqlls"
+  "dockerls"
 }
 
 for _, lsp in ipairs(servers) do

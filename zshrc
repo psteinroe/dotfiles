@@ -36,7 +36,7 @@ export RBENV_ROOT="$HOME/.rbenv/"
 
 # nvm (Node Version Manager)
 export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" # This loads nvm
+source $(brew --prefix nvm)/nvm.sh
 
 # PNPM
 export PNPM_HOME="/Users/psteinroe/Library/pnpm"

@@ -5,6 +5,7 @@ tap "ms-jpq/sad"
 tap "fsouza/prettierd"
 tap "homebrew/cask-fonts"
 tap "homebrew/cask-drivers"
+tap "charmbracelet/tap"
 
 # ---- Programming Languages and their Package Managers ----
 # Fast, disk space efficient package manager
@@ -22,9 +23,21 @@ brew "prettierd"
 # Golang
 brew "golang"
 
-# ---- Comamnd Line Tools ----
+# ---- Command Line Tools ----
+# Secure and free password manager for all of your devices
+brew "bitwarden-cli"
+# Write terminal GIFs as code for integration testing and demoing your CLI tools.
+brew "vhs"
+# Play, record, convert, and stream audio and video
+brew "ffmpeg"
+# Command-line tool for sharing terminal over the web
+brew "ttyd"
+# Manage multiple Node.js version
+brew "nvm"
 # Clone of cat(1) with syntax highlighting and Git integration
 brew "bat"
+# CLI tool for Cloudflare Workers
+brew "cloudflare-wrangler"
 # Good-lookin' diffs with diff-highlight and more
 brew "diff-so-fancy"
 # Cryptography and SSL/TLS Toolkit
@@ -82,7 +95,7 @@ brew "supabase"
 # Cross-platform make
 brew "cmake"
 # Rust toolchain installer
-brew "rustup-init"
+brew "rustup"
 # Terraform
 brew "terraform"
 # PostgreSQL
@@ -137,5 +150,11 @@ cask "docker"
 cask "obsidian"
 # Video communication and virtual meeting platform
 cask "zoom"
+# Desktop password and login vault
+cask "bitwarden"
+# Screen and video recording software
+cask "loom"
+# Utility that prevents the system from going to sleep
+cask "caffeine"
 
 mas "Xcode", id: 497799835
