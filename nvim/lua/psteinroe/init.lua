@@ -1,4 +1,5 @@
- require("psteinroe.set")
+require("psteinroe.packer")
+require("psteinroe.set")
 require("psteinroe.remap")
 
 local augroup = vim.api.nvim_create_augroup

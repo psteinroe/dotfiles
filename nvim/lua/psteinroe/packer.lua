@@ -61,6 +61,11 @@ return require('packer').startup(function(use)
   use("kristijanhusak/vim-dadbod-completion")
   use ("kristijanhusak/vim-dadbod-ui")
 
+  use {
+      "folke/trouble.nvim",
+      requires = "kyazdani42/nvim-web-devicons"
+  }
+
 
 
 end)

@@ -84,7 +84,8 @@ local null_opts = lsp.build_options('null-ls', {
 null_ls.setup({
     on_attach = null_opts.on_attach,
     sources = {
-        null_ls.builtins.formatting.pg_format
+        null_ls.builtins.formatting.pg_format,
+        null_ls.builtins.formatting.prettierd
     }
 })
 
