@@ -71,12 +71,22 @@ vim.diagnostic.config({
     virtual_text = true,
 })
 
+
+
 local null_opts = lsp.build_options('null-ls', {
-    on_attach = function(client)
+    on_attach = function(client, bufnr)
         vim.api.nvim_create_autocmd("BufWritePre", {
             desc = "Auto format before save",
             pattern = "<buffer>",
-            callback = vim.lsp.buf.formatting_sync,
+            callback = function()
+                vim.lsp.buf.format({
+                    filter = function()
+                        -- only use null-ls for formatting
+                        return client.name == "null-ls"
+                    end,
+                    bufnr = bufnr,
+                })
+            end,
         })
     end
 })
