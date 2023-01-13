@@ -6,6 +6,7 @@ tap "fsouza/prettierd"
 tap "homebrew/cask-fonts"
 tap "homebrew/cask-drivers"
 tap "charmbracelet/tap"
+tap "getsentry/tools"
 
 # ---- Programming Languages and their Package Managers ----
 # Fast, disk space efficient package manager
@@ -24,6 +25,8 @@ brew "prettierd"
 brew "golang"
 
 # ---- Command Line Tools ----
+# Sentry CLI
+brew "getsentry/tools/sentry-cli"
 # Secure and free password manager for all of your devices
 brew "bitwarden-cli"
 # Write terminal GIFs as code for integration testing and demoing your CLI tools.
@@ -154,7 +157,5 @@ cask "zoom"
 cask "bitwarden"
 # Screen and video recording software
 cask "loom"
-# Utility that prevents the system from going to sleep
-cask "caffeine"
 
 mas "Xcode", id: 497799835

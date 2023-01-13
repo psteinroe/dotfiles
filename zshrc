@@ -105,11 +105,11 @@ function openpr() {
   pr_url=$github_url"/compare/dev..."$branch_name
   open $pr_url;
 }
- 
+
 # Run git push and then immediately open the Pull Request URL
 function gpr() {
   git push origin HEAD
- 
+
   if [ $? -eq 0 ]; then
     openpr
   else
@@ -177,8 +177,7 @@ alias cat="bat"
 # Directory shortcuts
 alias dotfiles="cd $HOME/.dotfiles"
 alias hellomateo="cd $HOME/Developer/hellomateo"
-alias supabase-cache-helpers="cd $HOME/Developer/supabase-cache-helpers"
-alias monorepo="cd $HOME/Developer/monorepo"
+alias sbch="cd $HOME/Developer/supabase-cache-helpers"
 
 # Get week number
 alias week='date +%V'
@@ -199,3 +198,11 @@ alias sb="supabase"
 # Git
 alias gc="git commit -m"
 alias gp="git push"
+
+# pnpm
+alias pn="pnpm"
+alias pnr="pnpm run"
+
+# tabtab source for pnpm package
+# uninstall by removing these lines
+[[ -f ~/.config/tabtab/zsh/__tabtab.zsh ]] && . ~/.config/tabtab/zsh/__tabtab.zsh || true

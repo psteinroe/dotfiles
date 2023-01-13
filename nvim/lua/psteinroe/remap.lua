@@ -42,3 +42,12 @@ vim.keymap.set("n", "<leader>j", "<cmd>lprev<CR>zz")
 
 -- leader s to replace the work that I was on
 vim.keymap.set("n", "<leader>s", [[:%s/\<<C-r><C-w>\>/<C-r><C-w>/gI<Left><Left><Left>]])
+
+-- overwrite WORD definition to word
+-- ref: https://github.com/chaoren/vim-wordmotion/issues/71#event-8216691978
+vim.keymap.set("n", "W", "w", {remap= false})
+vim.keymap.set("n", "B", "b", {remap= false})
+vim.keymap.set("x", "aW", "aw", {remap= false})
+vim.keymap.set("o", "aW", "aw", {remap= false})
+vim.keymap.set("x", "iW", "iw", {remap= false})
+vim.keymap.set("o", "iW", "iw", {remap= false})
