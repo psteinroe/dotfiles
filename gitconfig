@@ -76,7 +76,7 @@
 [rerere]
   enabled = 1
 [fetch]
-  prune = true
+	prune = true
   fsckobjects = false
 [filter "lfs"]
   required = true
@@ -85,3 +85,5 @@
   clean = git-lfs clean -- %f
 [web]
   browser = open
+[pull]
+	rebase = true
