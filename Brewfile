@@ -113,6 +113,8 @@ brew "flyctl"
 brew "pgformatter"
 
 # --- Cask ---
+# Automated testing of webapps for Google Chrome
+cask "chromedriver"
 # Cross-platform, fast, feature-rich, GPU based terminal
 cask "kitty"
 # Web browser
