@@ -1,5 +1,4 @@
 # *** *** Configuration *** ***
-
 CASE_SENSITIVE="true"          # Case-sensitive completion
 DISABLE_AUTO_TITLE="true"      # Disable auto-setting terminal title
 COMPLETION_WAITING_DOTS="true" # Red dots while waiting for completion
@@ -30,6 +29,8 @@ export FZF_CTRL_T_OPTS="--preview 'bat --color=always --style=numbers {}' --bind
 
 export FZF_ALT_C_COMMAND="fd --type d $FD_OPTIONS --color=never --hidden"
 export FZF_ALT_C_OPTS="--preview 'tree -C {} | head -50'"
+
+export ZSH_CACHE_DIR=~/.zsh_cache
 
 # rbenv
 export RBENV_ROOT="$HOME/.rbenv/"
@@ -135,6 +136,7 @@ load-nvmrc() {
 add-zsh-hook chpwd load-nvmrc
 load-nvmrc
 
+autoload -Uz compinit && compinit
 
 # *** *** Plugins *** ***
 
@@ -142,7 +144,7 @@ load-nvmrc
 source $(brew --prefix)/opt/antidote/share/antidote/antidote.zsh
 
 # initialize plugins statically with ${ZDOTDIR:-~}/.zsh_plugins.txt
-antidote load
+antidote load $HOME/.dotfiles/zsh_plugins.txt
 
 # Additional zsh plugins
 fpath=(~/.zsh.d/ $fpath)
@@ -206,3 +208,4 @@ alias pnr="pnpm run"
 # tabtab source for pnpm package
 # uninstall by removing these lines
 [[ -f ~/.config/tabtab/zsh/__tabtab.zsh ]] && . ~/.config/tabtab/zsh/__tabtab.zsh || true
+

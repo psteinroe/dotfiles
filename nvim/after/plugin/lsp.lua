@@ -8,10 +8,9 @@ lsp.preset('recommended')
 lsp.ensure_installed({
     'tsserver',
     'eslint',
-    'sumneko_lua',
     'rust_analyzer',
     'jedi_language_server',
-    'marksman'
+    'sqlls'
 })
 
 -- Fix Undefined global 'vim'

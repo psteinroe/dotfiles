@@ -25,6 +25,8 @@ brew "prettierd"
 brew "golang"
 
 # ---- Command Line Tools ----
+# Dependency manager for Cocoa projects
+brew "cocoapods"
 # Sentry CLI
 brew "getsentry/tools/sentry-cli"
 # Secure and free password manager for all of your devices
@@ -41,8 +43,12 @@ brew "nvm"
 brew "bat"
 # CLI tool for Cloudflare Workers
 brew "cloudflare-wrangler"
+# Easiest way to build and release mobile app
+brew "fastlane"
 # Good-lookin' diffs with diff-highlight and more
 brew "diff-so-fancy"
+# Watch files and take action when they change
+brew "watchman"
 # Cryptography and SSL/TLS Toolkit
 brew "openssl"
 # Get a file from an HTTP, HTTPS or FTP server

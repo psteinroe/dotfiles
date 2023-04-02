@@ -54,3 +54,6 @@ vim.keymap.set("o", "iW", "iw", {remap= false})
 
 -- replace current selection in file
 vim.keymap.set("v", "<C-r>", "\"hy:%s/<C-r>h//gc<left><left><left>", {remap= false})
+
+-- open copilot
+vim.keymap.set("n", "<leader>cp", "<cmd>Copilot<cr>")
