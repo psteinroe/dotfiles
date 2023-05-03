@@ -1,14 +1,7 @@
-require('rose-pine').setup({
-    disable_background = true
-})
+vim.opt.termguicolors = true
+vim.opt.background = "dark"
 
-function ColorMyPencils(color) 
-	color = color or "rose-pine"
-	vim.cmd.colorscheme(color)
+vim.g.gruvbox_material_background = "hard"
+vim.g.gruvbox_material_better_performance = 1
 
-	vim.api.nvim_set_hl(0, "Normal", { bg = "none" })
-	vim.api.nvim_set_hl(0, "NormalFloat", { bg = "none" })
-
-end
-
-ColorMyPencils()
+vim.cmd [[colorscheme gruvbox-material]]

@@ -23,6 +23,14 @@ brew "perl"
 brew "prettierd"
 # Golang
 brew "golang"
+# Java
+brew "java"
+# Java 17
+brew "openjdk@17"
+# Java 11
+brew "openjdk@11"
+# Java 8
+brew "openjdk@8"
 
 # ---- Command Line Tools ----
 # Dependency manager for Cocoa projects
@@ -165,5 +173,9 @@ cask "zoom"
 cask "bitwarden"
 # Screen and video recording software
 cask "loom"
+# Tools for building Android applications
+cask "android-studio"
+# Set of tools to manage resources and applications hosted on Google Cloud
+cask "google-cloud-sdk"
 
 mas "Xcode", id: 497799835

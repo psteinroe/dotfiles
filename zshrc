@@ -70,6 +70,12 @@ export BAT_PAGER="less -R"
 # Starship
 eval "$(starship init zsh)"
 
+export ANDROID_HOME=$HOME/Library/Android/sdk
+export PATH=$PATH:$ANDROID_HOME/emulator
+export PATH=$PATH:$ANDROID_HOME/platform-tools
+
+export JAVA_HOME=`/usr/libexec/java_home -v 17`
+
 # FZF
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
 
@@ -180,6 +186,7 @@ alias cat="bat"
 alias dotfiles="cd $HOME/.dotfiles"
 alias hellomateo="cd $HOME/Developer/hellomateo"
 alias sbch="cd $HOME/Developer/supabase-cache-helpers"
+alias pg_lsp="cd $HOME/Developer/postgres_lsp"
 
 # Get week number
 alias week='date +%V'

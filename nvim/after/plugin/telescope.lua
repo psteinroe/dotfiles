@@ -5,7 +5,7 @@ vim.keymap.set('n', '<leader>ps', function()
 	builtin.grep_string({ search = vim.fn.input("Grep > ") })
 end)
 vim.keymap.set('n', '<C-s>', builtin.live_grep, {})
-
+vim.keymap.set('n', '<C-t>', '<cmd>Telescope resume<cr>', {})
 
 -- stolen from https://github.com/nvim-telescope/telescope.nvim/issues/2201
 -- select directory
