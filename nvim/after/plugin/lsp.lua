@@ -51,10 +51,52 @@ lsp.set_preferences {
   },
 }
 
+-- from https://www.reddit.com/r/neovim/comments/107g8lg/how_to_ignore_node_modules_when_using/
+-- ignore react.d.ts on go to definition
+local function filter(arr, fn)
+  if type(arr) ~= "table" then
+    return arr
+  end
+
+  local filtered = {}
+  for k, v in pairs(arr) do
+    if fn(v, k, arr) then
+      table.insert(filtered, v)
+    end
+  end
+
+  return filtered
+end
+
+-- filter react/index.d.ts
+local function filterReactDTS(value)
+  return string.match(value.filename, "react/index.d.ts") == nil
+end
+
+-- custom list handler
+local function on_list(options)
+  local items = options.items
+  if #items > 1 then
+    -- filter out react/index.d.ts
+    items = filter(items, filterReactDTS)
+  end
+
+  vim.fn.setqflist({}, " ", { title = options.title, items = items, context = options.context })
+  if #items > 1 then
+    -- if more than one option, open loc list
+    vim.api.nvim_command "copen"
+  else
+    -- else jump directly
+    vim.api.nvim_command "cfirst"
+  end
+end
+
 lsp.on_attach(function(client, bufnr)
   local opts = { buffer = bufnr, remap = false }
 
-  vim.keymap.set("n", "gd", vim.lsp.buf.definition, opts)
+  vim.keymap.set("n", "gd", function()
+    vim.lsp.buf.definition { on_list = on_list }
+  end, opts)
   vim.keymap.set("n", "K", vim.lsp.buf.hover, opts)
   vim.keymap.set("n", "<leader>vws", vim.lsp.buf.workspace_symbol, opts)
   vim.keymap.set("n", "<leader>vd", vim.diagnostic.open_float, opts)
