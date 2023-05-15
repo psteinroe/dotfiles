@@ -3,6 +3,9 @@
 # Install Xcode Developer Tools
 xcode-select --install
 
+# Install all available updates
+sudo softwareupdate -i -a
+
 # Install Rosetta 2
 softwareupdate --install-rosetta --agree-to-license
 
