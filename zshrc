@@ -113,6 +113,11 @@ function openpr() {
   open $pr_url;
 }
 
+# Update all Wallpapers
+function set_wallpaper() {
+    osascript -e "tell application \"System Events\" to tell every desktop to set picture to \"/Users/psteinroe/.dotfiles/media/wallpaper.jpg\" as POSIX file"
+}
+
 # Run git push and then immediately open the Pull Request URL
 function gpr() {
   git push origin HEAD
