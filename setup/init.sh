@@ -33,6 +33,9 @@ parent_path=$( cd "$(dirname "${BASH_SOURCE[0]}")" ; pwd -P )
 cd "$parent_path"
 source ./brew.sh
 
+# Accepts license
+sudo xcodebuild -license
+
 source ~/.zshrc
 
 # Installing Node.js
