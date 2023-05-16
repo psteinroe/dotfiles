@@ -16,7 +16,33 @@ Dotbot will create symlinks from all necessary files in the folder.
 
 ## Setting Up a New Computer
 
-The project includes a `setup` folder that has install scripts for everything I need on a new computer. You can run the scripts individually or all at once by running `./setup/init.sh`.
+```shell
+# Install all available updates
+sudo softwareupdate -i -a
+
+# Install Homebrew
+NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# Load Homebrew
+echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
+eval "$(/opt/homebrew/bin/brew shellenv)"
+
+# Install GitHub ClI
+brew install gh
+
+# Login with SSH
+gh auth login
+
+# Clone this repository
+git clone git@github.com:psteinroe/dotfiles.git ~/.dotfiles
+cd ~/.dotfiles/
+
+# Install
+./install
+
+# Setup
+./setup/init.sh
+```
 
 ## Syncing Homebrew
 
