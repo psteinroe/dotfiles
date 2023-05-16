@@ -143,6 +143,8 @@ cask "kindle"
 cask "microsoft-office"
 # Provides updates to various Microsoft products
 cask "microsoft-auto-update"
+# Communication tool for focused discussions and decision taking
+cask "threads"
 # Collaborative presentation software for modern teams
 cask "pitch"
 # Your Place to Talk and Hang Out

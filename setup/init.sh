@@ -74,14 +74,19 @@ source ./neovim.sh
 
 source ~/.zshrc
 
-# Setup zsh 
+# Setup zsh
 cd "$parent_path"
 source ./zsh.sh
 
 source ~/.zshrc
 
-# Setup Java 
+# Setup Java
 cd "$parent_path"
 source ./java.sh
 
 source ~/.zshrc
+
+# Setup Dock
+cd "$parent_path"
+source ./dock.sh
+
