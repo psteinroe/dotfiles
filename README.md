@@ -17,6 +17,9 @@ Dotbot will create symlinks from all necessary files in the folder.
 ## Setting Up a New Computer
 
 ```shell
+# Keep screen on
+caffeinate -t 3600
+
 # Install all available updates
 sudo softwareupdate -i -a
 
