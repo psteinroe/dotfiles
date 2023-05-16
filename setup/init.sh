@@ -22,6 +22,8 @@ NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Ho
 echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
 eval "$(/opt/homebrew/bin/brew shellenv)"
 
+source ~/.zshrc
+
 # Set Wallpaper
 set_wallpaper
 
@@ -31,34 +33,52 @@ parent_path=$( cd "$(dirname "${BASH_SOURCE[0]}")" ; pwd -P )
 cd "$parent_path"
 source ./brew.sh
 
+source ~/.zshrc
+
 # Installing Node.js
 cd "$parent_path"
 source ./nvm.sh
+
+source ~/.zshrc
 
 # Installing Global Dependencies
 cd "$parent_path"
 source ./pnpm.sh
 
+source ~/.zshrc
+
 # Installing Python version manager
 cd "$parent_path"
 source ./python.sh
+
+source ~/.zshrc
 
 # Installing Lua packages
 cd "$parent_path"
 source ./lua.sh
 
+source ~/.zshrc
+
 # Installing Rust packages
 cd "$parent_path"
 source ./rust.sh
+
+source ~/.zshrc
 
 # Installing Neovim
 cd "$parent_path"
 source ./neovim.sh
 
+source ~/.zshrc
+
 # Setup zsh 
 cd "$parent_path"
 source ./zsh.sh
 
+source ~/.zshrc
+
 # Setup Java 
 cd "$parent_path"
 source ./java.sh
+
+source ~/.zshrc
