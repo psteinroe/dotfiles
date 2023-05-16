@@ -41,10 +41,13 @@ git clone git@github.com:psteinroe/dotfiles.git ~/.dotfiles
 cd ~/.dotfiles/
 
 # Install
-./install
+./install.sh
 
 # Setup
 ./setup/init.sh
+
+# Install again
+./install.sh
 ```
 
 ## Syncing Homebrew
