@@ -15,6 +15,8 @@ brew "pnpm"
 brew "lua"
 # Package manager for the Lua programming language
 brew "luarocks"
+# Language Server for Lua
+brew "lua-language-server"
 # A dynamic, open source programming language with a focus on simplicity and productivity.
 brew "ruby"
 # Perl is a highly capable, feature-rich programming language with over 30 years of development.
