@@ -18,7 +18,7 @@ Dotbot will create symlinks from all necessary files in the folder.
 
 ```shell
 # Keep screen on
-caffeinate -t 3600
+caffeinate -t 3600 &
 
 # Install all available updates
 sudo softwareupdate -i -a
