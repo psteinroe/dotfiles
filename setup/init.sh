@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# Keep screen on
+caffeinate -t 3600 &
+
 # Install all available updates
 sudo softwareupdate -i -a
 
