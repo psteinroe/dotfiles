@@ -1,4 +1,3 @@
-cargo install --git https://github.com/MordechaiHadad/bob.git --features bob/openssl
+cargo install bob-nvim
 
-# Use 0.8.0 as required by nvchad
-bob use 0.8.0
+bob use 0.9.0

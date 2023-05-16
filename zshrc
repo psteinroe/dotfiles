@@ -44,7 +44,7 @@ export PNPM_HOME="/Users/psteinroe/Library/pnpm"
 export PATH="$PNPM_HOME:$PATH"
 
 # neovim managed by bob
-export PATH="$HOME/Library/Application Support/neovim/bin:$PATH"
+export PATH="$HOME/.local/share/bob/nvim-bin:$PATH"
 
 # Rancher
 export PATH="$HOME/.rd/bin:$PATH"

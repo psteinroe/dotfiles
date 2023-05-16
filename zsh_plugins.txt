@@ -1,3 +1,5 @@
+$HOME/.cache/oh-my-zsh/completions kind:fpath
+
 ohmyzsh/ohmyzsh path:lib
 ohmyzsh/ohmyzsh path:plugins/brew
 ohmyzsh/ohmyzsh path:plugins/colored-man-pages

@@ -19,6 +19,9 @@ NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Ho
 echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
 eval "$(/opt/homebrew/bin/brew shellenv)"
 
+# Set Wallpaper
+set_wallpaper
+
 parent_path=$( cd "$(dirname "${BASH_SOURCE[0]}")" ; pwd -P )
 
 # Installing Homebrew packages, Cask binaries and Mac App Store software
@@ -48,3 +51,11 @@ source ./rust.sh
 # Installing Neovim
 cd "$parent_path"
 source ./neovim.sh
+
+# Setup zsh 
+cd "$parent_path"
+source ./zsh.sh
+
+# Setup Java 
+cd "$parent_path"
+source ./java.sh
