@@ -57,3 +57,6 @@ vim.keymap.set("v", "<C-r>", "\"hy:%s/<C-r>h//gc<left><left><left>", {remap= fal
 
 -- open copilot
 vim.keymap.set("n", "<leader>cp", "<cmd>Copilot<cr>")
+
+-- copy everything between { and } including the brackets
+vim.keymap.set("n", "YY", "va{Vy")

@@ -55,6 +55,15 @@ export PATH="$HOME/.cargo/bin:$PATH"
 # Ruby
 export PATH="/usr/local/opt/ruby/bin:$PATH"
 
+# Android SDK
+export ANDROID_HOME="$HOME/Library/Android/sdk"
+
+# Android platform tools
+export PATH="$HOME/Library/Android/sdk/platform-tools:$PATH"
+
+# postgres_lsp debug build
+export PATH="$HOME/Developer/postgres_lsp/target/debug/postgres_lsp:$PATH"
+
 # Pyenv
 export PYENV_ROOT="$HOME/.pyenv"
 export PATH="$PYENV_ROOT/bin:$PATH"
@@ -74,7 +83,17 @@ export ANDROID_HOME=$HOME/Library/Android/sdk
 export PATH=$PATH:$ANDROID_HOME/emulator
 export PATH=$PATH:$ANDROID_HOME/platform-tools
 
-export JAVA_HOME=`/usr/libexec/java_home -v 17`
+# Java
+export JAVA_11_HOME=$(/usr/libexec/java_home -v11)
+export JAVA_17_HOME=$(/usr/libexec/java_home -v17)
+export JAVA_20_HOME=$(/usr/libexec/java_home -v20)
+
+alias java11='export JAVA_HOME=$JAVA_11_HOME'
+alias java17='export JAVA_HOME=$JAVA_17_HOME'
+alias java20='export JAVA_HOME=$JAVA_20_HOME'
+
+# default java17
+export JAVA_HOME=$JAVA_17_HOME
 
 # FZF
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh

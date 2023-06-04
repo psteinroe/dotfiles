@@ -181,5 +181,7 @@ cask "loom"
 cask "android-studio"
 # Set of tools to manage resources and applications hosted on Google Cloud
 cask "google-cloud-sdk"
+# System monitor for the menu bar
+cask "stats"
 
 mas "Xcode", id: 497799835

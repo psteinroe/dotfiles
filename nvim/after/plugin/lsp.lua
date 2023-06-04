@@ -2,8 +2,21 @@ local lsp = require "lsp-zero"
 local null_ls = require "null-ls"
 local mason_null_ls = require "mason-null-ls"
 local cmp = require "cmp"
+local lspconfig = require "lspconfig"
+local configs = require "lspconfig/configs"
+local util = require "lspconfig/util"
+
+require('lspconfig.configs').postgres_lsp = {
+  default_config = {
+    name = 'postgres_lsp',
+    cmd = {'postgres_lsp'},
+    filetypes = {'sql'}
+  }
+}
 
 lsp.preset "recommended"
+
+lsp.configure("postgres_lsp", {force_setup = true})
 
 lsp.ensure_installed {
   "tsserver",
@@ -11,18 +24,11 @@ lsp.ensure_installed {
   "rust_analyzer",
   "jedi_language_server",
   "sqlls",
+  "tailwindcss"
 }
 
 -- Fix Undefined global 'vim'
-lsp.configure("lua_ls", {
-  settings = {
-    Lua = {
-      diagnostics = {
-        globals = { "vim" },
-      },
-    },
-  },
-})
+lsp.nvim_workspace()
 
 local cmp_select = { behavior = cmp.SelectBehavior.Select }
 local cmp_mappings = lsp.defaults.cmp_mappings {
@@ -137,6 +143,7 @@ null_ls.setup {
   sources = {
     -- null_ls.builtins.formatting.pg_format,
     null_ls.builtins.formatting.prettierd,
+    null_ls.builtins.formatting.rustfmt
   },
 }
 
