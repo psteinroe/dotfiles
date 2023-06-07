@@ -6,11 +6,15 @@ local lspconfig = require "lspconfig"
 local configs = require "lspconfig/configs"
 local util = require "lspconfig/util"
 
+vim.lsp.set_log_level("debug")
+
 require('lspconfig.configs').postgres_lsp = {
   default_config = {
     name = 'postgres_lsp',
     cmd = {'postgres_lsp'},
-    filetypes = {'sql'}
+    filetypes = {'sql'},
+    single_file_support = true
+    -- root_dir = util.root_pattern '.postgres_lsp.toml'
   }
 }
 

@@ -62,7 +62,7 @@ export ANDROID_HOME="$HOME/Library/Android/sdk"
 export PATH="$HOME/Library/Android/sdk/platform-tools:$PATH"
 
 # postgres_lsp debug build
-export PATH="$HOME/Developer/postgres_lsp/target/debug/postgres_lsp:$PATH"
+export PATH="$HOME/Developer/postgres_lsp/target/debug:$PATH"
 
 # Pyenv
 export PYENV_ROOT="$HOME/.pyenv"
@@ -153,6 +153,10 @@ function rg() {
   git checkout "$(git remote show origin | grep 'HEAD branch' | cut -d' ' -f5)"
   git pull
   git branch --merged | egrep -v \"(^\\*|prod|staging|dev|main)\" | xargs git branch -d
+}
+
+function hello_world() {
+  echo "hello world"
 }
 
 # Auto change the nvm version based on a .nvmrc file based on the current directory.

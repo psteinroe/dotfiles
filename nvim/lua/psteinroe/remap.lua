@@ -60,3 +60,7 @@ vim.keymap.set("n", "<leader>cp", "<cmd>Copilot<cr>")
 
 -- copy everything between { and } including the brackets
 vim.keymap.set("n", "YY", "va{Vy")
+
+-- remap for merging conflicts
+vim.keymap.set("n", "gu", "<cmd>diffget //2<cr>")
+vim.keymap.set("n", "gh", "<cmd>diffget //3<cr>")
