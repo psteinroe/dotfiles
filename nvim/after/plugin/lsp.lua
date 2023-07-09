@@ -6,15 +6,15 @@ local lspconfig = require "lspconfig"
 local configs = require "lspconfig/configs"
 local util = require "lspconfig/util"
 
-vim.lsp.set_log_level("debug")
+-- vim.lsp.set_log_level("debug")
 
 require('lspconfig.configs').postgres_lsp = {
   default_config = {
     name = 'postgres_lsp',
     cmd = {'postgres_lsp'},
     filetypes = {'sql'},
-    single_file_support = true
-    -- root_dir = util.root_pattern '.postgres_lsp.toml'
+    single_file_support = true,
+    root_dir = util.root_pattern 'root-file.txt'
   }
 }
 
@@ -27,7 +27,7 @@ lsp.ensure_installed {
   "eslint",
   "rust_analyzer",
   "jedi_language_server",
-  "sqlls",
+  -- "sqlls",
   "tailwindcss"
 }
 

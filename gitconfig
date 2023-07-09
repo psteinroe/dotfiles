@@ -87,3 +87,4 @@
   browser = open
 [pull]
 	rebase = true
+    autostash = true

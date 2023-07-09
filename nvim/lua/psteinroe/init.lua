@@ -29,6 +29,20 @@ autocmd({"BufWritePre"}, {
     command = [[%s/\s\+$//e]],
 })
 
+vim.api.nvim_create_autocmd("BufRead", {
+    callback = function ()
+        vim.filetype.add({
+            filename = {
+                [".env"] = "sh",
+                [".envrc"] = "sh",
+                ["*.env"] = "sh",
+                ["*.envrc"] = "sh",
+                [".env.local"] = "sh"
+            }
+        })
+    end,
+})
+
 vim.g.netrw_browse_split = 0
 vim.g.netrw_banner = 0
 vim.g.netrw_winsize = 25

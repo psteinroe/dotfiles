@@ -37,6 +37,8 @@ brew "openjdk@8"
 # ---- Command Line Tools ----
 # Dependency manager for Cocoa projects
 brew "cocoapods"
+# Bourne-Again SHell, a UNIX command interpreter
+brew "bash"
 # Sentry CLI
 brew "getsentry/tools/sentry-cli"
 # Secure and free password manager for all of your devices
@@ -133,8 +135,6 @@ brew "pgformatter"
 cask "chromedriver"
 # Cross-platform, fast, feature-rich, GPU based terminal
 cask "kitty"
-# Web browser
-cask "google-chrome"
 # Utility to fix grammar errors and style issues in text
 cask "grammarly"
 # Interface for reading and syncing eBooks
@@ -167,8 +167,6 @@ cask "font-fira-code-nerd-font"
 cask "visual-studio-code"
 # Logitech Options for MX Products
 cask  "logitech-options"
-# Docker Desktop
-cask "docker"
 # Knowledge base that works on top of a local folder of plain text Markdown files
 cask "obsidian"
 # Video communication and virtual meeting platform
@@ -183,5 +181,9 @@ cask "android-studio"
 cask "google-cloud-sdk"
 # System monitor for the menu bar
 cask "stats"
+# Google Chromium, sans integration with Google
+cask "eloston-chromium"
+# Replacement for Docker Desktop
+cask "orbstack"
 
 mas "Xcode", id: 497799835
