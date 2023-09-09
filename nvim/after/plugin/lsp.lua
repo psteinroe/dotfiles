@@ -34,6 +34,7 @@ lsp.ensure_installed {
 -- Fix Undefined global 'vim'
 lsp.nvim_workspace()
 
+
 local cmp_select = { behavior = cmp.SelectBehavior.Select }
 local cmp_mappings = lsp.defaults.cmp_mappings {
   ["<C-p>"] = cmp.mapping.select_prev_item(cmp_select),
@@ -157,3 +158,4 @@ mason_null_ls.setup {
   automatic_setup = false,
   handlers = {},
 }
+

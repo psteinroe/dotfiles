@@ -7,6 +7,7 @@ tap "homebrew/cask-fonts"
 tap "homebrew/cask-drivers"
 tap "charmbracelet/tap"
 tap "getsentry/tools"
+tap "oven-sh/bun"
 
 # ---- Programming Languages and their Package Managers ----
 # Fast, disk space efficient package manager
@@ -33,8 +34,12 @@ brew "openjdk@17"
 brew "openjdk@11"
 # Java 8
 brew "openjdk@8"
+# Bun
+brew "bun"
 
 # ---- Command Line Tools ----
+# Syntax-highlighting pager for git and diff output
+brew "git-delta"
 # Dependency manager for Cocoa projects
 brew "cocoapods"
 # Bourne-Again SHell, a UNIX command interpreter
@@ -129,6 +134,14 @@ brew "deno"
 brew "flyctl"
 # PostgreSQL syntax beautifier
 brew "pgformatter"
+# Stuff to build node-canvas with arm chip
+brew "pkg-config"
+brew "cairo"
+brew "pango"
+brew "libpng"
+brew "jpeg"
+brew "giflib"
+brew "librsvg"
 
 # --- Cask ---
 # Automated testing of webapps for Google Chrome
@@ -140,7 +153,7 @@ cask "grammarly"
 # Interface for reading and syncing eBooks
 cask "kindle"
 # Office Applications
-cask "microsoft-office"
+# cask "microsoft-office"
 # Provides updates to various Microsoft products
 cask "microsoft-auto-update"
 # Communication tool for focused discussions and decision taking
@@ -185,5 +198,9 @@ cask "stats"
 cask "eloston-chromium"
 # Replacement for Docker Desktop
 cask "orbstack"
+# Administration and development platform for PostgreSQL
+cask "pgadmin4"
+# Video game digital distribution service
+cask "steam"
 
 mas "Xcode", id: 497799835
