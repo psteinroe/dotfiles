@@ -1,6 +1,6 @@
 # Dotfiles
 
-![Maintenance](https://img.shields.io/maintenance/yes/2022.svg)
+![Maintenance](https://img.shields.io/maintenance/yes/2023.svg)
 
 These are my Dotfiles, a collection of [Neovim](https://neovim.io/), [tmux](https://tmux.github.io/), [zsh](http://zsh.sourceforge.net/), and other tools.
 
