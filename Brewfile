@@ -202,5 +202,7 @@ cask "orbstack"
 cask "pgadmin4"
 # Video game digital distribution service
 cask "steam"
+# Update maps and software, sync with Garmin Connect and register your device
+cask "garmin-express"
 
 mas "Xcode", id: 497799835

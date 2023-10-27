@@ -6,31 +6,32 @@
 
 - link:
     ~/.ack: ack
+    ~/.wakatime.cfg: .wakatime.cfg
     ~/.ag: ag
-    ~/.config/kitty: 
-     create: true
-     path: kitty
-    ~/.config/base16-shell: 
-     create: true
-     path: .base16-shell
-    ~/.config/nvim: 
-     create: true
-     path: nvim
-    ~/.config/starship.toml: 
-     create: true
-     path: starship.toml
+    ~/.config/kitty:
+      create: true
+      path: kitty
+    ~/.config/base16-shell:
+      create: true
+      path: .base16-shell
+    ~/.config/nvim:
+      create: true
+      path: nvim
+    ~/.config/starship.toml:
+      create: true
+      path: starship.toml
     ~/.config/tmuxinator:
-     create: true
-     path: tmuxinator
+      create: true
+      path: tmuxinator
     ~/.gitconfig: gitconfig
     ~/.ripgreprc: ripgrep
     ~/.tmux.conf: tmux.conf
     ~/.pg_format: pg_format
     ~/.wget: wget
     ~/.zshrc: zshrc
-    ~/Library/Application Support/lazygit/config.yml: 
-     create: true
-     path: lazygit.yml
+    ~/Library/Application Support/lazygit/config.yml:
+      create: true
+      path: lazygit.yml
 
 - shell:
     - [git submodule update --init --recursive, Installing submodules]
@@ -38,4 +39,3 @@
         ~/.tmux/plugins/tpm/scripts/install_plugins.sh >/dev/null 2>&1,
         Installing tmux plugins,
       ]
-

@@ -46,3 +46,5 @@ vim.api.nvim_create_autocmd("BufRead", {
 vim.g.netrw_browse_split = 0
 vim.g.netrw_banner = 0
 vim.g.netrw_winsize = 25
+vim.opt.spelllang = 'de,en_us'
+vim.opt.spell = true

@@ -4,3 +4,5 @@ nvim/plugin
 Brewfile.lock.json
 
 zsh_plugins.zsh
+
+.wakatime.cfg
