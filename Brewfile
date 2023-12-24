@@ -1,6 +1,5 @@
 tap "homebrew/bundle"
 tap "homebrew/cask"
-tap "supabase/tap"
 tap "ms-jpq/sad"
 tap "fsouza/prettierd"
 tap "homebrew/cask-fonts"
@@ -38,6 +37,8 @@ brew "openjdk@8"
 brew "bun"
 
 # ---- Command Line Tools ----
+# Control night shift
+brew "smudge/smudge/nightlight"
 # Syntax-highlighting pager for git and diff output
 brew "git-delta"
 # Dependency manager for Cocoa projects
@@ -116,8 +117,6 @@ brew "zsh-syntax-highlighting"
 brew "antidote"
 # Search and replace | Space Age seD
 brew "sad"
-# Supabase CLI
-brew "supabase"
 # Cross-platform make
 brew "cmake"
 # Rust toolchain installer
@@ -156,8 +155,6 @@ cask "kindle"
 # cask "microsoft-office"
 # Provides updates to various Microsoft products
 cask "microsoft-auto-update"
-# Communication tool for focused discussions and decision taking
-cask "threads"
 # Collaborative presentation software for modern teams
 cask "pitch"
 # Your Place to Talk and Hang Out
