@@ -7,3 +7,6 @@ sudo bash -c 'echo "/opt/homebrew/bin/bash" >> /etc/shells'
 
 chsh -s /opt/homebrew/bin/bash
 sudo chsh -s /opt/homebrew/bin/bash
+
+# install gh extension
+gh extension install seachicken/gh-poi

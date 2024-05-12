@@ -43,8 +43,20 @@ vim.api.nvim_create_autocmd("BufRead", {
     end,
 })
 
+
+vim.api.nvim_create_autocmd("VimEnter", {
+    pattern = "",
+    callback = function()
+        vim.api.nvim_out_write("2 check if dotenv exists \n")
+        if vim.fn.exists(':Dotenv') ~= 0 then
+            vim.api.nvim_out_write("2 loading env\n")
+            vim.cmd('verbose Dotenv! ~/.neovimenv')
+        end
+    end
+})
+
 vim.g.netrw_browse_split = 0
 vim.g.netrw_banner = 0
 vim.g.netrw_winsize = 25
-vim.opt.spelllang = 'de,en_us'
+vim.opt.spelllang = 'de'
 vim.opt.spell = true

@@ -11,10 +11,15 @@ local util = require "lspconfig/util"
 require('lspconfig.configs').postgres_lsp = {
   default_config = {
     name = 'postgres_lsp',
-    cmd = {'postgres_lsp'},
+    cmd = {'pglsp'},
     filetypes = {'sql'},
     single_file_support = true,
-    root_dir = util.root_pattern 'root-file.txt'
+    root_dir = util.root_pattern 'root-file.txt',
+    settings = {
+        ['postgres_lsp'] = {
+            dbConnectionString = 'postgresql://postgres:postgres@127.0.0.1:54322/postgres',
+        }
+    }
   }
 }
 
@@ -24,7 +29,7 @@ lsp.configure("postgres_lsp", {force_setup = true})
 
 lsp.ensure_installed {
   "tsserver",
-  "eslint",
+  -- "eslint",
   "rust_analyzer",
   "jedi_language_server",
   -- "sqlls",
@@ -33,7 +38,6 @@ lsp.ensure_installed {
 
 -- Fix Undefined global 'vim'
 lsp.nvim_workspace()
-
 
 local cmp_select = { behavior = cmp.SelectBehavior.Select }
 local cmp_mappings = lsp.defaults.cmp_mappings {
@@ -147,7 +151,7 @@ null_ls.setup {
   on_attach = null_opts.on_attach,
   sources = {
     -- null_ls.builtins.formatting.pg_format,
-    null_ls.builtins.formatting.prettierd,
+    -- null_ls.builtins.formatting.prettierd,
     null_ls.builtins.formatting.rustfmt
   },
 }

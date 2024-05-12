@@ -18,6 +18,8 @@ return require("packer").startup(function(use)
 
   use "vim-airline/vim-airline"
 
+  use "lukas-reineke/indent-blankline.nvim"
+
   use {
     "nvim-treesitter/nvim-treesitter",
     run = function()
@@ -106,4 +108,32 @@ return require("packer").startup(function(use)
   }
 
   use "wakatime/vim-wakatime"
+
+  use {
+    "ggandor/leap.nvim",
+    requires = "tpope/vim-repeat"
+  }
+
+  use "tpope/vim-dotenv"
+
+  use({
+      "jackMort/ChatGPT.nvim",
+      config = function()
+          require("chatgpt").setup({
+              openai_params = {
+                model = "gpt-4",
+                max_tokens = 8192,
+              },
+              openai_edit_params = {
+                model = "gpt-4-1106-preview",
+                max_tokens = 128000,
+              },
+          })
+      end,
+      requires = {
+          "MunifTanjim/nui.nvim",
+          "nvim-lua/plenary.nvim",
+          "nvim-telescope/telescope.nvim"
+      }
+  })
 end)

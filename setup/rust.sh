@@ -9,3 +9,5 @@ cargo install stylua
 cargo install cargo-expand
 
 cargo install cargo-insta
+
+rustup component add clippy

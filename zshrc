@@ -79,6 +79,9 @@ export BAT_PAGER="less -R"
 # Starship
 eval "$(starship init zsh)"
 
+# Open API Key
+export OPENAI_API_KEY=$(security find-generic-password -w -s 'openai' -a 'neovim')
+
 export ANDROID_HOME=$HOME/Library/Android/sdk
 export PATH=$PATH:$ANDROID_HOME/emulator
 export PATH=$PATH:$ANDROID_HOME/platform-tools

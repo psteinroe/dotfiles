@@ -35,10 +35,10 @@ brew "openjdk@11"
 brew "openjdk@8"
 # Bun
 brew "bun"
+# Bun
+brew "gpg"
 
 # ---- Command Line Tools ----
-# Control night shift
-brew "smudge/smudge/nightlight"
 # Syntax-highlighting pager for git and diff output
 brew "git-delta"
 # Dependency manager for Cocoa projects
@@ -59,8 +59,6 @@ brew "ttyd"
 brew "nvm"
 # Clone of cat(1) with syntax highlighting and Git integration
 brew "bat"
-# CLI tool for Cloudflare Workers
-brew "cloudflare-wrangler"
 # Easiest way to build and release mobile app
 brew "fastlane"
 # Good-lookin' diffs with diff-highlight and more
@@ -183,8 +181,6 @@ cask "obsidian"
 cask "zoom"
 # Desktop password and login vault
 cask "bitwarden"
-# Screen and video recording software
-cask "loom"
 # Tools for building Android applications
 cask "android-studio"
 # Set of tools to manage resources and applications hosted on Google Cloud
@@ -201,5 +197,9 @@ cask "pgadmin4"
 cask "steam"
 # Update maps and software, sync with Garmin Connect and register your device
 cask "garmin-express"
+# Native desktop client for WhatsApp
+cask "whatsapp"
+# Launch builds and start simulators from your menu bar
+cask "expo-orbit"
 
 mas "Xcode", id: 497799835
