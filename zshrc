@@ -1,26 +1,56 @@
-# *** *** Configuration *** ***
+source "$(brew --prefix)/share/antigen/antigen.zsh"
+
+# Load the oh-my-zsh library.
+antigen use oh-my-zsh plugins/gh plugins/per-directory-history plugins/git plugins/git-auto-fetch plugins/tmux
+
+# Autocomplete bundle.
+antigen bundle marlonrichert/zsh-autocomplete@main
+
+# Autosuggestions bundle.
+antigen bundle zsh-users/zsh-autosuggestions
+
+# Syntax highlighting bundle.
+antigen bundle zsh-users/zsh-syntax-highlighting
+
+# Vi mode
+antigen bundle jeffreytse/zsh-vi-mode
+
+antigen theme sbugzu/gruvbox-zsh
+
+# Tell Antigen that you're done.
+antigen apply
+
+# Zoxide
+eval "$(zoxide init zsh)"
+
 CASE_SENSITIVE="true"          # Case-sensitive completion
 DISABLE_AUTO_TITLE="true"      # Disable auto-setting terminal title
-COMPLETION_WAITING_DOTS="true" # Red dots while waiting for completion
+
+# Auto-update behavior
+zstyle ':omz:update' mode auto      # update automatically without asking
+
+HIST_STAMPS="yyyy-mm-dd"
 
 # Autosuggest Highlighting
 ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE="fg=7,bg=bold,underline"
 
 export KEYTIMEOUT=1
-export RIPGREP_CONFIG_PATH=$HOME/.ripgreprc
 export GIT_EDITOR=nvim
 export EDITOR=nvim
-
-# Fish shell like syntax highlighting for zsh
-source "$(brew --prefix)/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
-export ZSH_HIGHLIGHT_HIGHLIGHTERS_DIR="$(brew --prefix)/share/zsh-syntax-highlighting/highlighters"
 
 # Base16 Shell
 source ~/.config/base16-shell/base16-shell.plugin.zsh
 
+# Autocomplete
+source ~/.antigen/bundles/marlonrichert/zsh-autocomplete-main/zsh-autocomplete.plugin.zsh
+
+# Start each command line in history search mode
+# zstyle ':autocomplete:*' default-context history-incremental-search-backward
+
 # FD
 FD_OPTIONS="--follow --exclude .git --exclude node_modules"
 
+# FZF
 export FZF_DEFAULT_COMMAND="git ls-files --cached --others --exclude-standard | fd --hidden --type f --type l $FD_OPTIONS"
 export FZF_DEFAULT_OPTS='--no-height'
 
@@ -30,7 +60,8 @@ export FZF_CTRL_T_OPTS="--preview 'bat --color=always --style=numbers {}' --bind
 export FZF_ALT_C_COMMAND="fd --type d $FD_OPTIONS --color=never --hidden"
 export FZF_ALT_C_OPTS="--preview 'tree -C {} | head -50'"
 
-export ZSH_CACHE_DIR=~/.zsh_cache
+# ripgrep
+export RIPGREP_CONFIG_PATH=$HOME/.ripgreprc
 
 # rbenv
 export RBENV_ROOT="$HOME/.rbenv/"
@@ -45,9 +76,6 @@ export PATH="$PNPM_HOME:$PATH"
 
 # neovim managed by bob
 export PATH="$HOME/.local/share/bob/nvim-bin:$PATH"
-
-# Rancher
-export PATH="$HOME/.rd/bin:$PATH"
 
 # Rust
 export PATH="$HOME/.cargo/bin:$PATH"
@@ -64,39 +92,12 @@ export PATH="$HOME/Library/Android/sdk/platform-tools:$PATH"
 # postgres_lsp debug build
 export PATH="$HOME/Developer/postgres_lsp/target/debug:$PATH"
 
-# Pyenv
-export PYENV_ROOT="$HOME/.pyenv"
-export PATH="$PYENV_ROOT/bin:$PATH"
-eval "$(pyenv init --path)"
-eval "$(pyenv virtualenv-init -)"
-
-# Man
-export MANPATH="/usr/local/man:$MANPATH"
-
-# Bat
-export BAT_PAGER="less -R"
-
 # Starship
 eval "$(starship init zsh)"
-
-# Open API Key
-export OPENAI_API_KEY=$(security find-generic-password -w -s 'openai' -a 'neovim')
 
 export ANDROID_HOME=$HOME/Library/Android/sdk
 export PATH=$PATH:$ANDROID_HOME/emulator
 export PATH=$PATH:$ANDROID_HOME/platform-tools
-
-# Java
-export JAVA_11_HOME=$(/usr/libexec/java_home -v11)
-export JAVA_17_HOME=$(/usr/libexec/java_home -v17)
-export JAVA_20_HOME=$(/usr/libexec/java_home -v20)
-
-alias java11='export JAVA_HOME=$JAVA_11_HOME'
-alias java17='export JAVA_HOME=$JAVA_17_HOME'
-alias java20='export JAVA_HOME=$JAVA_20_HOME'
-
-# default java17
-export JAVA_HOME=$JAVA_17_HOME
 
 # FZF
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
@@ -114,52 +115,14 @@ bindkey -v
 bindkey -M viins '^r' fzf-history-widget # (r)everse history search
 bindkey -M viins '^f' fzf-file-widget    # (f)ile / (t)
 bindkey -M viins '^z' fzf-cd-widget      # (z) jump
-
+# bindkey              '^I'         menu-complete
+# bindkey "$terminfo[kcbt]" reverse-menu-complet
 
 # *** *** Functions *** ***
-
-# Get OS X Software Updates, Homebrew, pnpm, and their installed packages
-function update () {
-  brew update && brew outdated && brew upgrade && brew cleanup
-  pnpm -g update --latest
-  nvim -c 'autocmd User PackerComplete quitall' -c 'PackerSync'
-  nvim +Mason +15sleep +qall
-  sudo softwareupdate -i -a
-}
-
-# Open the Pull Request URL for your current directory's branch (base branch defaults to main)
-function openpr() {
-  github_url=`git remote -v | awk '/fetch/{print $2}' | sed -Ee 's#(git@|git://)#https://#' -e 's@com:@com/@' -e 's%\.git$%%' | awk '/github/'`;
-  branch_name=`git symbolic-ref HEAD | cut -d"/" -f 3,4`;
-  pr_url=$github_url"/compare/dev..."$branch_name
-  open $pr_url;
-}
 
 # Update all Wallpapers
 function set_wallpaper() {
     osascript -e "tell application \"System Events\" to tell every desktop to set picture to \"/Users/psteinroe/.dotfiles/media/wallpaper.jpg\" as POSIX file"
-}
-
-# Run git push and then immediately open the Pull Request URL
-function gpr() {
-  git push origin HEAD
-
-  if [ $? -eq 0 ]; then
-    openpr
-  else
-    echo 'failed to push commits and open a pull request.';
-  fi
-}
-
-# Resets git by checking out the main branch and removing all merged branches but prod|staging|dev|main
-function rg() {
-  git checkout "$(git remote show origin | grep 'HEAD branch' | cut -d' ' -f5)"
-  git pull
-  git branch --merged | egrep -v \"(^\\*|prod|staging|dev|main)\" | xargs git branch -d
-}
-
-function hello_world() {
-  echo "hello world"
 }
 
 # Auto change the nvm version based on a .nvmrc file based on the current directory.
@@ -172,19 +135,6 @@ load-nvmrc() {
 }
 add-zsh-hook chpwd load-nvmrc
 load-nvmrc
-
-autoload -Uz compinit && compinit
-
-# *** *** Plugins *** ***
-
-# Load Antidote plugin manager
-source $(brew --prefix)/opt/antidote/share/antidote/antidote.zsh
-
-# initialize plugins statically with ${ZDOTDIR:-~}/.zsh_plugins.txt
-antidote load $HOME/.dotfiles/zsh_plugins.txt
-
-# Additional zsh plugins
-fpath=(~/.zsh.d/ $fpath)
 
 # *** *** Aliases *** ***
 
@@ -209,9 +159,6 @@ fi
 
 # Tmuxinator
 alias mux="tmuxinator"
-
-# Bat
-alias cat="bat"
 
 # Directory shortcuts
 alias dotfiles="cd $HOME/.dotfiles"
@@ -242,19 +189,3 @@ alias gp="git push"
 # pnpm
 alias pn="pnpm"
 alias pnr="pnpm run"
-
-# tabtab source for pnpm package
-# uninstall by removing these lines
-[[ -f ~/.config/tabtab/zsh/__tabtab.zsh ]] && . ~/.config/tabtab/zsh/__tabtab.zsh || true
-
-
-# pnpm
-export PNPM_HOME="/Users/psteinroe/Library/pnpm"
-case ":$PATH:" in
-  *":$PNPM_HOME:"*) ;;
-  *) export PATH="$PNPM_HOME:$PATH" ;;
-esac
-# pnpm end
-
-# bun completions
-[ -s "/opt/homebrew/Cellar/bun/1.0.11/share/zsh/site-functions/_bun" ] && source "/opt/homebrew/Cellar/bun/1.0.11/share/zsh/site-functions/_bun"

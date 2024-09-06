@@ -56,6 +56,12 @@ source ./python.sh
 
 source ~/.zshrc
 
+# Installing elixir packages
+cd "$parent_path"
+source ./elixir.sh
+
+source ~/.zshrc
+
 # Installing Lua packages
 cd "$parent_path"
 source ./lua.sh

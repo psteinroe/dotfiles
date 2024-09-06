@@ -55,8 +55,3 @@ cd ~/.dotfiles/
 Install from Brewfile: `brew bundle`
 
 Cleanup: `brew bundle --force cleanup`
-
-## Acknowledgements
-
-- https://github.com/kogakure/dotfiles
-- https://github.com/NvChad/NvChad

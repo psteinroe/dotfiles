@@ -33,7 +33,8 @@ lsp.ensure_installed {
   "rust_analyzer",
   "jedi_language_server",
   -- "sqlls",
-  "tailwindcss"
+  "tailwindcss",
+  "elixirls"
 }
 
 -- Fix Undefined global 'vim'

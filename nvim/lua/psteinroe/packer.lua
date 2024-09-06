@@ -9,7 +9,6 @@ return require("packer").startup(function(use)
 
   use {
     "nvim-telescope/telescope.nvim",
-    tag = "0.1.0",
     requires = { { "nvim-lua/plenary.nvim" } },
   }
   use { "nvim-telescope/telescope-file-browser.nvim" }
@@ -19,6 +18,8 @@ return require("packer").startup(function(use)
   use "vim-airline/vim-airline"
 
   use "lukas-reineke/indent-blankline.nvim"
+
+  -- use "mrcjkb/rustaceanvim"
 
   use {
     "nvim-treesitter/nvim-treesitter",

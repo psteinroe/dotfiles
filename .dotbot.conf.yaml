@@ -5,12 +5,13 @@
 - clean: ["~"]
 
 - link:
-    ~/.ack: ack
     ~/.wakatime.cfg: .wakatime.cfg
-    ~/.ag: ag
     ~/.config/kitty:
       create: true
       path: kitty
+    ~/.config/ghostty:
+      create: true
+      path: ghostty
     ~/.config/base16-shell:
       create: true
       path: .base16-shell
@@ -20,14 +21,12 @@
     ~/.config/starship.toml:
       create: true
       path: starship.toml
+    ~/.ripgreprc: ripgrep
     ~/.config/tmuxinator:
       create: true
       path: tmuxinator
     ~/.gitconfig: gitconfig
-    ~/.ripgreprc: ripgrep
     ~/.tmux.conf: tmux.conf
-    ~/.pg_format: pg_format
-    ~/.wget: wget
     ~/.zshrc: zshrc
     ~/Library/Application Support/lazygit/config.yml:
       create: true
