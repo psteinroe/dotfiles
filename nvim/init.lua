@@ -1,1 +1,1 @@
-require("psteinroe")
+require "config.lazy"

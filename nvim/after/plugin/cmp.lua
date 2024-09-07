@@ -1,3 +1,0 @@
--- require("cmp").config.formatting = {
---   format = require("cmp-tailwind-colors").formatter
--- }

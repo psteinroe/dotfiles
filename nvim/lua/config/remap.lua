@@ -1,6 +1,3 @@
-vim.g.mapleader = " "
-vim.keymap.set("n", "<leader>pv", vim.cmd.Ex)
-
 -- move highlighted
 vim.keymap.set("v", "J", ":m '>+1<CR>gv=gv")
 vim.keymap.set("v", "K", ":m '<-2<CR>gv=gv")
@@ -31,8 +28,6 @@ vim.keymap.set("i", "<C-c>", "<Esc>")
 vim.keymap.set("n", "Q", "<nop>")
 -- ctrl f to switch projects, ctrl a + L to go back
 vim.keymap.set("n", "<C-f>", "<cmd>silent !tmux neww tmux-sessionizer<CR>")
--- format
-vim.keymap.set("n", "<leader>f", vim.lsp.buf.format)
 
 -- quick fix navigation
 vim.keymap.set("n", "<C-k>", "<cmd>cnext<CR>zz")
@@ -58,12 +53,10 @@ vim.keymap.set("o", "iW", "iw", {remap= false})
 -- replace current selection in file
 vim.keymap.set("v", "<C-r>", "\"hy:%s/<C-r>h//gc<left><left><left>", {remap= false})
 
--- open copilot
-vim.keymap.set("n", "<leader>cp", "<cmd>Copilot<cr>")
-
 -- copy everything between { and } including the brackets
 vim.keymap.set("n", "YY", "va{Vy")
 
 -- remap for merging conflicts
 vim.keymap.set("n", "gu", "<cmd>diffget //2<cr>")
 vim.keymap.set("n", "gh", "<cmd>diffget //3<cr>")
+
