@@ -2,6 +2,7 @@
   useConfigOnly = true
   email = philipp@steinroetter.com
   name = psteinroe
+  signingkey = C3F5A010
 [include]
   path = ~/.gitconfig.local
 [help]
@@ -38,6 +39,8 @@
   autoSetupRemote = true
 [status]
   showUntrackedFiles = all
+[commit]
+  gpgsign = true
 [transfer]
   fsckobjects = true
 [i18n]
