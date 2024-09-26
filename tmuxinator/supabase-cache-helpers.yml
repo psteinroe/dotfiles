@@ -1,8 +1,0 @@
-name: supabase-cache-helpers
-root: ~/Developer/supabase-cache-helpers
-windows:
-  - editor: 
-      layout: main-vertical
-      panes: 
-        - nvim
-        - clear

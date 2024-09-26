@@ -17,7 +17,7 @@ return {
       auto_set_highlight_group = false,
       auto_set_keymaps = true,
       auto_apply_diff_after_generation = false,
-      support_paste_from_clipboard = false,
+      support_paste_from_clipboard = true,
     },
   },
   -- if you want to build from source then do `make BUILD_FROM_SOURCE=true`

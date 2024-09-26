@@ -1,8 +1,0 @@
-name: hellomateo
-root: ~/Developer/hellomateo
-windows:
-  - editor: 
-      layout: main-vertical
-      panes: 
-        - nvim
-        - clear

@@ -1,6 +1,14 @@
 return {
   "nvim-telescope/telescope.nvim",
-  dependencies = { "nvim-lua/plenary.nvim", "nvim-telescope/telescope-file-browser.nvim" },
+  lazy = false,
+  dependencies = {
+    "nvim-lua/plenary.nvim",
+    "nvim-telescope/telescope-file-browser.nvim",
+    {
+      "nvim-telescope/telescope-fzf-native.nvim",
+      build = "cmake -S. -Bbuild -DCMAKE_BUILD_TYPE=Release && cmake --build build --config Release",
+    },
+  },
   config = function()
     local builtin = require "telescope.builtin"
 
@@ -11,6 +19,9 @@ return {
     end)
     vim.keymap.set("n", "<C-s>", builtin.live_grep, {})
     vim.keymap.set("n", "<C-t>", "<cmd>Telescope resume<cr>", {})
+
+    -- git
+    vim.keymap.set("n", "<leader>gb", builtin.git_branches, {})
 
     -- stolen from https://github.com/nvim-telescope/telescope.nvim/issues/2201
     -- select directory

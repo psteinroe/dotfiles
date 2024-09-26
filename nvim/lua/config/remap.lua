@@ -15,11 +15,11 @@ vim.keymap.set("n", "N", "Nzzzv")
 vim.keymap.set("x", "<leader>p", [["_dP]])
 
 -- leader y to yank into system clipboard
-vim.keymap.set({"n", "v"}, "<leader>y", [["+y]])
+vim.keymap.set({ "n", "v" }, "<leader>y", [["+y]])
 vim.keymap.set("n", "<leader>Y", [["+Y]])
 
 -- deleting to void register
-vim.keymap.set({"n", "v"}, "<leader>d", [["_d]])
+vim.keymap.set({ "n", "v" }, "<leader>d", [["_d]])
 
 -- better escaping
 vim.keymap.set("i", "<C-c>", "<Esc>")
@@ -27,13 +27,13 @@ vim.keymap.set("i", "<C-c>", "<Esc>")
 -- never press capital q
 vim.keymap.set("n", "Q", "<nop>")
 -- ctrl f to switch projects, ctrl a + L to go back
-vim.keymap.set("n", "<C-f>", "<cmd>silent !tmux neww tmux-sessionizer<CR>")
+vim.keymap.set("n", "<C-f>", "<cmd>silent !tmux new tmux-sessionizer<CR>")
 
 -- quick fix navigation
-vim.keymap.set("n", "<C-k>", "<cmd>cnext<CR>zz")
-vim.keymap.set("n", "<C-j>", "<cmd>cprev<CR>zz")
-vim.keymap.set("n", "<leader>k", "<cmd>lnext<CR>zz")
-vim.keymap.set("n", "<leader>j", "<cmd>lprev<CR>zz")
+-- vim.keymap.set("n", "<C-k>", "<cmd>cnext<CR>zz")
+-- vim.keymap.set("n", "<C-j>", "<cmd>cprev<CR>zz")
+-- vim.keymap.set("n", "<leader>k", "<cmd>lnext<CR>zz")
+-- vim.keymap.set("n", "<leader>j", "<cmd>lprev<CR>zz")
 
 -- leader s to replace the work that I was on
 vim.keymap.set("n", "<leader>s", [[:%s/\<<C-r><C-w>\>/<C-r><C-w>/gI<Left><Left><Left>]])
@@ -43,15 +43,15 @@ vim.keymap.set("n", "//", 'y/<C-R>"<CR>')
 
 -- overwrite WORD definition to word
 -- ref: https://github.com/chaoren/vim-wordmotion/issues/71#event-8216691978
-vim.keymap.set("n", "W", "w", {remap= false})
-vim.keymap.set("n", "B", "b", {remap= false})
-vim.keymap.set("x", "aW", "aw", {remap= false})
-vim.keymap.set("o", "aW", "aw", {remap= false})
-vim.keymap.set("x", "iW", "iw", {remap= false})
-vim.keymap.set("o", "iW", "iw", {remap= false})
+vim.keymap.set("n", "W", "w", { remap = false })
+vim.keymap.set("n", "B", "b", { remap = false })
+vim.keymap.set("x", "aW", "aw", { remap = false })
+vim.keymap.set("o", "aW", "aw", { remap = false })
+vim.keymap.set("x", "iW", "iw", { remap = false })
+vim.keymap.set("o", "iW", "iw", { remap = false })
 
 -- replace current selection in file
-vim.keymap.set("v", "<C-r>", "\"hy:%s/<C-r>h//gc<left><left><left>", {remap= false})
+vim.keymap.set("v", "<C-r>", '"hy:%s/<C-r>h//gc<left><left><left>', { remap = false })
 
 -- copy everything between { and } including the brackets
 vim.keymap.set("n", "YY", "va{Vy")
@@ -60,3 +60,9 @@ vim.keymap.set("n", "YY", "va{Vy")
 vim.keymap.set("n", "gu", "<cmd>diffget //2<cr>")
 vim.keymap.set("n", "gh", "<cmd>diffget //3<cr>")
 
+-- navigate between panes
+-- replaces with tmux-navigator
+-- vim.keymap.set("n", "<c-k>", ":wincmd k<CR>")
+-- vim.keymap.set("n", "<c-j>", ":wincmd j<CR>")
+-- vim.keymap.set("n", "<c-h>", ":wincmd h<CR>")
+-- vim.keymap.set("n", "<c-l>", ":wincmd l<CR>")

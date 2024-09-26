@@ -27,6 +27,8 @@ brew "bun"
 brew "elixir"
 
 # ---- Command Line Tools ----
+# Official Amazon AWS command-line interface
+brew "awscli"
 # Dependency manager for Cocoa projects
 brew "cocoapods"
 # Bourne-Again SHell, a UNIX command interpreter

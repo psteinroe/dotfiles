@@ -47,6 +47,9 @@ source ~/.antigen/bundles/marlonrichert/zsh-autocomplete-main/zsh-autocomplete.p
 # Start each command line in history search mode
 # zstyle ':autocomplete:*' default-context history-incremental-search-backward
 
+# tumxifier
+export PATH="$HOME/.tmuxifier/bin:$PATH"
+
 # FD
 FD_OPTIONS="--follow --exclude .git --exclude node_modules"
 
@@ -173,9 +176,6 @@ if type nvim > /dev/null 2>&1; then
   alias vim='nvim'
 fi
 
-# Tmuxinator
-alias mux="tmuxinator"
-
 # Directory shortcuts
 alias dotfiles="cd $HOME/.dotfiles"
 alias hellomateo="cd $HOME/Developer/hellomateo"
@@ -205,3 +205,4 @@ alias gp="git push"
 # pnpm
 alias pn="pnpm"
 alias pnr="pnpm run"
+export PATH="/opt/homebrew/opt/libpq/bin:$PATH"
