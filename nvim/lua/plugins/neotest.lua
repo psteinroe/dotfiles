@@ -27,6 +27,7 @@ return {
           filter_dir = function(name, rel_path, root)
             return name ~= "node_modules"
           end,
+          vitestCommand = "pnpm vitest",
         },
         require "neotest-elixir",
         require "rustaceanvim.neotest",
