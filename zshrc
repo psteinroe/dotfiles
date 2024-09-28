@@ -48,7 +48,8 @@ source ~/.antigen/bundles/marlonrichert/zsh-autocomplete-main/zsh-autocomplete.p
 # zstyle ':autocomplete:*' default-context history-incremental-search-backward
 
 # tumxifier
-export PATH="$HOME/.tmuxifier/bin:$PATH"
+export PATH="$HOME/.tmux/plugins/tmuxifier/bin:$PATH"
+export TMUXIFIER_LAYOUT_PATH="$HOME/.dotfiles/tmux-layouts"
 
 # FD
 FD_OPTIONS="--follow --exclude .git --exclude node_modules"

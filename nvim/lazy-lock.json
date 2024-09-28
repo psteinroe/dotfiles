@@ -41,6 +41,7 @@
   "scalpel.nvim": { "branch": "main", "commit": "a4f155a19b01c7ce46092a66ee5543d3ef930848" },
   "telescope-file-browser.nvim": { "branch": "master", "commit": "c5a14e0550699a7db575805cdb9ddc969ba0f1f5" },
   "telescope-fzf-native.nvim": { "branch": "main", "commit": "cf48d4dfce44e0b9a2e19a008d6ec6ea6f01a83b" },
+  "telescope-live-grep-args.nvim": { "branch": "master", "commit": "649b662a8f476fd2c0289570764459e95ebaa3f3" },
   "telescope-undo.nvim": { "branch": "main", "commit": "51be9ae7c42fc27c0b05505e3a0162e0f05fbb6a" },
   "telescope.nvim": { "branch": "master", "commit": "5972437de807c3bc101565175da66a1aa4f8707a" },
   "trouble.nvim": { "branch": "main", "commit": "6efc446226679fda0547c0fd6a7892fd5f5b15d8" },

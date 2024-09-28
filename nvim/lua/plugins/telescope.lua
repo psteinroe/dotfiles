@@ -1,28 +1,81 @@
 return {
   "nvim-telescope/telescope.nvim",
-  lazy = false,
   dependencies = {
     "nvim-lua/plenary.nvim",
     "nvim-telescope/telescope-file-browser.nvim",
     {
       "nvim-telescope/telescope-fzf-native.nvim",
-      build = "cmake -S. -Bbuild -DCMAKE_BUILD_TYPE=Release && cmake --build build --config Release",
+      build = "make",
     },
   },
+  keys = {
+    {
+      "<leader>pf",
+      function()
+        require("telescope.builtin").find_files {
+          hidden = true,
+          find_command = {
+            "rg",
+            "--files",
+            "--hidden",
+            "--glob=!.git/**",
+            "--glob=!node_modules/**",
+            "--glob=!tmp/**",
+          },
+        }
+      end,
+      { noremap = true, silent = true },
+    },
+    {
+      "<C-p>",
+      function()
+        require("telescope.builtin").git_files()
+      end,
+      { noremap = true, silent = true },
+    },
+    {
+      "<leader>ps",
+      function()
+        require("telescope.builtin").grep_string { search = vim.fn.input "Grep > " }
+      end,
+      { noremap = true, silent = true },
+    },
+    {
+      "<C-s>",
+      function()
+        require("telescope.builtin").live_grep()
+      end,
+      { noremap = true, silent = true },
+    },
+    {
+      "<leader>fm",
+      function()
+        require("telescope.builtin").live_grep {
+          search_dirs = {
+            "supabase/migrations",
+          },
+          additional_args = {
+            "--sortr=path",
+          },
+        }
+      end,
+      { noremap = true, silent = true },
+    },
+    {
+      "<C-t>",
+      "<cmd>Telescope resume<cr>",
+      { noremap = true, silent = true },
+    },
+    {
+      "<leader>gb",
+      function()
+        require("telescope.builtin").git_branches()
+      end,
+      { noremap = true, silent = true },
+    },
+  },
+  cmd = { "Telescope" },
   config = function()
-    local builtin = require "telescope.builtin"
-
-    vim.keymap.set("n", "<leader>pf", builtin.find_files, {})
-    vim.keymap.set("n", "<C-p>", builtin.git_files, {})
-    vim.keymap.set("n", "<leader>ps", function()
-      builtin.grep_string { search = vim.fn.input "Grep > " }
-    end)
-    vim.keymap.set("n", "<C-s>", builtin.live_grep, {})
-    vim.keymap.set("n", "<C-t>", "<cmd>Telescope resume<cr>", {})
-
-    -- git
-    vim.keymap.set("n", "<leader>gb", builtin.git_branches, {})
-
     -- stolen from https://github.com/nvim-telescope/telescope.nvim/issues/2201
     -- select directory
     local ts_select_dir_for_grep = function(prompt_bufnr)
@@ -69,5 +122,7 @@ return {
         },
       },
     }
+
+    require("telescope").load_extension "fzf"
   end,
 }
