@@ -18,7 +18,7 @@ return {
               vim.lsp.buf.format {
                 filter = function(client)
                   -- only use null-ls for formatting instead of lsp server for non-Rust files
-                  return client.name == "null-ls" or client.name == "rust-analyzer"
+                  return client.name == "null-ls"
                 end,
                 bufnr = bufnr,
               }

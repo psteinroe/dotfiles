@@ -21,6 +21,8 @@ return {
     lazy = false,
     config = function()
       local lspconfig = require "lspconfig"
+      local configs = require "lspconfig.configs"
+      local util = require "lspconfig.util"
       local capabilities = require("cmp_nvim_lsp").default_capabilities()
 
       lspconfig.lua_ls.setup {
@@ -39,6 +41,18 @@ return {
       lspconfig.tailwindcss.setup {
         capabilities = capabilities,
       }
+
+      configs.postgres_lsp = {
+        default_config = {
+          name = "postgres_lsp",
+          cmd = { "pg_cli", "lsp-proxy" },
+          root_dir = util.root_pattern "pglsp.toml",
+          filetypes = { "sql" },
+        },
+      }
+
+      lspconfig.postgres_lsp.setup {}
+
       -- rust_analyzer is being handled by rustacean
 
       vim.keymap.set("n", "K", vim.lsp.buf.hover, {})

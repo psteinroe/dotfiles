@@ -1,5 +1,4 @@
 tap "homebrew/bundle"
-tap "homebrew/cask"
 tap "ms-jpq/sad"
 tap "homebrew/cask-fonts"
 tap "homebrew/cask-drivers"
@@ -25,8 +24,12 @@ brew "golang"
 brew "bun"
 # Elixir
 brew "elixir"
+# graphite.dev
+brew "withgraphite/tap/graphite"
 
 # ---- Command Line Tools ----
+# infiscal CLI
+brew "infisical/get-cli/infisical"
 # Official Amazon AWS command-line interface
 brew "awscli"
 # Dependency manager for Cocoa projects

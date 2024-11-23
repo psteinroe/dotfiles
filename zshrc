@@ -1,10 +1,10 @@
 source "$(brew --prefix)/share/antigen/antigen.zsh"
 
 # Load the oh-my-zsh library.
-antigen use oh-my-zsh plugins/gh plugins/per-directory-history plugins/git plugins/git-auto-fetch plugins/tmux
+antigen use oh-my-zsh plugins/gh plugins/per-directory-history plugins/git-auto-fetch plugins/tmux
 
 # Autocomplete bundle.
-antigen bundle marlonrichert/zsh-autocomplete@main
+# antigen bundle marlonrichert/zsh-autocomplete@main
 
 # Autosuggestions bundle.
 antigen bundle zsh-users/zsh-autosuggestions
@@ -42,7 +42,7 @@ export EDITOR=nvim
 source ~/.config/base16-shell/base16-shell.plugin.zsh
 
 # Autocomplete
-source ~/.antigen/bundles/marlonrichert/zsh-autocomplete-main/zsh-autocomplete.plugin.zsh
+# source ~/.antigen/bundles/marlonrichert/zsh-autocomplete-main/zsh-autocomplete.plugin.zsh
 
 # Start each command line in history search mode
 # zstyle ':autocomplete:*' default-context history-incremental-search-backward
