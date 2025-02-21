@@ -38,6 +38,9 @@ return {
       lspconfig.ts_ls.setup {
         capabilities = capabilities,
       }
+      lspconfig.eslint.setup {
+        capabilities = capabilities,
+      }
       lspconfig.tailwindcss.setup {
         capabilities = capabilities,
       }
@@ -45,13 +48,15 @@ return {
       configs.postgres_lsp = {
         default_config = {
           name = "postgres_lsp",
-          cmd = { "pg_cli", "lsp-proxy" },
-          root_dir = util.root_pattern "pglsp.toml",
+          cmd = { "pglt", "lsp-proxy" },
+          root_dir = util.root_pattern "pglt.toml",
           filetypes = { "sql" },
         },
       }
 
       lspconfig.postgres_lsp.setup {}
+
+      -- vim.lsp.set_log_level "debug"
 
       -- rust_analyzer is being handled by rustacean
 

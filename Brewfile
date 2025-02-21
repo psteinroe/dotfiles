@@ -28,6 +28,10 @@ brew "elixir"
 brew "withgraphite/tap/graphite"
 
 # ---- Command Line Tools ----
+# Hugo
+brew "hugo"
+# Handy way to save and run project-specific commands
+brew "just"
 # infiscal CLI
 brew "infisical/get-cli/infisical"
 # Official Amazon AWS command-line interface
@@ -142,6 +146,8 @@ cask "expo-orbit"
 cask "hoppscotch"
 # Adaptive brightness for displays
 cask "vivid"
+# Write, edit, and chat about your code with AI
+cask "cursor"
 
 mas "Xcode", id: 497799835
 mas "WhatsApp Messenger", id: 310633997

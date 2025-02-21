@@ -25,6 +25,12 @@
   syntax-theme = Dracula
 [alias]
   undo = reset --soft HEAD^
+	next = stack next
+	prev = stack previous
+	reword = stack reword
+	amend = stack amend
+	sync = stack sync
+	run = stack run
 [apply]
   whitespace = fix
 [color]

@@ -10,6 +10,13 @@ return {
     "hrsh7th/cmp-nvim-lsp",
   },
   {
+    "petertriho/cmp-git",
+    dependencies = { "hrsh7th/nvim-cmp" },
+    init = function()
+      table.insert(require("cmp").get_config().sources, { name = "git" })
+    end,
+  },
+  {
     "hrsh7th/nvim-cmp",
     dependencies = {
       "hrsh7th/cmp-buffer",

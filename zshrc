@@ -145,6 +145,15 @@ function set_wallpaper() {
     osascript -e "tell application \"System Events\" to tell every desktop to set picture to \"/Users/psteinroe/.dotfiles/media/wallpaper.jpg\" as POSIX file"
 }
 
+# Open latest logfile for the lsp
+function open_lsp_log() {
+  latest_file=$(ls -t /Users/psteinroe/Library/Caches/dev.supabase-community.pglt/pglt-logs | head -n 1)
+  if [ -n "$latest_file" ]; then
+    tail -f "/Users/psteinroe/Library/Caches/dev.supabase-community.pglt/pglt-logs/$latest_file"
+  else
+    echo 'No log files found'
+  fi
+}
 # Auto change the nvm version based on a .nvmrc file based on the current directory.
 # See https://github.com/creationix/nvm/issues/110#issuecomment-190125863
 autoload -U add-zsh-hook
