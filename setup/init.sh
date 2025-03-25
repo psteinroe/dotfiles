@@ -96,3 +96,5 @@ source ~/.zshrc
 cd "$parent_path"
 source ./dock.sh
 
+# Install nix
+curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install --determinate

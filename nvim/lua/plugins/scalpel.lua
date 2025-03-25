@@ -1,15 +1,15 @@
 return {
-  'wassimk/scalpel.nvim',
+  "wassimk/scalpel.nvim",
   version = "*",
   config = true,
   keys = {
     {
-      '<leader>e',
+      "<leader>e",
       function()
-        require('scalpel').substitute()
+        require("scalpel").substitute()
       end,
-      mode = { 'n', 'x' },
-      desc = 'substitute word(s)',
+      mode = { "n", "x" },
+      desc = "substitute word(s)",
     },
   },
 }

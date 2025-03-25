@@ -18,6 +18,10 @@ brew "lua-language-server"
 brew "ruby"
 # Perl is a highly capable, feature-rich programming language with over 30 years of development.
 brew "perl"
+# Python
+brew "mkdocs"
+# uv
+brew "uv"
 # Golang
 brew "golang"
 # Bun
@@ -26,6 +30,8 @@ brew "bun"
 brew "elixir"
 # graphite.dev
 brew "withgraphite/tap/graphite"
+# Bat
+brew "bat"
 
 # ---- Command Line Tools ----
 # Hugo

@@ -48,8 +48,8 @@ return {
       configs.postgres_lsp = {
         default_config = {
           name = "postgres_lsp",
-          cmd = { "pglt", "lsp-proxy" },
-          root_dir = util.root_pattern "pglt.toml",
+          cmd = { "postgrestools", "lsp-proxy" },
+          root_dir = util.root_pattern "postgrestools.jsonc",
           filetypes = { "sql" },
         },
       }

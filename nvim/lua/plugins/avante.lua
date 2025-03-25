@@ -5,15 +5,17 @@ return {
   version = false, -- set this if you want to always pull the latest change
   opts = {
     provider = "claude",
+    cursor_applying_provider = "claude",
     claude = {
       endpoint = "https://api.anthropic.com",
-      model = "claude-3-5-sonnet-20240620",
+      model = "claude-3-7-sonnet-latest",
       temperature = 0,
       max_tokens = 4096,
     },
     hints = { enabled = false },
     behaviour = {
       auto_suggestions = false, -- Experimental stage
+      enable_cursor_planning_mode = true,
       auto_set_highlight_group = false,
       auto_set_keymaps = true,
       auto_apply_diff_after_generation = false,
