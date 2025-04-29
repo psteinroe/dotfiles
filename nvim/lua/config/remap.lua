@@ -22,6 +22,7 @@ vim.keymap.set("n", "<leader>Y", [["+Y]])
 vim.keymap.set({ "n", "v" }, "<leader>d", [["_d]])
 
 -- better escaping
+-- used by toggleterm now
 vim.keymap.set("i", "<C-c>", "<Esc>")
 
 -- never press capital q
@@ -66,3 +67,25 @@ vim.keymap.set("n", "gh", "<cmd>diffget //3<cr>")
 -- vim.keymap.set("n", "<c-j>", ":wincmd j<CR>")
 -- vim.keymap.set("n", "<c-h>", ":wincmd h<CR>")
 -- vim.keymap.set("n", "<c-l>", ":wincmd l<CR>")
+
+local function open_latest_migration()
+  local path = "supabase/migrations/"
+  local cmd = 'ls -1v "' .. path .. '" | grep ".sql$" | tail -n 1'
+
+  local handle = io.popen(cmd)
+  if handle == nil then
+    print "Could not list migration files."
+    return
+  end
+
+  local latest = handle:read "*l"
+  handle:close()
+
+  if latest and #latest > 0 then
+    vim.cmd("edit " .. path .. latest)
+  else
+    print "No .sql migration files found."
+  end
+end
+
+vim.keymap.set("n", "<leader>lm", open_latest_migration, { desc = "Open latest migration" })

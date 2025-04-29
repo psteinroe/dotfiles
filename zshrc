@@ -145,6 +145,27 @@ function set_wallpaper() {
     osascript -e "tell application \"System Events\" to tell every desktop to set picture to \"/Users/psteinroe/.dotfiles/media/wallpaper.jpg\" as POSIX file"
 }
 
+# ffmpeg -i in.mov -pix_fmt rgb8 -r 10 output.gif && gifsicle -O3 output.gif -o output.gif
+
+# Convert video to optimized GIF
+function video_to_gif() {
+  if [ -z "$1" ]; then
+    echo "Usage: video_to_gif input_file.mov [output_file.gif] [framerate]"
+    echo "  Default output file will be input_file.gif"
+    echo "  Default framerate is 10"
+    return 1
+  fi
+
+  local input_file="$1"
+  local output_file="${2:-${input_file%.*}.gif}"
+  local framerate="${3:-10}"
+
+  echo "Converting $input_file to $output_file with framerate $framerate..."
+  ffmpeg -i "$input_file" -pix_fmt rgb8 -r "$framerate" "$output_file" && \
+  gifsicle -O3 "$output_file" -o "$output_file" && \
+  echo "Conversion complete: $output_file"
+}
+
 # Open latest logfile for the lsp
 function open_lsp_log() {
   latest_file=$(ls -t /Users/psteinroe/Library/Caches/dev.supabase-community.pglt/pglt-logs | head -n 1)
@@ -192,6 +213,9 @@ alias hellomateo="cd $HOME/Developer/hellomateo"
 alias sbch="cd $HOME/Developer/supabase-cache-helpers"
 alias pg_lsp="cd $HOME/Developer/postgres_lsp"
 
+# Just
+alias j='just'
+
 # Get week number
 alias week='date +%V'
 
@@ -202,7 +226,7 @@ alias timer='echo "Timer started. Stop with Ctrl-D." && date && time cat && date
 alias cleanup="find . -type f -name '*.DS_Store' -ls -delete"
 
 # Empty the Trash on all mounted volumes and the main HDD
-# Also, clear Apple’s System Logs to improve shell startup speed
+# Also, clear Apple's System Logs to improve shell startup speed
 alias emptytrash="sudo rm -rfv /Volumes/*/.Trashes; sudo rm -rfv ~/.Trash; sudo rm -rfv /private/var/log/asl/*.asl"
 
 # Supabase CLI

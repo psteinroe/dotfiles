@@ -4,6 +4,7 @@ tap "homebrew/cask-fonts"
 tap "homebrew/cask-drivers"
 tap "charmbracelet/tap"
 tap "oven-sh/bun"
+tap "opencode-ai/tap"
 
 # ---- Programming Languages and their Package Managers ----
 # Fast, disk space efficient package manager
@@ -32,6 +33,8 @@ brew "elixir"
 brew "withgraphite/tap/graphite"
 # Bat
 brew "bat"
+# Open Code AI
+brew "opencode"
 
 # ---- Command Line Tools ----
 # Hugo
@@ -148,12 +151,14 @@ cask "steam"
 cask "garmin-express"
 # Launch builds and start simulators from your menu bar
 cask "expo-orbit"
-# Open source API development ecosystem
-cask "hoppscotch"
 # Adaptive brightness for displays
 cask "vivid"
 # Write, edit, and chat about your code with AI
 cask "cursor"
+# Open source IDE for exploring and testing APIs
+cask "bruno"
+# Automatic time and productivity tracking app
+cask "timing"
 
 mas "Xcode", id: 497799835
 mas "WhatsApp Messenger", id: 310633997

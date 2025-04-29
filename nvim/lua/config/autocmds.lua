@@ -4,46 +4,46 @@ end
 
 -- Check if we need to reload the file when it changed
 vim.api.nvim_create_autocmd({ "FocusGained", "TermClose", "TermLeave" }, {
-  group = augroup("checktime"),
+  group = augroup "checktime",
   callback = function()
     if vim.o.buftype ~= "nofile" then
-      vim.cmd("checktime")
+      vim.cmd "checktime"
     end
   end,
 })
 
 -- highlight on yank
-vim.api.nvim_create_autocmd('TextYankPost', {
-    group = augroup('highlight_yank'),
-    pattern = '*',
-    callback = function()
-        vim.highlight.on_yank({
-            higroup = 'IncSearch',
-            timeout = 40,
-        })
-    end,
+vim.api.nvim_create_autocmd("TextYankPost", {
+  group = augroup "highlight_yank",
+  pattern = "*",
+  callback = function()
+    vim.highlight.on_yank {
+      higroup = "IncSearch",
+      timeout = 40,
+    }
+  end,
 })
 
 -- remove trailing whitespace from files on save
-vim.api.nvim_create_autocmd({"BufWritePre"}, {
-    group = augroup('remove_trailing_whitespace'),
-    pattern = "*",
-    command = [[%s/\s\+$//e]],
+vim.api.nvim_create_autocmd({ "BufWritePre" }, {
+  group = augroup "remove_trailing_whitespace",
+  pattern = "*",
+  command = [[%s/\s\+$//e]],
 })
 
 -- resize splits if window got resized
 vim.api.nvim_create_autocmd({ "VimResized" }, {
-  group = augroup("resize_splits"),
+  group = augroup "resize_splits",
   callback = function()
     local current_tab = vim.fn.tabpagenr()
-    vim.cmd("tabdo wincmd =")
+    vim.cmd "tabdo wincmd ="
     vim.cmd("tabnext " .. current_tab)
   end,
 })
 
 -- go to last loc when opening a buffer
 vim.api.nvim_create_autocmd("BufReadPost", {
-  group = augroup("last_loc"),
+  group = augroup "last_loc",
   callback = function(event)
     local exclude = { "gitcommit" }
     local buf = event.buf
@@ -61,7 +61,7 @@ vim.api.nvim_create_autocmd("BufReadPost", {
 
 -- wrap and check for spell in text filetypes
 vim.api.nvim_create_autocmd("FileType", {
-  group = augroup("wrap_spell"),
+  group = augroup "wrap_spell",
   pattern = { "text", "plaintex", "typst", "gitcommit", "markdown" },
   callback = function()
     vim.opt_local.wrap = true
@@ -69,4 +69,15 @@ vim.api.nvim_create_autocmd("FileType", {
   end,
 })
 
+vim.o.title = true
 
+local function update_title()
+  -- Get the current working directory and extract the last path component
+  local cwd = vim.fn.getcwd()
+  local project_name = vim.fn.fnamemodify(cwd, ":t")
+  vim.o.titlestring = project_name
+end
+
+vim.api.nvim_create_autocmd({ "VimEnter", "DirChanged" }, {
+  callback = update_title,
+})
