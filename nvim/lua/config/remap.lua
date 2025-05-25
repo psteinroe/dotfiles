@@ -89,3 +89,18 @@ local function open_latest_migration()
 end
 
 vim.keymap.set("n", "<leader>lm", open_latest_migration, { desc = "Open latest migration" })
+
+local function get_repo_name()
+  local repo = vim.fn.systemlist("git config --get remote.origin.url")[1]
+  if repo then
+    repo = repo:match "([^:/]+/[^.]+)%.git$"
+  end
+  return repo or ""
+end
+
+vim.api.nvim_set_keymap(
+  "n",
+  "<leader>op",
+  ":Octo search sort:updated-desc author:@me is:open is:pr repo:" .. get_repo_name() .. "<CR>",
+  { noremap = true, silent = true }
+)

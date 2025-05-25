@@ -96,6 +96,9 @@ export PATH="$HOME/Library/Android/sdk/platform-tools:$PATH"
 # postgres_lsp debug build
 export PATH="$HOME/Developer/postgres_lsp/target/debug:$PATH"
 
+# Postgres Language Server Log Path
+export PGT_LOG_PATH="$HOME/Library/Caches/dev.supabase-community.pgt/pgt-logs"
+
 # Starship
 eval "$(starship init zsh)"
 
@@ -166,15 +169,38 @@ function video_to_gif() {
   echo "Conversion complete: $output_file"
 }
 
-# Open latest logfile for the lsp
-function open_lsp_log() {
-  latest_file=$(ls -t /Users/psteinroe/Library/Caches/dev.supabase-community.pglt/pglt-logs | head -n 1)
-  if [ -n "$latest_file" ]; then
-    tail -f "/Users/psteinroe/Library/Caches/dev.supabase-community.pglt/pglt-logs/$latest_file"
-  else
-    echo 'No log files found'
-  fi
+tm() {
+    if command -v fzf >/dev/null 2>&1; then
+        # Get all tmuxifier sessions with status
+        local sessions_with_status
+        sessions_with_status=$(tmuxifier list | while read session; do
+            if tmux has-session -t "$session" 2>/dev/null; then
+                echo "$session (active)"
+            else
+                echo "$session"
+            fi
+        done)
+
+        local selection
+        selection=$(echo "$sessions_with_status" | fzf --height 40% --reverse) &&
+
+        # Extract session name (remove status if present)
+        local session_name
+        session_name=$(echo "$selection" | sed 's/ (active)$//')
+
+        tmuxifier load-session "$session_name"
+    else
+        echo "Available tmuxifier sessions:"
+        tmuxifier list | while read session; do
+            if tmux has-session -t "$session" 2>/dev/null; then
+                echo "  $session (active)"
+            else
+                echo "  $session"
+            fi
+        done
+    fi
 }
+
 # Auto change the nvm version based on a .nvmrc file based on the current directory.
 # See https://github.com/creationix/nvm/issues/110#issuecomment-190125863
 autoload -U add-zsh-hook
