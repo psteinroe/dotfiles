@@ -171,27 +171,30 @@ function video_to_gif() {
 
 tm() {
     if command -v fzf >/dev/null 2>&1; then
-        # Get all tmuxifier sessions with status
-        local sessions_with_status
-        sessions_with_status=$(tmuxifier list | while read session; do
+        local selection
+        selection=$(tmuxifier list | grep "^ - " | sed 's/^ - //' | while read -r session; do
             if tmux has-session -t "$session" 2>/dev/null; then
                 echo "$session (active)"
             else
                 echo "$session"
             fi
-        done)
+        done | fzf --height 40% --reverse)
 
-        local selection
-        selection=$(echo "$sessions_with_status" | fzf --height 40% --reverse) &&
+        if [[ -n "$selection" ]]; then
+            # Extract session name (remove status if present)
+            local session_name
+            session_name=$(echo "$selection" | sed 's/ (active)$//')
 
-        # Extract session name (remove status if present)
-        local session_name
-        session_name=$(echo "$selection" | sed 's/ (active)$//')
+            # Set Ghostty tab title explicitly (requires Ghostty CLI)
+            if command -v ghostty >/dev/null 2>&1; then
+                ghostty title "tmux: $session_name"
+            fi
 
-        tmuxifier load-session "$session_name"
+            tmuxifier load-session "$session_name"
+        fi
     else
         echo "Available tmuxifier sessions:"
-        tmuxifier list | while read session; do
+        tmuxifier list | grep "^ - " | sed 's/^ - //' | while read session; do
             if tmux has-session -t "$session" 2>/dev/null; then
                 echo "  $session (active)"
             else
@@ -235,7 +238,7 @@ fi
 
 # Directory shortcuts
 alias dotfiles="cd $HOME/.dotfiles"
-alias hellomateo="cd $HOME/Developer/hellomateo"
+alias hellomateo="cd $HOME/Developer/hellomateo.git"
 alias sbch="cd $HOME/Developer/supabase-cache-helpers"
 alias pg_lsp="cd $HOME/Developer/postgres_lsp"
 
@@ -266,3 +269,6 @@ alias gp="git push"
 alias pn="pnpm"
 alias pnr="pnpm run"
 export PATH="/opt/homebrew/opt/libpq/bin:$PATH"
+
+
+PROMPT_COMMAND='echo -en "\033]0;$(whoami)@$(hostname)|$(pwd|cut -d "/" -f 4-100)\a"'

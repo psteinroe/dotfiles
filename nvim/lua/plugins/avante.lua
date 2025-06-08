@@ -8,9 +8,9 @@ return {
     cursor_applying_provider = "claude",
     claude = {
       endpoint = "https://api.anthropic.com",
-      model = "claude-3-7-sonnet-latest",
+      model = "claude-sonnet-4-20250514",
       temperature = 0,
-      max_tokens = 4096,
+      max_tokens = 8192,
       disable_tools = true,
     },
     hints = { enabled = false },
