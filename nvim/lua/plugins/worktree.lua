@@ -20,7 +20,7 @@ return {
     end)
 
     -- Run pnpm install when switching to a worktree with pnpm-lock.yaml
-    Hooks.register(Hooks.type.SWITCH, function(path, prev_path)
+    Hooks.register(Hooks.type.SWITCH, function(path)
       local pnpm_lock = path .. "/pnpm-lock.yaml"
       if vim.fn.filereadable(pnpm_lock) == 1 then
         vim.notify("Running pnpm install in " .. path)
@@ -98,8 +98,35 @@ return {
           return
         end
 
-        vim.ui.input({ prompt = "Base branch (default: main): " }, function(base)
-          base = base and base ~= "" and base or "main"
+        -- Get the actual default branch using GitHub CLI
+        local function get_default_branch()
+          -- First try using GitHub CLI to get the default branch
+          local gh_result = vim.fn
+            .system("gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name' 2>/dev/null")
+            :gsub("\n", "")
+
+          if gh_result ~= "" and vim.v.shell_error == 0 then
+            return gh_result
+          end
+
+          -- Fallback to git symbolic-ref
+          local git_result = vim.fn
+            .system("git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@'")
+            :gsub("\n", "")
+
+          if git_result ~= "" and vim.v.shell_error == 0 then
+            return git_result
+          end
+
+          -- Final fallback
+          return "main"
+        end
+
+        local default_branch = get_default_branch()
+
+        vim.ui.input({ prompt = "Base branch (default: " .. default_branch .. "): " }, function(base)
+          base = base and base ~= "" and base or default_branch
+          vim.notify("Creating worktree for branch " .. branch .. " based on " .. base)
           git_worktree.create_worktree(branch, base)
         end)
       end)

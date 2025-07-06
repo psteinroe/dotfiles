@@ -39,5 +39,3 @@ require("lazy").setup {
 
 require "config.autocmds"
 require "config.remap"
-
-require("avante_lib").load()

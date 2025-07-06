@@ -1,5 +1,7 @@
 return {
   "akinsho/toggleterm.nvim",
+  version = "*",
+  lazy = false,
   config = function()
     require("toggleterm").setup {
       open_mapping = [[<C-t>]],
@@ -24,6 +26,30 @@ return {
         vim.keymap.set("t", "<C-q>", "<C-\\><C-n><C-v>", { noremap = true, silent = true }) -- Alternative for block mode
       end,
     })
+
+    -- Create a dedicated terminal for Claude Code
+    local Terminal = require("toggleterm.terminal").Terminal
+    local claude_term = Terminal:new {
+      cmd = "claude",
+      direction = "float",
+      hidden = true,  -- Hide from regular terminal list
+      count = 99,     -- Give it a specific ID far from regular terminals
+      on_open = function()
+        vim.cmd "startinsert!"
+      end,
+      on_close = function()
+        vim.cmd "startinsert!"
+      end,
+    }
+
+    vim.keymap.set("n", "<C-a>", function()
+      claude_term:toggle()
+    end, { noremap = true, silent = true, desc = "Ask Claude" })
+    
+    -- Also map in terminal mode to close it
+    vim.keymap.set("t", "<C-a>", function()
+      claude_term:toggle()
+    end, { noremap = true, silent = true, desc = "Close Claude" })
   end,
   keys = {
     { [[<C-t>]] },
