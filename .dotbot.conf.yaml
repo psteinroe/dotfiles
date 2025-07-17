@@ -21,6 +21,9 @@
     ~/.config/starship.toml:
       create: true
       path: starship.toml
+    ~/.config/atuin:
+      create: true
+      path: atuin
     ~/.ripgreprc: ripgrep
     ~/.config/tmuxinator:
       create: true

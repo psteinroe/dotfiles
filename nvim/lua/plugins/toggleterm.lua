@@ -4,7 +4,7 @@ return {
   lazy = false,
   config = function()
     require("toggleterm").setup {
-      open_mapping = [[<C-t>]],
+      open_mapping = [[<C-ö>]],
       shade_terminals = false,
       -- add --login so ~/.zprofile is loaded
       -- https://vi.stackexchange.com/questions/16019/neovim-terminal-not-reading-bash-profile/16021#16021
@@ -30,10 +30,10 @@ return {
     -- Create a dedicated terminal for Claude Code
     local Terminal = require("toggleterm.terminal").Terminal
     local claude_term = Terminal:new {
-      cmd = "claude",
+      cmd = "claude --dangerously-skip-permissions",
       direction = "float",
-      hidden = true,  -- Hide from regular terminal list
-      count = 99,     -- Give it a specific ID far from regular terminals
+      hidden = true, -- Hide from regular terminal list
+      count = 99, -- Give it a specific ID far from regular terminals
       on_open = function()
         vim.cmd "startinsert!"
       end,
@@ -45,13 +45,13 @@ return {
     vim.keymap.set("n", "<C-a>", function()
       claude_term:toggle()
     end, { noremap = true, silent = true, desc = "Ask Claude" })
-    
+
     -- Also map in terminal mode to close it
     vim.keymap.set("t", "<C-a>", function()
       claude_term:toggle()
     end, { noremap = true, silent = true, desc = "Close Claude" })
   end,
   keys = {
-    { [[<C-t>]] },
+    { [[<C-ö>]] },
   },
 }

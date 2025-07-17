@@ -111,6 +111,8 @@ brew "jq"
 brew "flyctl"
 # Shell extension to navigate your filesystem faster
 brew "zoxide"
+# Magical shell history using SQLite
+brew "atuin"
 
 # --- Cask ---
 # Automated testing of webapps for Google Chrome

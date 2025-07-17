@@ -61,13 +61,11 @@ return {
       end,
       { noremap = true, silent = true },
     },
-    -- used by toggleterm now
-    -- try to use quickfix lists
-    -- {
-    --   "<C-t>",
-    --   "<cmd>Telescope resume<cr>",
-    --   { noremap = true, silent = true },
-    -- },
+    {
+      "<C-t>",
+      "<cmd>Telescope resume<cr>",
+      { noremap = true, silent = true },
+    },
     {
       "<leader>gb",
       function()

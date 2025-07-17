@@ -1,7 +1,7 @@
 source "$(brew --prefix)/share/antigen/antigen.zsh"
 
 # Load the oh-my-zsh library.
-antigen use oh-my-zsh plugins/gh plugins/per-directory-history plugins/git-auto-fetch plugins/tmux
+antigen use oh-my-zsh plugins/gh plugins/git-auto-fetch plugins/tmux
 
 # Autocomplete bundle.
 # antigen bundle marlonrichert/zsh-autocomplete@main
@@ -102,6 +102,9 @@ export PGT_LOG_PATH="$HOME/Library/Caches/dev.supabase-community.pgt/pgt-logs"
 # Starship
 eval "$(starship init zsh)"
 
+# Atuin - magical shell history
+eval "$(atuin init zsh)"
+
 export ANDROID_HOME=$HOME/Library/Android/sdk
 export PATH=$PATH:$ANDROID_HOME/emulator
 export PATH=$PATH:$ANDROID_HOME/platform-tools
@@ -135,7 +138,8 @@ path=(
 
 # Bindkey
 bindkey -v
-bindkey -M viins '^r' fzf-history-widget # (r)everse history search
+# Atuin handles Ctrl-R by default, use Alt-R for FZF as fallback
+bindkey -M viins '^[r' fzf-history-widget # Alt-R for FZF history
 bindkey -M viins '^f' fzf-file-widget    # (f)ile / (t)
 bindkey -M viins '^z' fzf-cd-widget      # (z) jump
 # bindkey              '^I'         menu-complete
@@ -190,6 +194,8 @@ tm() {
                 ghostty title "tmux: $session_name"
             fi
 
+            # Track session switch in Atuin history
+            atuin history start "tmuxifier load-session $session_name" || true
             tmuxifier load-session "$session_name"
         fi
     else
@@ -268,6 +274,15 @@ alias gp="git push"
 # pnpm
 alias pn="pnpm"
 alias pnr="pnpm run"
+
+# Atuin aliases
+alias ah='atuin history list'                    # List recent commands
+alias as='atuin search'                         # Search with UI
+alias ast='atuin stats'                         # Usage statistics
+alias asd='atuin search --cwd .'               # Search in current dir
+alias asw='atuin search --workspace'            # Search in git workspace
+alias zstats='atuin search --cmd "z " --limit 50 | sort | uniq -c | sort -nr'  # Zoxide usage stats
+
 export PATH="/opt/homebrew/opt/libpq/bin:$PATH"
 
 

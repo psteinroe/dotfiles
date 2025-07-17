@@ -1,0 +1,68 @@
+# Atuin Configuration
+# https://docs.atuin.sh/configuration/config/
+
+# Sync with vim mode preference
+keymap_mode = "vim-insert"
+keymap_cursor = { vim_insert = "bar", vim_normal = "block" }
+
+# Use fuzzy search (matches your FZF setup)
+search_mode = "fuzzy"
+filter_mode = "workspace"
+filter_mode_shell_up_key_binding = "workspace"
+
+# UI settings for your terminal setup
+style = "compact"
+inline_height = 20
+show_preview = true
+show_help = false
+
+# History filtering - exclude sensitive commands
+history_filter = [
+  "^secret",
+  "^pass",
+  "^keychain-environment-variable",
+  "ANTHROPIC_API_KEY",
+  "API_KEY",
+  "TOKEN",
+  "PASSWORD"
+]
+
+# Exclude sensitive directories
+cwd_filter = [
+  "^/tmp",
+  "^/private"
+]
+
+# Sync configuration (optional - disabled by default)
+# Uncomment and configure if you want to use sync
+# sync_frequency = "5m"
+# sync_address = "https://api.atuin.sh"
+
+# Stats - track common subcommands
+common_subcommands = [
+  "cargo",
+  "go",
+  "git",
+  "npm",
+  "pnpm",
+  "just",
+  "supabase",
+  "brew",
+  "tmuxifier"
+]
+
+# Exit on scroll
+keys.scroll_exits = true
+
+# Show tabs for workspaces
+workspaces = true
+
+# Update check
+update_check = true
+
+# History settings
+max_history_length = 100000
+history_format = "{time} {command} {duration}"
+
+# Search settings
+exit_mode = "return-original"
