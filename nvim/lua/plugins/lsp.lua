@@ -1,6 +1,7 @@
 return {
   {
     "williamboman/mason.nvim",
+    version = "v1.*", -- Pin to v1.x for Neovim 0.10 compatibility
     lazy = false,
     config = function()
       require("mason").setup()
@@ -8,12 +9,22 @@ return {
   },
   {
     "williamboman/mason-lspconfig.nvim",
+    version = "v1.*", -- Pin to v1.x for Neovim 0.10 compatibility
     dependencies = {
       "williamboman/mason.nvim",
     },
     lazy = false,
     opts = {
-      auto_install = true,
+      ensure_installed = {
+        "ruff",
+        "lua_ls",
+        "pyright",
+        "ts_ls",
+        "eslint",
+        "tailwindcss",
+        -- "ty", -- Uncomment if you want to use ty language server
+      },
+      automatic_installation = true,
     },
   },
   {
@@ -25,6 +36,9 @@ return {
       local util = require "lspconfig.util"
       local capabilities = require("cmp_nvim_lsp").default_capabilities()
 
+      -- lspconfig.ruff.setup {
+      --   capabilities = capabilities,
+      -- }
       lspconfig.lua_ls.setup {
         capabilities = capabilities,
         settings = {
@@ -35,6 +49,9 @@ return {
           },
         },
       }
+      lspconfig.pyright.setup {
+        capabilities = capabilities,
+      }
       lspconfig.ts_ls.setup {
         capabilities = capabilities,
       }
@@ -44,6 +61,21 @@ return {
       lspconfig.tailwindcss.setup {
         capabilities = capabilities,
       }
+      -- lspconfig.ty.setup {
+      --   capabilities = capabilities,
+      --   init_options = {
+      --     settings = {},
+      --   },
+      -- }
+      -- configs.ty = {
+      --   default_config = {
+      --     cmd = { "ty", "server" },
+      --     filetypes = { "python" },
+      --     root_markers = { "ty.toml", "pyproject.toml", ".git" },
+      --   },
+      -- }
+      --
+      -- lspconfig.ty.setup {}
 
       configs.postgres_lsp = {
         default_config = {

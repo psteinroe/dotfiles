@@ -5,13 +5,16 @@ return {
   version = false, -- set this if you want to always pull the latest change
   opts = {
     provider = "claude",
-    cursor_applying_provider = "claude",
-    claude = {
-      endpoint = "https://api.anthropic.com",
-      model = "claude-sonnet-4-20250514",
-      temperature = 0,
-      max_tokens = 8192,
-      disable_tools = true,
+    providers = {
+      claude = {
+        endpoint = "https://api.anthropic.com",
+        model = "claude-sonnet-4-20250514",
+        extra_request_body = {
+          temperature = 0.75,
+          max_tokens = 20480,
+        },
+        disable_tools = true,
+      },
     },
     hints = { enabled = false },
     behaviour = {

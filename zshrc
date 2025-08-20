@@ -152,6 +152,10 @@ function set_wallpaper() {
     osascript -e "tell application \"System Events\" to tell every desktop to set picture to \"/Users/psteinroe/.dotfiles/media/wallpaper.jpg\" as POSIX file"
 }
 
+function explain() {
+    open -a "Safari" "$HOME/.dotfiles/explain.html"
+}
+
 # ffmpeg -i in.mov -pix_fmt rgb8 -r 10 output.gif && gifsicle -O3 output.gif -o output.gif
 
 # Convert video to optimized GIF
@@ -221,6 +225,72 @@ load-nvmrc() {
 add-zsh-hook chpwd load-nvmrc
 load-nvmrc
 
+# Git worktree helper - lists worktrees and optionally cleans up merged PRs
+function gwt_cleanup() {
+  git worktree list
+
+  if ! command -v gh >/dev/null 2>&1; then
+    echo "\nGitHub CLI (gh) required for safe cleanup."
+    return 1
+  fi
+
+  echo "\nChecking PR status..."
+  local cleanup_candidates=()
+  local repo_root=$(git rev-parse --show-toplevel 2>/dev/null)
+  local temp_file=$(mktemp)
+
+  git worktree list --porcelain | grep '^worktree' | cut -d' ' -f2- | while read worktree_path; do
+    if [ "$worktree_path" != "$repo_root" ] && [ "$worktree_path" != "$(dirname "$repo_root")/$(basename "$repo_root")" ]; then
+      local branch=$(git -C "$worktree_path" branch --show-current 2>/dev/null)
+      if [ -n "$branch" ]; then
+        local pr_state=$(gh pr view "$branch" --json state -q '.state' 2>/dev/null || echo "")
+        case "$pr_state" in
+          "MERGED")
+            echo "Merged: $branch"
+            echo "$worktree_path:$branch" >> "$temp_file"
+            ;;
+          "CLOSED")
+            echo "Closed: $branch"
+            echo "$worktree_path:$branch" >> "$temp_file"
+            ;;
+          "OPEN")
+            echo "Active: $branch"
+            ;;
+          "")
+            echo "No PR: $branch"
+            ;;
+        esac
+      fi
+    fi
+  done
+
+  if [ ! -s "$temp_file" ]; then
+    echo "\nNo merged/closed PRs found."
+    rm -f "$temp_file"
+    return 0
+  fi
+
+  echo "\nRemovable worktrees:"
+  while IFS=: read -r worktree_path branch; do
+    echo "  $branch"
+    cleanup_candidates+=("$worktree_path:$branch")
+  done < "$temp_file"
+
+  echo -n "\nRemove these? (y/N): "
+  read response
+  if [[ "$response" =~ ^[Yy]$ ]]; then
+    while IFS=: read -r worktree_path branch; do
+      echo "Removing $branch..."
+      git worktree remove "$worktree_path" --force
+    done < "$temp_file"
+    echo "\nDone."
+  else
+    echo "Cancelled."
+  fi
+
+  rm -f "$temp_file"
+}
+
 # *** *** Aliases *** ***
 
 # ZSH
@@ -246,7 +316,7 @@ fi
 alias dotfiles="cd $HOME/.dotfiles"
 alias hellomateo="cd $HOME/Developer/hellomateo.git"
 alias sbch="cd $HOME/Developer/supabase-cache-helpers"
-alias pg_lsp="cd $HOME/Developer/postgres_lsp"
+alias pg_lsp="cd $HOME/Developer/postgres-language-server.git"
 
 # Just
 alias j='just'
