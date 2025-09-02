@@ -96,7 +96,6 @@ return {
       vim.keymap.set("n", "<leader>gd", vim.lsp.buf.definition, {})
       vim.keymap.set("n", "<leader>gr", vim.lsp.buf.references, {})
       vim.keymap.set("n", "<leader>ca", vim.lsp.buf.code_action, {})
-      vim.keymap.set("n", "<leader>rn", vim.lsp.buf.code_action, {})
       vim.keymap.set("n", "<space>rn", vim.lsp.buf.rename, {})
 
       -- from https://www.reddit.com/r/neovim/comments/107g8lg/how_to_ignore_node_modules_when_using/

@@ -161,6 +161,8 @@ cask "cursor"
 cask "bruno"
 # Automatic time and productivity tracking app
 cask "timing"
+# Keyboard shortcuts for every button on your screen
+cask "homerow"
 
 mas "Xcode", id: 497799835
 mas "WhatsApp Messenger", id: 310633997

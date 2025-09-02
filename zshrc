@@ -226,7 +226,7 @@ add-zsh-hook chpwd load-nvmrc
 load-nvmrc
 
 # Git worktree helper - lists worktrees and optionally cleans up merged PRs
-function gwt_cleanup() {
+function wtclean() {
   git worktree list
 
   if ! command -v gh >/dev/null 2>&1; then
@@ -289,6 +289,100 @@ function gwt_cleanup() {
   fi
 
   rm -f "$temp_file"
+}
+
+# Git worktree helper - creates a new worktree and navigates to it
+function wtcreate() {
+  if [ -z "$1" ]; then
+    echo "Usage: gwt <branch-name>"
+    echo "Creates a git worktree, navigates to it, and runs package manager install/check"
+    return 1
+  fi
+
+  local branch_name="$1"
+
+  # Get the main repository root from worktree list
+  local repo_root=$(git worktree list --porcelain | grep "^worktree" | head -1 | cut -d' ' -f2-)
+  if [ -z "$repo_root" ]; then
+    echo "Not in a git repository"
+    return 1
+  fi
+
+  # Get the repository name
+  local repo_name=$(basename "$repo_root")
+
+  # Create worktree path relative to the parent of the current worktree
+  local worktree_parent=$(dirname "$repo_root")
+  # Check if repo name already ends with .git
+  if [[ "$repo_name" == *.git ]]; then
+    local worktree_path="$worktree_parent/$repo_name/$branch_name"
+  else
+    local worktree_path="$worktree_parent/$repo_name.git/$branch_name"
+  fi
+
+  # Create the worktree
+  if git worktree add "$worktree_path" -b "$branch_name"; then
+    echo "Created worktree at: $worktree_path"
+
+    # Navigate to the new worktree
+    cd "$worktree_path"
+
+    # Check for git submodules
+    if [ -f ".gitmodules" ]; then
+      echo "Found .gitmodules, updating submodules..."
+      git submodule update --init --recursive
+    fi
+
+    # Check for different package managers and run appropriate commands
+    if [ -f "pnpm-lock.yaml" ]; then
+      echo "Found pnpm-lock.yaml, running pnpm install..."
+      pnpm install
+    fi
+
+    if [ -f "bun.lockb" ] || [ -f "bun.lock" ]; then
+      echo "Found bun lockfile, running bun install..."
+      bun install
+    fi
+
+    # Check for Cargo workspace
+    if [ -f "Cargo.toml" ] && (grep -q "^\[workspace\]" "Cargo.toml" || [ -d "crates" ] || [ -d "packages" ]); then
+      echo "Found Cargo workspace, running cargo check..."
+      cargo check
+    fi
+  else
+    echo "Failed to create worktree"
+    return 1
+  fi
+}
+
+# Claude Code with per-directory session persistence
+ccode() {
+    local session_file=".claude-session-id"
+    local session_id
+
+    # Ensure session file is always gitignored
+    if [[ -f ".gitignore" ]]; then
+        if ! grep -q "^\.claude-session-id$" .gitignore; then
+            echo ".claude-session-id" >> .gitignore
+        fi
+    else
+        # Create .gitignore if it doesn't exist
+        echo ".claude-session-id" > .gitignore
+    fi
+
+    if [[ -f "$session_file" ]]; then
+        # Use existing session ID for this directory
+        session_id=$(cat "$session_file")
+        echo "Resuming session in $(basename $(pwd)): $session_id"
+    else
+        # Generate new session ID and save it
+        session_id=$(uuidgen)
+        echo "$session_id" > "$session_file"
+        echo "Starting new session in $(basename $(pwd)): $session_id"
+    fi
+
+    # Launch Claude with the directory-specific session ID
+    command claude --resume "$session_id" --dangerously-skip-permissions
 }
 
 # *** *** Aliases *** ***

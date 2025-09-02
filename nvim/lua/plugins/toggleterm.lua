@@ -4,7 +4,8 @@ return {
   lazy = false,
   config = function()
     require("toggleterm").setup {
-      open_mapping = [[<C-ö>]],
+      -- open_mapping = [[<c-ö>]],
+      open_mapping = [[<c-\>]],
       shade_terminals = false,
       -- add --login so ~/.zprofile is loaded
       -- https://vi.stackexchange.com/questions/16019/neovim-terminal-not-reading-bash-profile/16021#16021
@@ -30,8 +31,11 @@ return {
     -- Create a dedicated terminal for Claude Code
     local Terminal = require("toggleterm.terminal").Terminal
     local claude_term = Terminal:new {
-      cmd = "claude --dangerously-skip-permissions",
+      cmd = "zsh -c 'source ~/.dotfiles/zshrc && ccode'",
       direction = "float",
+      -- add --login so ~/.zprofile is loaded
+      -- https://vi.stackexchange.com/questions/16019/neovim-terminal-not-reading-bash-profile/16021#16021
+      shell = "zsh --login",
       hidden = true, -- Hide from regular terminal list
       count = 99, -- Give it a specific ID far from regular terminals
       on_open = function()
@@ -52,6 +56,6 @@ return {
     end, { noremap = true, silent = true, desc = "Close Claude" })
   end,
   keys = {
-    { [[<C-ö>]] },
+    { [[<C-\>]] },
   },
 }

@@ -6,3 +6,4 @@ Brewfile.lock.json
 zsh_plugins.zsh
 
 .wakatime.cfg
+.claude-session-id
