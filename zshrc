@@ -83,6 +83,8 @@ export PATH="$HOME/.local/share/bob/nvim-bin:$PATH"
 
 # Rust
 export PATH="$HOME/.cargo/bin:$PATH"
+# Go
+export PATH="$HOME/go/bin:$PATH"
 
 # Ruby
 export PATH="/usr/local/opt/ruby/bin:$PATH"
@@ -224,6 +226,10 @@ load-nvmrc() {
 }
 add-zsh-hook chpwd load-nvmrc
 load-nvmrc
+
+wtlist() {
+  git worktree list
+}
 
 # Git worktree helper - lists worktrees and optionally cleans up merged PRs
 function wtclean() {

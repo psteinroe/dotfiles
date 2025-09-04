@@ -22,6 +22,7 @@ return {
         "ts_ls",
         "eslint",
         "tailwindcss",
+        "gopls", -- Go language server
         -- "ty", -- Uncomment if you want to use ty language server
       },
       automatic_installation = true,
@@ -60,6 +61,27 @@ return {
       }
       lspconfig.tailwindcss.setup {
         capabilities = capabilities,
+      }
+      lspconfig.gopls.setup {
+        capabilities = capabilities,
+        cmd = { "gopls" },
+        filetypes = { "go", "gomod", "gowork", "gotmpl" },
+        root_dir = util.root_pattern("go.mod", "go.work", ".git"),
+        settings = {
+          gopls = {
+            completeUnimported = true,
+            usePlaceholders = true,
+            analyses = {
+              unusedparams = true,
+              shadow = true,
+              nilness = true,
+              unusedwrite = true,
+              useany = true,
+            },
+            staticcheck = true,
+            gofumpt = true,
+          },
+        },
       }
       -- lspconfig.ty.setup {
       --   capabilities = capabilities,

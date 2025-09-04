@@ -9,6 +9,7 @@ return {
     -- adapters
     "marilari88/neotest-vitest",
     "jfpedroza/neotest-elixir",
+    "nvim-neotest/neotest-go",
   },
   config = function()
     local map = vim.api.nvim_set_keymap
@@ -31,6 +32,9 @@ return {
         },
         require "neotest-elixir",
         require "rustaceanvim.neotest",
+        require "neotest-go" {
+          args = { "-timeout=60s" },
+        },
       },
     }
   end,

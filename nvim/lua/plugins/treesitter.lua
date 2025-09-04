@@ -4,8 +4,9 @@ return {
   config = function()
     local config = require "nvim-treesitter.configs"
     config.setup {
+      ensure_installed = { "go", "gomod", "gowork", "gosum" },
       sync_install = false,
-      auto_install = false,
+      auto_install = true,
       highlight = {
         enable = true,
         -- Setting this to true will run `:h syntax` and tree-sitter at the same time.

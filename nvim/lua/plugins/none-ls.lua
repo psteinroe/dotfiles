@@ -6,6 +6,9 @@ return {
       sources = {
         null_ls.builtins.formatting.stylua,
         null_ls.builtins.formatting.biome,
+        null_ls.builtins.formatting.gofmt,
+        null_ls.builtins.formatting.goimports,
+        null_ls.builtins.diagnostics.golangci_lint,
       },
       -- configure format on save
       on_attach = function(current_client, bufnr)
