@@ -380,8 +380,13 @@ ccode() {
         # Use existing session ID for this directory
         session_id=$(cat "$session_file")
         echo "Resuming session in $(basename $(pwd)): $session_id"
-        # Launch Claude with resume if session exists
-        command claude --dangerously-skip-permissions --resume "$session_id"
+        # Launch Claude with resume if session exists, fallback to new session on error
+        if ! command claude --dangerously-skip-permissions --resume "$session_id"; then
+            echo "Session resume failed, starting new session..."
+            session_id=$(uuidgen)
+            echo "$session_id" > "$session_file"
+            command claude --dangerously-skip-permissions --session-id "$session_id"
+        fi
     else
         # Generate new session ID and save it
         session_id=$(uuidgen)

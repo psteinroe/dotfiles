@@ -25,16 +25,6 @@ return {
         luasnip = false, -- enable included luasnip snippets
       })
 
-      -- Run gofmt + goimports on save
-      local format_sync_grp = vim.api.nvim_create_augroup("GoFormat", {})
-      vim.api.nvim_create_autocmd("BufWritePre", {
-        pattern = "*.go",
-        callback = function()
-          require("go.format").goimports()
-        end,
-        group = format_sync_grp,
-      })
-
       -- Keymaps for Go
       vim.api.nvim_set_keymap("n", "<leader>gaj", "<cmd>GoAddTag json<cr>", { desc = "Add JSON tags" })
       vim.api.nvim_set_keymap("n", "<leader>gay", "<cmd>GoAddTag yaml<cr>", { desc = "Add YAML tags" })

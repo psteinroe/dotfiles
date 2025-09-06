@@ -20,6 +20,10 @@ return {
       end,
     }
 
+    -- explicitly set the keymap as backup
+    vim.keymap.set("n", "<C-\\>", "<Cmd>ToggleTerm<CR>", { noremap = true, silent = true, desc = "Toggle Terminal" })
+    vim.keymap.set("t", "<C-\\>", "<Cmd>ToggleTerm<CR>", { noremap = true, silent = true, desc = "Toggle Terminal" })
+
     vim.api.nvim_create_autocmd("TermOpen", {
       pattern = "*",
       callback = function()
@@ -55,7 +59,4 @@ return {
       claude_term:toggle()
     end, { noremap = true, silent = true, desc = "Close Claude" })
   end,
-  keys = {
-    { [[<C-\>]] },
-  },
 }
