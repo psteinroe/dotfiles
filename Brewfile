@@ -107,6 +107,8 @@ brew "cmake"
 brew "rustup"
 # JQ
 brew "jq"
+# YQ
+brew "yq"
 # Flyctl is a command-line utility that lets you work with the Fly.io platform
 brew "flyctl"
 # Shell extension to navigate your filesystem faster

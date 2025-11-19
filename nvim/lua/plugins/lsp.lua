@@ -15,16 +15,6 @@ return {
     },
     lazy = false,
     opts = {
-      ensure_installed = {
-        "ruff",
-        "lua_ls",
-        "pyright",
-        "ts_ls",
-        "eslint",
-        "tailwindcss",
-        "gopls", -- Go language server
-        -- "ty", -- Uncomment if you want to use ty language server
-      },
       automatic_installation = true,
     },
   },

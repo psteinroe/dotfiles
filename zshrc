@@ -34,6 +34,9 @@ HIST_STAMPS="yyyy-mm-dd"
 # Autosuggest Highlighting
 ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE="fg=7,bg=bold,underline"
 
+# Configure autosuggestions to NOT use Tab by default
+ZSH_AUTOSUGGEST_CLEAR_WIDGETS+=(expand-or-complete)
+
 export KEYTIMEOUT=1
 export GIT_EDITOR=nvim
 export EDITOR=nvim
@@ -96,7 +99,7 @@ export ANDROID_HOME="$HOME/Library/Android/sdk"
 export PATH="$HOME/Library/Android/sdk/platform-tools:$PATH"
 
 # postgres_lsp debug build
-export PATH="$HOME/Developer/postgres_lsp/target/debug:$PATH"
+export PATH="$HOME/Developer/postgres-language-server.git/main/target/debug:$PATH"
 
 # Postgres Language Server Log Path
 export PGT_LOG_PATH="$HOME/Library/Caches/dev.supabase-community.pgt/pgt-logs"
@@ -144,10 +147,25 @@ bindkey -v
 bindkey -M viins '^[r' fzf-history-widget # Alt-R for FZF history
 bindkey -M viins '^f' fzf-file-widget    # (f)ile / (t)
 bindkey -M viins '^z' fzf-cd-widget      # (z) jump
-# bindkey              '^I'         menu-complete
-# bindkey "$terminfo[kcbt]" reverse-menu-complet
+# Tab accepts autosuggestion, Shift+Tab opens completion menu
+bindkey -M viins '^I' autosuggest-accept        # Tab accepts suggestion
+bindkey -M viins '^[[Z' expand-or-complete      # Shift+Tab for completion menu
+# Right arrow: complete at end of line, otherwise move cursor
+bindkey '^[OC' right-arrow-or-complete   # Right arrow
+bindkey '^[[C' right-arrow-or-complete   # Right arrow (alternate sequence)
 
 # *** *** Functions *** ***
+
+# Right arrow: show completion menu if at end of line, otherwise move cursor
+function right-arrow-or-complete() {
+    if [[ $CURSOR -eq ${#BUFFER} ]]; then
+        zle list-choices
+        zle menu-complete
+    else
+        zle forward-char
+    fi
+}
+zle -N right-arrow-or-complete
 
 # Update all Wallpapers
 function set_wallpaper() {
@@ -314,6 +332,10 @@ function wtcreate() {
     return 1
   fi
 
+  # Fetch latest changes from remote
+  echo "Fetching latest changes..."
+  git fetch
+
   # Get the repository name
   local repo_name=$(basename "$repo_root")
 
@@ -397,6 +419,39 @@ ccode() {
     fi
 }
 
+# Codex Code with per-directory session persistence
+ccodex() {
+    local session_file=".codex-session-id"
+    local session_id
+    local cwd_name="$(basename $(pwd))"
+
+    # Ensure session file is always gitignored
+    if [[ -f ".gitignore" ]]; then
+        if ! grep -q "^\.codex-session-id$" .gitignore; then
+            echo ".codex-session-id" >> .gitignore
+        fi
+    else
+        # Create .gitignore if it doesn't exist
+        echo ".codex-session-id" > .gitignore
+    fi
+
+    if [[ -f "$session_file" ]]; then
+        session_id=$(cat "$session_file")
+        echo "Resuming Codex session in ${cwd_name}: $session_id"
+        if ! command codex resume --yolo "$session_id"; then
+            echo "Session resume failed, starting new Codex session..."
+            session_id=$(uuidgen)
+            echo "$session_id" > "$session_file"
+            command codex --yolo --session-id "$session_id"
+        fi
+    else
+        session_id=$(uuidgen)
+        echo "$session_id" > "$session_file"
+        echo "Starting new Codex session in ${cwd_name}: $session_id"
+        command codex --yolo --session-id "$session_id"
+    fi
+}
+
 # *** *** Aliases *** ***
 
 # ZSH
@@ -422,7 +477,9 @@ fi
 alias dotfiles="cd $HOME/.dotfiles"
 alias hellomateo="cd $HOME/Developer/hellomateo.git"
 alias sbch="cd $HOME/Developer/supabase-cache-helpers"
-alias pg_lsp="cd $HOME/Developer/postgres-language-server.git"
+alias pglsp="cd $HOME/Developer/postgres-language-server.git"
+alias pgconductor="cd $HOME/Developer/pgconductor"
+alias ninjascale="cd $HOME/Developer/otel-autoscaler"
 
 # Just
 alias j='just'

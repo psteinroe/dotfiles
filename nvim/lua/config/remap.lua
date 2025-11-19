@@ -62,11 +62,10 @@ vim.keymap.set("n", "gu", "<cmd>diffget //2<cr>")
 vim.keymap.set("n", "gh", "<cmd>diffget //3<cr>")
 
 -- navigate between panes
--- replaces with tmux-navigator
--- vim.keymap.set("n", "<c-k>", ":wincmd k<CR>")
--- vim.keymap.set("n", "<c-j>", ":wincmd j<CR>")
--- vim.keymap.set("n", "<c-h>", ":wincmd h<CR>")
--- vim.keymap.set("n", "<c-l>", ":wincmd l<CR>")
+vim.keymap.set("n", "<c-k>", ":wincmd k<CR>")
+vim.keymap.set("n", "<c-j>", ":wincmd j<CR>")
+vim.keymap.set("n", "<c-h>", ":wincmd h<CR>")
+vim.keymap.set("n", "<c-l>", ":wincmd l<CR>")
 
 local function open_latest_migration()
   local path = "supabase/migrations/"

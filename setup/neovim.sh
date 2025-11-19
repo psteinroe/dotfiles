@@ -1,3 +1,3 @@
 cargo install bob-nvim
 
-bob use 0.9.0
+bob use 0.10.3
