@@ -97,7 +97,7 @@ local function get_repo_name()
   return repo or ""
 end
 
-vim.api.nvim_set_keymap(
+vim.keymap.set(
   "n",
   "<leader>op",
   ":Octo search sort:updated-desc author:@me is:open is:pr repo:" .. get_repo_name() .. "<CR>",

@@ -520,3 +520,6 @@ export PATH="/opt/homebrew/opt/libpq/bin:$PATH"
 
 
 PROMPT_COMMAND='echo -en "\033]0;$(whoami)@$(hostname)|$(pwd|cut -d "/" -f 4-100)\a"'
+
+# bun completions
+[ -s "/Users/psteinroe/.bun/_bun" ] && source "/Users/psteinroe/.bun/_bun"

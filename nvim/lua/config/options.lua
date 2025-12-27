@@ -34,3 +34,11 @@ vim.opt.updatetime = 50
 vim.opt.background = "dark"
 
 -- vim.opt.colorcolumn = "80"
+
+-- Diagnostic config (virtual_text is now opt-in in 0.11)
+vim.diagnostic.config({
+  virtual_text = true,
+  signs = true,
+  underline = true,
+  update_in_insert = false,
+})

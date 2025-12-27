@@ -26,16 +26,16 @@ return {
       })
 
       -- Keymaps for Go
-      vim.api.nvim_set_keymap("n", "<leader>gaj", "<cmd>GoAddTag json<cr>", { desc = "Add JSON tags" })
-      vim.api.nvim_set_keymap("n", "<leader>gay", "<cmd>GoAddTag yaml<cr>", { desc = "Add YAML tags" })
-      vim.api.nvim_set_keymap("n", "<leader>gat", "<cmd>GoAddTag<cr>", { desc = "Add tags" })
-      vim.api.nvim_set_keymap("n", "<leader>grt", "<cmd>GoRemoveTag<cr>", { desc = "Remove tags" })
-      vim.api.nvim_set_keymap("n", "<leader>gfs", "<cmd>GoFillStruct<cr>", { desc = "Fill struct" })
-      vim.api.nvim_set_keymap("n", "<leader>gie", "<cmd>GoIfErr<cr>", { desc = "Add if err" })
-      vim.api.nvim_set_keymap("n", "<leader>gtc", "<cmd>GoCoverage<cr>", { desc = "Test coverage" })
-      vim.api.nvim_set_keymap("n", "<leader>gta", "<cmd>GoTest<cr>", { desc = "Run tests" })
-      vim.api.nvim_set_keymap("n", "<leader>gtf", "<cmd>GoTestFunc<cr>", { desc = "Test function" })
-      vim.api.nvim_set_keymap("n", "<leader>gtp", "<cmd>GoTestPkg<cr>", { desc = "Test package" })
+      vim.keymap.set("n", "<leader>gaj", "<cmd>GoAddTag json<cr>", { desc = "Add JSON tags" })
+      vim.keymap.set("n", "<leader>gay", "<cmd>GoAddTag yaml<cr>", { desc = "Add YAML tags" })
+      vim.keymap.set("n", "<leader>gat", "<cmd>GoAddTag<cr>", { desc = "Add tags" })
+      vim.keymap.set("n", "<leader>grt", "<cmd>GoRemoveTag<cr>", { desc = "Remove tags" })
+      vim.keymap.set("n", "<leader>gfs", "<cmd>GoFillStruct<cr>", { desc = "Fill struct" })
+      vim.keymap.set("n", "<leader>gie", "<cmd>GoIfErr<cr>", { desc = "Add if err" })
+      vim.keymap.set("n", "<leader>gtc", "<cmd>GoCoverage<cr>", { desc = "Test coverage" })
+      vim.keymap.set("n", "<leader>gta", "<cmd>GoTest<cr>", { desc = "Run tests" })
+      vim.keymap.set("n", "<leader>gtf", "<cmd>GoTestFunc<cr>", { desc = "Test function" })
+      vim.keymap.set("n", "<leader>gtp", "<cmd>GoTestPkg<cr>", { desc = "Test package" })
     end,
     event = { "CmdlineEnter" },
     ft = { "go", "gomod" },
