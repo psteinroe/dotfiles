@@ -34,6 +34,9 @@ return {
         root_markers = { "postgrestools.jsonc" },
       })
 
+      -- Ensure lspconfig.util is loaded before vim.lsp.enable() uses lsp/* configs
+      require("lspconfig.util")
+
       vim.lsp.config("gopls", {
         settings = {
           gopls = {
@@ -71,6 +74,7 @@ return {
         "tailwindcss",
         "oxlint",
         "postgres_lsp",
+        "nil_ls", -- Nix LSP
       })
 
       -- Filter for React DTS (keep existing logic for gd)

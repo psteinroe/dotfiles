@@ -1,6 +1,5 @@
 return {
   "saghen/blink.cmp",
-  dependencies = { "rafamadriz/friendly-snippets" },
   version = "1.*",
 
   opts = {
@@ -18,7 +17,7 @@ return {
       documentation = { auto_show = true },
     },
     sources = {
-      default = { "lsp", "path", "snippets", "buffer" },
+      default = { "lsp", "path", "buffer" },
     },
     fuzzy = { implementation = "prefer_rust_with_warning" },
   },
