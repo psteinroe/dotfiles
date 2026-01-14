@@ -45,18 +45,18 @@ in
     stylua
     shfmt
     prettierd
-    nixfmt-rfc-style
+    nixfmt
 
     # LSPs
     lua-language-server
     vscode-langservers-extracted
     typescript-language-server
     tailwindcss-language-server
-    dockerfile-language-server-nodejs
+    dockerfile-language-server
     yaml-language-server
     nil # Nix LSP
     gopls
-    rust-analyzer
+    # rust-analyzer provided by rustup
 
     # Linters
     eslint_d
