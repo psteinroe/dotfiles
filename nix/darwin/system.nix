@@ -46,12 +46,6 @@
       StandardHideWidgets = 1;
       StageManagerHideWidgets = 1;
     };
-    # Disable Spotlight hotkey (Cmd+Space) so Raycast can use it
-    "com.apple.symbolichotkeys" = {
-      AppleSymbolicHotKeys = {
-        "64" = { enabled = 0; };  # Spotlight search
-      };
-    };
     # Raycast settings
     "com.raycast.macos" = {
       raycastGlobalHotkey = "Command-49";  # Cmd+Space
@@ -67,8 +61,11 @@
     askForPasswordDelay = 0;
   };
 
-  # Set wallpaper
+  # Set wallpaper and disable Spotlight hotkey for Raycast
   system.activationScripts.postActivation.text = ''
     osascript -e 'tell application "System Events" to tell every desktop to set picture to "/Users/psteinroe/Developer/dotfiles/media/wallpaper.jpg" as POSIX file' 2>/dev/null || true
+
+    # Disable Spotlight Cmd+Space (key 64) so Raycast can use it
+    /usr/libexec/PlistBuddy -c "Set :AppleSymbolicHotKeys:64:enabled false" ~/Library/Preferences/com.apple.symbolichotkeys.plist 2>/dev/null || true
   '';
 }
