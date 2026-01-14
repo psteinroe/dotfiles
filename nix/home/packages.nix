@@ -75,7 +75,8 @@ in
     cargo-expand
     cargo-insta
 
-    # Git tools (managed in git.nix but need packages)
+    # Version control
+    jujutsu # jj - Git-compatible DVCS
     git-stack
 
     # Claude Code (via claude-code-nix)

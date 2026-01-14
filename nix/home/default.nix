@@ -31,6 +31,7 @@ in
     "ghostty".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/ghostty";
     "starship.toml".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/starship.toml";
     "atuin".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/atuin";
+    "jj".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/jj";
   };
 
   # Home directory files (symlinked for fast iteration)
