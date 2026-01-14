@@ -32,6 +32,9 @@
     ApplePressAndHoldEnabled = false; # Enable key repeat
     NSAutomaticCapitalizationEnabled = false;
     NSAutomaticSpellingCorrectionEnabled = false;
+    # Scroll direction: false = traditional (not natural)
+    "com.apple.swipescrolldirection" = false;
+    AppleEnableSwipeNavigateWithScrolls = false;
   };
 
   # Trackpad settings
@@ -45,6 +48,13 @@
     "com.apple.WindowManager" = {
       StandardHideWidgets = 1;
       StageManagerHideWidgets = 1;
+    };
+    # Raycast settings
+    "com.raycast.macos" = {
+      raycastGlobalHotkey = "Command-49"; # Cmd+Space (set manually in System Settings first)
+      raycastShouldFollowSystemAppearance = 1;
+      raycastPreferredWindowMode = "default";
+      showGettingStartedLink = 0;
     };
   };
 
