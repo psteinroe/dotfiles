@@ -37,7 +37,7 @@ in
   home.file = {
     ".gitconfig".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/gitconfig";
     ".ripgreprc".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/ripgrep";
-    ".zshrc".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/zshrc";
+    # zshrc is managed by home-manager (shell.nix) - sources zsh/*.zsh files
     ".wakatime.cfg".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/.wakatime.cfg";
 
     # Lazygit (macOS path)
