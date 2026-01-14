@@ -10,8 +10,8 @@ alias lla='ll -a'
 alias mkdir='mkdir -p'
 
 # Vim
-alias v='vim'
-type nvim > /dev/null 2>&1 && alias vim='nvim'
+alias vim='nvim'
+alias v='nvim'
 
 # Directory shortcuts
 alias dotfiles="cd $HOME/Developer/dotfiles"
