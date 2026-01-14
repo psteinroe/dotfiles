@@ -69,8 +69,7 @@ return {
         "lua_ls",
         "ts_ls",
         "gopls",
-        "pyright",
-        -- "eslint",  -- Removed: using oxlint instead
+        "ty", -- Python (astral.sh) - install via: uv tool install ty
         "tailwindcss",
         "oxlint",
         "postgres_lsp",

@@ -46,6 +46,7 @@ in
     shfmt
     prettierd
     nixfmt
+    oxfmt # JS/TS formatter (oxc)
 
     # LSPs
     lua-language-server
@@ -57,10 +58,18 @@ in
     nil # Nix LSP
     gopls
     # rust-analyzer provided by rustup
+    # ty (Python) installed via: uv tool install ty
 
     # Linters
-    eslint_d
+    oxlint
     golangci-lint
+
+    # Go tools
+    gotools # includes goimports
+    delve # debugger
+
+    # Debuggers
+    # codelldb: run `uv tool install codelldb` or use Mason for now
 
     # Rust tools
     cargo-expand

@@ -1,4 +1,4 @@
-{ config, lib, ... }:
+{ config, lib, pkgs, ... }:
 
 let
   dotfiles = "/Users/psteinroe/Developer/dotfiles";
@@ -14,6 +14,12 @@ in
     username = lib.mkForce "psteinroe";
     homeDirectory = lib.mkForce "/Users/psteinroe";
     stateVersion = "24.11";
+
+    # Install Python tools via uv (runs only on rebuild, not every shell)
+    activation.uvTools = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      ${pkgs.uv}/bin/uv tool install ty --quiet 2>/dev/null || true
+      ${pkgs.uv}/bin/uv tool install ruff --quiet 2>/dev/null || true
+    '';
   };
 
   # Let Home Manager manage itself

@@ -16,10 +16,12 @@ return {
     formatters_by_ft = {
       lua = { "stylua" },
       go = { "goimports", "gofmt" },
-      -- javascript = { "oxfmt" },
-      -- typescript = { "oxfmt" },
-      -- javascriptreact = { "oxfmt" },
-      -- typescriptreact = { "oxfmt" },
+      javascript = { "oxfmt" },
+      typescript = { "oxfmt" },
+      javascriptreact = { "oxfmt" },
+      typescriptreact = { "oxfmt" },
+      python = { "ruff_format" },
+      nix = { "nixfmt" },
     },
     format_on_save = {
       timeout_ms = 500,
