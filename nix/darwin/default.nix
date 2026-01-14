@@ -6,13 +6,8 @@
     ./system.nix
   ];
 
-  # Nix configuration
-  nix = {
-    settings = {
-      experimental-features = [ "nix-command" "flakes" ];
-      trusted-users = [ "root" username ];
-    };
-  };
+  # Disable nix-darwin's Nix management (Determinate handles it)
+  nix.enable = false;
 
   # Create /etc/zshrc that loads the nix-darwin environment
   programs.zsh.enable = true;
