@@ -10,11 +10,7 @@ in
     ./git.nix
   ];
 
-  home = {
-    username = "psteinroe";
-    homeDirectory = "/Users/psteinroe";
-    stateVersion = "24.11";
-  };
+  home.stateVersion = "24.11";
 
   # Let Home Manager manage itself
   programs.home-manager.enable = true;
