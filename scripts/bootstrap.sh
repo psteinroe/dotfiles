@@ -22,9 +22,10 @@ if ! command -v nix &>/dev/null; then
 fi
 
 # Clone dotfiles
-DOTFILES="$HOME/.dotfiles"
+DOTFILES="$HOME/Developer/dotfiles"
 if [ ! -d "$DOTFILES" ]; then
   echo "Cloning dotfiles..."
+  mkdir -p "$HOME/Developer"
   git clone git@github.com:psteinroe/dotfiles.git "$DOTFILES"
 fi
 
@@ -38,4 +39,4 @@ echo ""
 echo "=== Done! ==="
 echo "Your system is configured. Restart your terminal."
 echo ""
-echo "Future updates: darwin-rebuild switch --flake ~/.dotfiles"
+echo "Future updates: darwin-rebuild switch --flake ~/Developer/dotfiles"

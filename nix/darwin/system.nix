@@ -57,6 +57,6 @@
 
   # Set wallpaper
   system.activationScripts.postActivation.text = ''
-    osascript -e 'tell application "System Events" to tell every desktop to set picture to "/Users/${username}/.dotfiles/media/wallpaper.jpg" as POSIX file' 2>/dev/null || true
+    osascript -e 'tell application "System Events" to tell every desktop to set picture to "/Users/'${username}'/Developer/dotfiles/media/wallpaper.jpg" as POSIX file' 2>/dev/null || true
   '';
 }

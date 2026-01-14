@@ -1,7 +1,7 @@
 { config, username, ... }:
 
 let
-  dotfiles = "/Users/${username}/.dotfiles";
+  dotfiles = "/Users/${username}/Developer/dotfiles";
 in
 {
   imports = [
