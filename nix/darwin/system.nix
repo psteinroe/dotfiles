@@ -52,6 +52,10 @@
         "64" = { enabled = 0; };  # Spotlight search
       };
     };
+    # Raycast settings
+    "com.raycast.macos" = {
+      raycastGlobalHotkey = "Command-49";  # Cmd+Space
+    };
   };
 
   # Screensaver
