@@ -16,7 +16,7 @@
     # macOS-specific CLIs (not in nixpkgs or need macOS integration)
     brews = [
       "mas"       # Mac App Store CLI
-      "graphite"  # Not in nixpkgs
+      "withgraphite/tap/graphite"  # Not in nixpkgs
 
       # iOS development
       "cocoapods"
