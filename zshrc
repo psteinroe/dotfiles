@@ -1,26 +1,4 @@
-source "$(brew --prefix)/share/antigen/antigen.zsh"
-
-# Load the oh-my-zsh library.
-antigen use oh-my-zsh plugins/gh plugins/git-auto-fetch plugins/tmux
-
-# Autocomplete bundle.
-# antigen bundle marlonrichert/zsh-autocomplete@main
-
-# Autosuggestions bundle.
-antigen bundle zsh-users/zsh-autosuggestions
-
-# Syntax highlighting bundle.
-antigen bundle zsh-users/zsh-syntax-highlighting
-
-# Vi mode
-antigen bundle jeffreytse/zsh-vi-mode
-
-antigen theme sbugzu/gruvbox-zsh
-
-# Tell Antigen that you're done.
-antigen apply
-
-# Zoxide
+# Zoxide (managed by home-manager, just init here)
 eval "$(zoxide init zsh)"
 
 CASE_SENSITIVE="true"          # Case-sensitive completion
@@ -41,18 +19,6 @@ export KEYTIMEOUT=1
 export GIT_EDITOR=nvim
 export EDITOR=nvim
 
-# Base16 Shell
-source ~/.config/base16-shell/base16-shell.plugin.zsh
-
-# Autocomplete
-# source ~/.antigen/bundles/marlonrichert/zsh-autocomplete-main/zsh-autocomplete.plugin.zsh
-
-# Start each command line in history search mode
-# zstyle ':autocomplete:*' default-context history-incremental-search-backward
-
-# tumxifier
-export PATH="$HOME/.tmux/plugins/tmuxifier/bin:$PATH"
-export TMUXIFIER_LAYOUT_PATH="$HOME/.dotfiles/tmux-layouts"
 
 # FD
 FD_OPTIONS="--follow --exclude .git --exclude node_modules"
@@ -70,19 +36,9 @@ export FZF_ALT_C_OPTS="--preview 'tree -C {} | head -50'"
 # ripgrep
 export RIPGREP_CONFIG_PATH=$HOME/.ripgreprc
 
-# rbenv
-export RBENV_ROOT="$HOME/.rbenv/"
-
-# nvm (Node Version Manager)
-export NVM_DIR="$HOME/.nvm"
-source $(brew --prefix nvm)/nvm.sh
-
 # PNPM
 export PNPM_HOME="/Users/psteinroe/Library/pnpm"
 export PATH="$PNPM_HOME:$PATH"
-
-# neovim managed by bob
-export PATH="$HOME/.local/share/bob/nvim-bin:$PATH"
 
 # Rust
 export PATH="$HOME/.cargo/bin:$PATH"
@@ -196,54 +152,6 @@ function video_to_gif() {
   gifsicle -O3 "$output_file" -o "$output_file" && \
   echo "Conversion complete: $output_file"
 }
-
-tm() {
-    if command -v fzf >/dev/null 2>&1; then
-        local selection
-        selection=$(tmuxifier list | grep "^ - " | sed 's/^ - //' | while read -r session; do
-            if tmux has-session -t "$session" 2>/dev/null; then
-                echo "$session (active)"
-            else
-                echo "$session"
-            fi
-        done | fzf --height 40% --reverse)
-
-        if [[ -n "$selection" ]]; then
-            # Extract session name (remove status if present)
-            local session_name
-            session_name=$(echo "$selection" | sed 's/ (active)$//')
-
-            # Set Ghostty tab title explicitly (requires Ghostty CLI)
-            if command -v ghostty >/dev/null 2>&1; then
-                ghostty title "tmux: $session_name"
-            fi
-
-            # Track session switch in Atuin history
-            atuin history start "tmuxifier load-session $session_name" || true
-            tmuxifier load-session "$session_name"
-        fi
-    else
-        echo "Available tmuxifier sessions:"
-        tmuxifier list | grep "^ - " | sed 's/^ - //' | while read session; do
-            if tmux has-session -t "$session" 2>/dev/null; then
-                echo "  $session (active)"
-            else
-                echo "  $session"
-            fi
-        done
-    fi
-}
-
-# Auto change the nvm version based on a .nvmrc file based on the current directory.
-# See https://github.com/creationix/nvm/issues/110#issuecomment-190125863
-autoload -U add-zsh-hook
-load-nvmrc() {
-  if [[ -f .nvmrc && -r .nvmrc ]]; then
-    nvm use
-  fi
-}
-add-zsh-hook chpwd load-nvmrc
-load-nvmrc
 
 wtlist() {
   git worktree list
@@ -462,7 +370,7 @@ alias reload="source $HOME/.zshrc"
 alias ...='cd ../..'
 alias ..='cd ..'
 alias cd..='cd ..'
-alias ll='exa -l -g --icons'
+alias ll='eza -l -g --icons'
 alias lla='ll -a'
 alias mkdir='mkdir -p'
 
@@ -474,7 +382,7 @@ if type nvim > /dev/null 2>&1; then
 fi
 
 # Directory shortcuts
-alias dotfiles="cd $HOME/.dotfiles"
+alias dotfiles="cd $HOME/Developer/dotfiles"
 alias hellomateo="cd $HOME/Developer/hellomateo.git"
 alias sbch="cd $HOME/Developer/supabase-cache-helpers"
 alias pglsp="cd $HOME/Developer/postgres-language-server.git"
