@@ -1,8 +1,7 @@
 { config, ... }:
 
 let
-  username = "psteinroe";
-  dotfiles = "/Users/${username}/Developer/dotfiles";
+  dotfiles = "/Users/psteinroe/Developer/dotfiles";
 in
 {
   imports = [
@@ -12,8 +11,8 @@ in
   ];
 
   home = {
-    username = username;
-    homeDirectory = "/Users/${username}";
+    username = "psteinroe";
+    homeDirectory = "/Users/psteinroe";
     stateVersion = "24.11";
   };
 
