@@ -31,7 +31,7 @@ fi
 
 # First run of nix-darwin (bootstraps itself)
 echo "Building system configuration..."
-sudo -i HOME="$HOME" nix run nix-darwin -- switch --flake "$DOTFILES"
+sudo -i HOME="$HOME" nix run nix-darwin -- switch --flake "$DOTFILES#psteinroe"
 
 echo ""
 echo "=== Done! ==="
