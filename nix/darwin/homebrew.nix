@@ -34,7 +34,7 @@
       "spotify"
       "google-chrome"
       "font-fira-code-nerd-font"
-      "tailscale"
+      "tailscale-app"
     ];
 
     masApps = {
