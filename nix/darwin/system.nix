@@ -55,6 +55,9 @@
     # Raycast settings
     "com.raycast.macos" = {
       raycastGlobalHotkey = "Command-49";  # Cmd+Space
+      raycastShouldFollowSystemAppearance = 1;
+      raycastPreferredWindowMode = "default";  # or "compact"
+      showGettingStartedLink = 0;
     };
   };
 
