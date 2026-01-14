@@ -33,7 +33,7 @@ cd "$DOTFILES"
 
 # First run of nix-darwin (bootstraps itself)
 echo "Building system configuration..."
-nix run nix-darwin -- switch --flake .
+sudo nix run nix-darwin -- switch --flake .
 
 echo ""
 echo "=== Done! ==="
