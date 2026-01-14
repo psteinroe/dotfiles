@@ -1,15 +1,10 @@
 { pkgs, ... }:
 
 {
-  # Just enable the programs - configs are symlinked from dotfiles
+  # Just install the packages - configs are symlinked from dotfiles
+  # gitconfig already has delta config, lazygit.yml is symlinked
   programs.git.enable = true;
-
-  programs.delta = {
-    enable = true;
-    enableGitIntegration = true;
-  };
-
+  programs.delta.enable = true;  # No enableGitIntegration - gitconfig has it
   programs.gh.enable = true;
-
   programs.lazygit.enable = true;
 }
