@@ -29,8 +29,6 @@ if [ ! -d "$DOTFILES" ]; then
   git clone https://github.com/psteinroe/dotfiles.git "$DOTFILES"
 fi
 
-cd "$DOTFILES"
-
 # First run of nix-darwin (bootstraps itself)
 echo "Building system configuration..."
 sudo -i HOME="$HOME" nix run nix-darwin -- switch --flake "$DOTFILES"
