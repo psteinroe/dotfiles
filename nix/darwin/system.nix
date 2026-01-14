@@ -46,6 +46,12 @@
       StandardHideWidgets = 1;
       StageManagerHideWidgets = 1;
     };
+    # Disable Spotlight hotkey (Cmd+Space) so Raycast can use it
+    "com.apple.symbolichotkeys" = {
+      AppleSymbolicHotKeys = {
+        "64" = { enabled = 0; };  # Spotlight search
+      };
+    };
   };
 
   # Screensaver
