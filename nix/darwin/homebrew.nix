@@ -17,11 +17,6 @@
     brews = [
       "mas"       # Mac App Store CLI
       "withgraphite/tap/graphite"  # Not in nixpkgs
-
-      # iOS development
-      "cocoapods"
-      "fastlane"
-      "watchman"
     ];
 
     casks = [
