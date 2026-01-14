@@ -24,10 +24,22 @@
       "watchman"
     ];
 
-    # Only apps that can't be nix-casks
     casks = [
-      "ghostty"          # nixpkgs broken on Darwin, needs signed binary
-      "logitech-options" # .pkg installer, hardware driver
+      "ghostty"
+      "logitech-options"
+      "slack"
+      "discord"
+      "raycast"
+      "bitwarden"
+      "stats"
+      "timing"
+      "linear-linear"
+      "bruno"
+      "orbstack"
+      "spotify"
+      "google-chrome"
+      "font-fira-code-nerd-font"
+      "tailscale"
     ];
 
     masApps = {

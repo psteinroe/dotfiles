@@ -1,7 +1,6 @@
 { pkgs, inputs, system, ... }:
 
 let
-  nix-casks = inputs.nix-casks.packages.${system};
   claude-code = inputs.claude-code.packages.${system};
 in
 {
@@ -73,19 +72,7 @@ in
     # Claude Code (via claude-code-nix)
     claude-code.default
 
-    # GUI Apps (via nix-casks)
-    nix-casks.slack
-    nix-casks.discord
-    nix-casks.raycast
-    nix-casks.bitwarden
-    nix-casks.stats
-    nix-casks.timing
-    nix-casks.linear-linear
-    nix-casks.bruno
-    nix-casks.orbstack
-    nix-casks.spotify
-    nix-casks.google-chrome
-    nix-casks.font-fira-code-nerd-font
-    nix-casks.tailscale
+    # GUI Apps - moved to Homebrew casks for reliability
+    # nix-casks can be unreliable, using homebrew.nix instead
   ];
 }

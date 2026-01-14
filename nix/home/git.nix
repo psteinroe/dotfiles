@@ -2,11 +2,11 @@
 
 {
   # Just enable the programs - configs are symlinked from dotfiles
-  programs.git = {
+  programs.git.enable = true;
+
+  programs.delta = {
     enable = true;
-    delta = {
-      enable = true;
-    };
+    enableGitIntegration = true;
   };
 
   programs.gh.enable = true;
