@@ -407,7 +407,7 @@ ccode() {
             echo "Session resume failed, starting new session..."
             session_id=$(uuidgen)
             echo "$session_id" > "$session_file"
-            command claude --dangerously-skip-permissions --session-id "$session_id"
+            command claude --dangerously-skip-permissions --chrome --session-id "$session_id"
         fi
     else
         # Generate new session ID and save it
@@ -415,7 +415,7 @@ ccode() {
         echo "$session_id" > "$session_file"
         echo "Starting new session in $(basename $(pwd)): $session_id"
         # Launch Claude with session-id for new sessions
-        command claude --dangerously-skip-permissions --session-id "$session_id"
+        command claude --dangerously-skip-permissions --chrome --session-id "$session_id"
     fi
 }
 

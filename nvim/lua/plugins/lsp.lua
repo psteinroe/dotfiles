@@ -11,7 +11,7 @@ return {
     dependencies = { "williamboman/mason.nvim" },
     lazy = false,
     opts = {
-      automatic_installation = true,
+      automatic_installation = false, -- Let vim.lsp.enable() control which servers run
     },
   },
   {
@@ -70,7 +70,7 @@ return {
         "ts_ls",
         "gopls",
         "pyright",
-        "eslint",
+        -- "eslint",  -- Removed: using oxlint instead
         "tailwindcss",
         "oxlint",
         "postgres_lsp",

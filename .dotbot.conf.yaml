@@ -6,9 +6,6 @@
 
 - link:
     ~/.wakatime.cfg: .wakatime.cfg
-    ~/.config/kitty:
-      create: true
-      path: kitty
     ~/.config/ghostty:
       create: true
       path: ghostty
@@ -25,19 +22,17 @@
       create: true
       path: atuin
     ~/.ripgreprc: ripgrep
-    ~/.config/tmuxinator:
-      create: true
-      path: tmuxinator
     ~/.gitconfig: gitconfig
-    ~/.tmux.conf: tmux.conf
     ~/.zshrc: zshrc
     ~/Library/Application Support/lazygit/config.yml:
       create: true
       path: lazygit.yml
+    ~/.claude/skills:
+      create: true
+      path: claude/skills
+    ~/.claude/CLAUDE.md:
+      create: true
+      path: claude/CLAUDE.md
 
 - shell:
     - [git submodule update --init --recursive, Installing submodules]
-    - [
-        ~/.tmux/plugins/tpm/scripts/install_plugins.sh >/dev/null 2>&1,
-        Installing tmux plugins,
-      ]
