@@ -429,6 +429,25 @@ system.defaults.NSGlobalDomain = {
   KeyRepeat = 2;
   InitialKeyRepeat = 15;
 };
+
+# Disable desktop widgets
+system.defaults.CustomUserPreferences = {
+  "com.apple.WindowManager" = {
+    StandardHideWidgets = 1;      # Hide widgets on desktop
+    StageManagerHideWidgets = 1;  # Hide widgets in Stage Manager
+  };
+};
+
+# Screensaver
+system.defaults.screensaver = {
+  askForPassword = true;
+  askForPasswordDelay = 0;  # Require password immediately
+};
+
+# Wallpaper (no built-in option, use activation script)
+system.activationScripts.postActivation.text = ''
+  osascript -e 'tell application "System Events" to tell every desktop to set picture to "/Users/psteinroe/.dotfiles/media/wallpaper.jpg" as POSIX file'
+'';
 ```
 
 ### Phase 7: Homebrew (`nix/darwin/homebrew.nix`)
