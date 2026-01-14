@@ -34,7 +34,8 @@ fi
 
 # First run of nix-darwin (bootstraps itself)
 echo "Building system configuration..."
-sudo bash -c "HOME='$HOME' nix run nix-darwin -- switch --flake '$DOTFILES#psteinroe'"
+echo "You may be prompted for your password..."
+nix run nix-darwin -- switch --flake "$DOTFILES#psteinroe"
 
 echo ""
 echo "=== Done! ==="

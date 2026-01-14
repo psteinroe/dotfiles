@@ -1,4 +1,4 @@
-{ config, ... }:
+{ config, lib, ... }:
 
 let
   dotfiles = "/Users/psteinroe/Developer/dotfiles";
@@ -10,7 +10,11 @@ in
     ./git.nix
   ];
 
-  home.stateVersion = "24.11";
+  home = {
+    username = lib.mkForce "psteinroe";
+    homeDirectory = lib.mkForce "/Users/psteinroe";
+    stateVersion = "24.11";
+  };
 
   # Let Home Manager manage itself
   programs.home-manager.enable = true;
