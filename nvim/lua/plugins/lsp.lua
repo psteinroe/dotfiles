@@ -1,19 +1,5 @@
 return {
-  {
-    "williamboman/mason.nvim",
-    lazy = false,
-    config = function()
-      require("mason").setup()
-    end,
-  },
-  {
-    "williamboman/mason-lspconfig.nvim",
-    dependencies = { "williamboman/mason.nvim" },
-    lazy = false,
-    opts = {
-      automatic_installation = false, -- Let vim.lsp.enable() control which servers run
-    },
-  },
+  -- LSPs installed via nix (packages.nix), not Mason
   {
     "neovim/nvim-lspconfig",
     lazy = false,
