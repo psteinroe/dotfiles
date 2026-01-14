@@ -9,11 +9,10 @@
       "/Applications/Safari.app"
       "/System/Applications/Mail.app"
       "/System/Applications/Calendar.app"
-      "/Applications/Slack.app"
       "/Applications/Ghostty.app"
-      "/Applications/Linear.app"
+      "/Applications/Slack.app"
       "/Applications/Spotify.app"
-      "/System/Applications/System Settings.app"
+      "/Applications/Linear.app"
     ];
   };
 
