@@ -21,12 +21,15 @@ if ! command -v nix &>/dev/null; then
   . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
 fi
 
-# Clone dotfiles
+# Clone or update dotfiles
 DOTFILES="$HOME/Developer/dotfiles"
 if [ ! -d "$DOTFILES" ]; then
   echo "Cloning dotfiles..."
   mkdir -p "$HOME/Developer"
   git clone https://github.com/psteinroe/dotfiles.git "$DOTFILES"
+else
+  echo "Updating dotfiles..."
+  git -C "$DOTFILES" pull
 fi
 
 # First run of nix-darwin (bootstraps itself)
