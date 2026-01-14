@@ -26,6 +26,7 @@
       autoload -Uz wtcreate
       autoload -Uz ccode
       autoload -Uz ccodex
+      autoload -Uz rebuild
     '';
   };
 

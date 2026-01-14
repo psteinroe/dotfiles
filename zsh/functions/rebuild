@@ -1,0 +1,2 @@
+# Rebuild nix-darwin configuration
+sudo HOME="$HOME" darwin-rebuild switch --flake "$HOME/Developer/dotfiles#psteinroe"
