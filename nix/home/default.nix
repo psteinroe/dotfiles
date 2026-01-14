@@ -1,6 +1,7 @@
-{ config, username, ... }:
+{ config, ... }:
 
 let
+  username = "psteinroe";
   dotfiles = "/Users/${username}/Developer/dotfiles";
 in
 {
