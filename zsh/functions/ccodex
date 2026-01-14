@@ -1,0 +1,27 @@
+# Codex with per-directory session persistence
+local session_file=".codex-session-id"
+local session_id
+local cwd_name="$(basename $(pwd))"
+
+# Ensure session file is always gitignored
+if [[ -f ".gitignore" ]]; then
+  grep -q "^\.codex-session-id$" .gitignore || echo ".codex-session-id" >> .gitignore
+else
+  echo ".codex-session-id" > .gitignore
+fi
+
+if [[ -f "$session_file" ]]; then
+  session_id=$(cat "$session_file")
+  echo "Resuming Codex session in ${cwd_name}: $session_id"
+  if ! command codex resume --yolo "$session_id"; then
+    echo "Session resume failed, starting new Codex session..."
+    session_id=$(uuidgen)
+    echo "$session_id" > "$session_file"
+    command codex --yolo --session-id "$session_id"
+  fi
+else
+  session_id=$(uuidgen)
+  echo "$session_id" > "$session_file"
+  echo "Starting new Codex session in ${cwd_name}: $session_id"
+  command codex --yolo --session-id "$session_id"
+fi

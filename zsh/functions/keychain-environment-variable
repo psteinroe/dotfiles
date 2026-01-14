@@ -1,0 +1,2 @@
+# Get environment variable from macOS keychain
+security find-generic-password -w -a ${USER} -D "environment variable" -s "${1}"

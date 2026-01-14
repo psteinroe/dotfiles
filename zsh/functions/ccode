@@ -1,0 +1,26 @@
+# Claude Code with per-directory session persistence
+local session_file=".claude-session-id"
+local session_id
+
+# Ensure session file is always gitignored
+if [[ -f ".gitignore" ]]; then
+  grep -q "^\.claude-session-id$" .gitignore || echo ".claude-session-id" >> .gitignore
+else
+  echo ".claude-session-id" > .gitignore
+fi
+
+if [[ -f "$session_file" ]]; then
+  session_id=$(cat "$session_file")
+  echo "Resuming session in $(basename $(pwd)): $session_id"
+  if ! command claude --dangerously-skip-permissions --resume "$session_id"; then
+    echo "Session resume failed, starting new session..."
+    session_id=$(uuidgen)
+    echo "$session_id" > "$session_file"
+    command claude --dangerously-skip-permissions --chrome --session-id "$session_id"
+  fi
+else
+  session_id=$(uuidgen)
+  echo "$session_id" > "$session_file"
+  echo "Starting new session in $(basename $(pwd)): $session_id"
+  command claude --dangerously-skip-permissions --chrome --session-id "$session_id"
+fi

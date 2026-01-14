@@ -1,0 +1,17 @@
+# Convert video to optimized GIF
+# Usage: video_to_gif input.mov [output.gif] [framerate]
+if [ -z "$1" ]; then
+  echo "Usage: video_to_gif input_file.mov [output_file.gif] [framerate]"
+  echo "  Default output file will be input_file.gif"
+  echo "  Default framerate is 10"
+  return 1
+fi
+
+local input_file="$1"
+local output_file="${2:-${input_file%.*}.gif}"
+local framerate="${3:-10}"
+
+echo "Converting $input_file to $output_file with framerate $framerate..."
+ffmpeg -i "$input_file" -pix_fmt rgb8 -r "$framerate" "$output_file" && \
+gifsicle -O3 "$output_file" -o "$output_file" && \
+echo "Conversion complete: $output_file"

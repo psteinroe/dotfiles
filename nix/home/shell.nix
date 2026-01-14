@@ -1,8 +1,32 @@
-{ ... }:
+{ pkgs, ... }:
 
 {
-  # Just enable the programs - configs are symlinked from dotfiles
-  programs.zsh.enable = true;
+  programs.zsh = {
+    enable = true;
+    autosuggestion.enable = true;
+    syntaxHighlighting.enable = true;
+
+    plugins = [
+      {
+        name = "zsh-vi-mode";
+        src = pkgs.zsh-vi-mode;
+        file = "share/zsh-vi-mode/zsh-vi-mode.plugin.zsh";
+      }
+    ];
+
+    initExtra = ''
+      # Autoload custom functions
+      fpath=($HOME/Developer/dotfiles/zsh/functions $fpath)
+      autoload -Uz keychain-environment-variable
+      autoload -Uz set-keychain-environment-variable
+      autoload -Uz video_to_gif
+      autoload -Uz wtlist
+      autoload -Uz wtclean
+      autoload -Uz wtcreate
+      autoload -Uz ccode
+      autoload -Uz ccodex
+    '';
+  };
 
   programs.starship = {
     enable = true;

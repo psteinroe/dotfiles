@@ -1,0 +1,40 @@
+# Git worktree helper - creates a new worktree and navigates to it
+# Usage: wtcreate <branch-name>
+if [ -z "$1" ]; then
+  echo "Usage: wtcreate <branch-name>"
+  echo "Creates a git worktree, navigates to it, and runs package manager install/check"
+  return 1
+fi
+
+local branch_name="$1"
+local repo_root=$(git worktree list --porcelain | grep "^worktree" | head -1 | cut -d' ' -f2-)
+
+if [ -z "$repo_root" ]; then
+  echo "Not in a git repository"
+  return 1
+fi
+
+echo "Fetching latest changes..."
+git fetch
+
+local repo_name=$(basename "$repo_root")
+local worktree_parent=$(dirname "$repo_root")
+
+if [[ "$repo_name" == *.git ]]; then
+  local worktree_path="$worktree_parent/$repo_name/$branch_name"
+else
+  local worktree_path="$worktree_parent/$repo_name.git/$branch_name"
+fi
+
+if git worktree add "$worktree_path" -b "$branch_name"; then
+  echo "Created worktree at: $worktree_path"
+  cd "$worktree_path"
+
+  [ -f ".gitmodules" ] && echo "Updating submodules..." && git submodule update --init --recursive
+  [ -f "pnpm-lock.yaml" ] && echo "Running pnpm install..." && pnpm install
+  [ -f "bun.lockb" ] || [ -f "bun.lock" ] && echo "Running bun install..." && bun install
+  [ -f "Cargo.toml" ] && (grep -q "^\[workspace\]" "Cargo.toml" || [ -d "crates" ]) && echo "Running cargo check..." && cargo check
+else
+  echo "Failed to create worktree"
+  return 1
+fi
