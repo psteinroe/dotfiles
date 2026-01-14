@@ -15,7 +15,7 @@
       }
     ];
 
-    initExtra = ''
+    initContent = ''
       # Source modular zsh config
       ZSH_DIR="$HOME/Developer/dotfiles/zsh"
       source "$ZSH_DIR/env.zsh"

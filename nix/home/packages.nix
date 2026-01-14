@@ -22,7 +22,7 @@ in
     go
     lua
     elixir
-    ruby
+    # ruby  # conflicts with gotools (both have bin/bundle)
     rustup
 
     # Python
