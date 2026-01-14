@@ -1,0 +1,43 @@
+# ZSH
+alias reload="source $HOME/.zshrc"
+
+# Navigation
+alias ...='cd ../..'
+alias ..='cd ..'
+alias cd..='cd ..'
+alias ll='eza -l -g --icons'
+alias lla='ll -a'
+alias mkdir='mkdir -p'
+
+# Vim
+alias v='vim'
+type nvim > /dev/null 2>&1 && alias vim='nvim'
+
+# Directory shortcuts
+alias dotfiles="cd $HOME/Developer/dotfiles"
+alias hellomateo="cd $HOME/Developer/hellomateo.git"
+alias sbch="cd $HOME/Developer/supabase-cache-helpers"
+alias pglsp="cd $HOME/Developer/postgres-language-server.git"
+alias pgconductor="cd $HOME/Developer/pgconductor"
+
+# Tools
+alias j='just'
+alias week='date +%V'
+alias timer='echo "Timer started. Stop with Ctrl-D." && date && time cat && date'
+alias cleanup="find . -type f -name '*.DS_Store' -ls -delete"
+alias sb="supabase"
+
+# Git
+alias gc="git commit -m"
+alias gp="git push"
+
+# pnpm
+alias pn="pnpm"
+alias pnr="pnpm run"
+
+# Atuin
+alias ah='atuin history list'
+alias as='atuin search'
+alias ast='atuin stats'
+alias asd='atuin search --cwd .'
+alias asw='atuin search --workspace'
