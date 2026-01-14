@@ -26,7 +26,7 @@ DOTFILES="$HOME/Developer/dotfiles"
 if [ ! -d "$DOTFILES" ]; then
   echo "Cloning dotfiles..."
   mkdir -p "$HOME/Developer"
-  git clone git@github.com:psteinroe/dotfiles.git "$DOTFILES"
+  git clone https://github.com/psteinroe/dotfiles.git "$DOTFILES"
 fi
 
 cd "$DOTFILES"
