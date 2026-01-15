@@ -6,3 +6,12 @@ nvim/plugin
 
 # Claude
 .claude-session-id
+claude/cache/
+claude/debug/
+claude/file-history/
+claude/history.jsonl
+claude/plugins/
+claude/projects/
+claude/shell-snapshots/
+claude/statsig/
+claude/todos/

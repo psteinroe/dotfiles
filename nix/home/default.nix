@@ -58,5 +58,6 @@ in
     ".claude/skills".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/claude/skills";
     ".claude/settings.json".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/claude/settings.json";
     ".claude/hooks".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/claude/hooks";
+    ".claude/file-suggestion.sh".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/claude/file-suggestion.sh";
   };
 }

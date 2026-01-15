@@ -10,5 +10,9 @@
     "ralph-loop@claude-plugins-official": true,
     "code-simplifier@claude-plugins-official": true
   },
-  "alwaysThinkingEnabled": true
+  "alwaysThinkingEnabled": true,
+  "fileSuggestion": {
+    "type": "command",
+    "command": "~/.claude/file-suggestion.sh"
+  }
 }

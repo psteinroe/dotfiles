@@ -21,27 +21,22 @@ if [ -d "$target_dir" ]; then
   return 1
 fi
 
-echo "Creating $target_dir with bare git backend..."
-mkdir -p "$target_dir/main"
-
-echo "Cloning bare git repository..."
-if ! git clone --bare "$url" "$target_dir/.git"; then
+echo "Cloning with jj..."
+if ! jj git clone --no-colocate "$url" "$target_dir"; then
   echo "Failed to clone repository"
   rm -rf "$target_dir"
   return 1
 fi
 
-echo "Initializing jj workspace in main/..."
-cd "$target_dir/main"
-if ! jj git init --git-repo=../.git; then
-  echo "Failed to initialize jj"
-  cd ..
-  rm -rf "$target_dir"
-  return 1
-fi
+echo "Creating main workspace..."
+cd "$target_dir"
+jj workspace add main -r "trunk()"
+jj workspace forget default
 
-echo "Checking out trunk..."
-jj new "trunk()"
+# Remove working copy files from root (keep only .jj and main)
+find . -maxdepth 1 ! -name '.' ! -name '.jj' ! -name 'main' -exec rm -rf {} +
+
+cd main
 
 # Install dependencies
 [ -f ".gitmodules" ] && echo "Updating submodules..." && git submodule update --init --recursive
