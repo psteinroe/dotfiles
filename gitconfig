@@ -2,7 +2,9 @@
   useConfigOnly = true
   email = philipp@steinroetter.com
   name = psteinroe
-  signingkey = C3F5A010
+  signingkey = ~/.ssh/id_ed25519.pub
+[gpg]
+  format = ssh
 [include]
   path = ~/.gitconfig.local
 [help]
