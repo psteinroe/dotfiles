@@ -40,7 +40,7 @@
       autoload -Uz jjlist
       autoload -Uz jjcreate
       autoload -Uz jjclean
-      autoload -Uz jjreview
+      autoload -Uz jjcheckout
     '';
   };
 

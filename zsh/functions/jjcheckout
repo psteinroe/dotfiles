@@ -1,18 +1,14 @@
-# jj workspace helper - checkout a PR into a workspace for review
-# Usage: jjreview <pr-number>
+# jj workspace helper - checkout a branch or PR into a workspace
+# Usage: jjcheckout <branch-name|pr-number>
 if [ -z "$1" ]; then
-  echo "Usage: jjreview <pr-number>"
-  echo "Creates a workspace to review a PR"
+  echo "Usage: jjcheckout <branch-name|pr-number>"
+  echo "Creates a workspace for a remote branch or PR"
   return 1
 fi
 
-if ! command -v gh >/dev/null 2>&1; then
-  echo "GitHub CLI (gh) required."
-  return 1
-fi
-
-local pr_number="$1"
-local workspace_name="review-$pr_number"
+local input="$1"
+local branch_name=""
+local workspace_name=""
 
 # Find repo root
 local repo_root=$(jj workspace root 2>/dev/null)
@@ -21,14 +17,24 @@ if [ -z "$repo_root" ]; then
   return 1
 fi
 
-# Get PR branch name
-local branch_name=$(gh pr view "$pr_number" --json headRefName -q '.headRefName' 2>/dev/null)
-if [ -z "$branch_name" ]; then
-  echo "Could not find PR #$pr_number"
-  return 1
+# Check if input is a PR number (all digits)
+if [[ "$input" =~ ^[0-9]+$ ]]; then
+  if ! command -v gh >/dev/null 2>&1; then
+    echo "GitHub CLI (gh) required for PR checkout."
+    return 1
+  fi
+  branch_name=$(gh pr view "$input" --json headRefName -q '.headRefName' 2>/dev/null)
+  if [ -z "$branch_name" ]; then
+    echo "Could not find PR #$input"
+    return 1
+  fi
+  workspace_name="pr-$input"
+  echo "PR #$input: $branch_name"
+else
+  branch_name="$input"
+  # Use branch name as workspace, replacing / with -
+  workspace_name="${branch_name//\//-}"
 fi
-
-echo "PR #$pr_number: $branch_name"
 
 # Go to repo root
 local current_dir=$(pwd)
@@ -38,6 +44,14 @@ echo "Fetching latest changes..."
 jj git fetch --all-remotes
 
 local workspace_path="$repo_root/$workspace_name"
+
+# Check if workspace already exists
+if [ -d "$workspace_path" ]; then
+  echo "Workspace already exists at $workspace_path"
+  echo "Navigating to existing workspace..."
+  cd "$workspace_path"
+  return 0
+fi
 
 echo "Creating workspace: $workspace_name"
 if ! jj workspace add "$workspace_name" "$workspace_path"; then
@@ -58,5 +72,4 @@ jj edit "$branch_name"
 [ -f "bun.lockb" ] || [ -f "bun.lock" ] && echo "Running bun install..." && bun install
 [ -f "Cargo.toml" ] && (grep -q "^\[workspace\]" "Cargo.toml" || [ -d "crates" ]) && echo "Running cargo check..." && cargo check
 
-echo "\nReady to review PR #$pr_number at: $(pwd)"
-echo "Use 'jjclean' when done to remove the workspace"
+echo "\nChecked out $branch_name at: $(pwd)"
