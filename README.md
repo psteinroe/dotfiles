@@ -5,7 +5,7 @@ nix-darwin + home-manager config for macOS.
 ## Fresh Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/psteinroe/dotfiles/main/scripts/bootstrap.sh | bash
+curl -fsSL https://raw.githubusercontent.com/psteinroe/dotfiles/main/bootstrap.sh | bash
 ```
 
 ## Manual Install
