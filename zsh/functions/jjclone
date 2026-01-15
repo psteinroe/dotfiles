@@ -43,7 +43,7 @@ if ! jj git init --git-repo=.git; then
 fi
 
 echo "Creating main workspace..."
-jj workspace add main ./main
+jj workspace add --name main ./main
 
 cd main
 
