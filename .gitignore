@@ -1,9 +1,8 @@
 # Neovim
 nvim/plugin
 
-Brewfile.lock.json
+# macOS
+.DS_Store
 
-zsh_plugins.zsh
-
-.wakatime.cfg
+# Claude
 .claude-session-id

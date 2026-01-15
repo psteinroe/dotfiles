@@ -46,7 +46,6 @@ in
     ".gitconfig".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/gitconfig";
     ".ripgreprc".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/ripgrep";
     # zshrc is managed by home-manager (shell.nix) - sources zsh/*.zsh files
-    ".wakatime.cfg".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/.wakatime.cfg";
 
     # Lazygit (macOS path)
     "Library/Application Support/lazygit/config.yml".source =

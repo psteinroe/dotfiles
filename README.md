@@ -1,57 +1,26 @@
 # Dotfiles
 
-![Maintenance](https://img.shields.io/maintenance/yes/2023.svg)
+nix-darwin + home-manager config for macOS.
 
-These are my Dotfiles, a collection of [Neovim](https://neovim.io/), [tmux](https://tmux.github.io/), [zsh](http://zsh.sourceforge.net/), and other tools.
+## Fresh Install
 
-## Initial Setup and Installation
-
-```sh
-git clone git@github.com:psteinroe/dotfiles.git ~/.dotfiles
-cd ~/.dotfiles/
-./install
+```bash
+curl -fsSL https://raw.githubusercontent.com/psteinroe/dotfiles/main/scripts/bootstrap.sh | bash
 ```
 
-Dotbot will create symlinks from all necessary files in the folder.
+## Manual Install
 
-## Setting Up a New Computer
+1. Install Xcode CLI: `xcode-select --install`
+2. Install Nix: `curl -sSf -L https://install.determinate.systems/nix | sh`
+3. Clone: `git clone https://github.com/psteinroe/dotfiles.git ~/Developer/dotfiles`
+4. Build: `nix run nix-darwin -- switch --flake ~/Developer/dotfiles`
 
-```shell
-# Keep screen on
-caffeinate -t 3600 &
+## Update
 
-# Install all available updates
-sudo softwareupdate -i -a
-
-# Install Homebrew
-NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-
-# Load Homebrew
-echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
-eval "$(/opt/homebrew/bin/brew shellenv)"
-
-# Install GitHub ClI
-brew install gh
-
-# Login with SSH
-gh auth login
-
-# Clone this repository
-git clone git@github.com:psteinroe/dotfiles.git ~/.dotfiles
-cd ~/.dotfiles/
-
-# Install
-./install.sh
-
-# Setup
-./setup/init.sh
-
-# Install again
-./install.sh
+```bash
+rebuild
 ```
 
-## Syncing Homebrew
+## License
 
-Install from Brewfile: `brew bundle`
-
-Cleanup: `brew bundle --force cleanup`
+MIT
