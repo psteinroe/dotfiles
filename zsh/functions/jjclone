@@ -1,0 +1,57 @@
+# jj workspace helper - clones a repo with bare git backend
+# Usage: jjclone <url> [name]
+if [ -z "$1" ]; then
+  echo "Usage: jjclone <url> [name]"
+  echo "Clones a repo with jj colocated git backend for workspace workflow"
+  return 1
+fi
+
+local url="$1"
+local name="$2"
+
+# Extract repo name from URL if not provided
+if [ -z "$name" ]; then
+  name=$(basename "$url" .git)
+fi
+
+local target_dir="${name}.jj"
+
+if [ -d "$target_dir" ]; then
+  echo "Directory $target_dir already exists"
+  return 1
+fi
+
+echo "Creating $target_dir with bare git backend..."
+
+mkdir -p "$target_dir"
+cd "$target_dir"
+
+echo "Cloning bare git repository..."
+if ! git clone --bare "$url" .git; then
+  echo "Failed to clone repository"
+  cd ..
+  rm -rf "$target_dir"
+  return 1
+fi
+
+echo "Initializing jj with git backend..."
+if ! jj git init --git-repo=.git; then
+  echo "Failed to initialize jj"
+  cd ..
+  rm -rf "$target_dir"
+  return 1
+fi
+
+echo "Creating main workspace..."
+jj workspace add main ./main
+
+cd main
+
+# Install dependencies
+[ -f ".gitmodules" ] && echo "Updating submodules..." && git submodule update --init --recursive
+[ -f "pnpm-lock.yaml" ] && echo "Running pnpm install..." && pnpm install
+[ -f "bun.lockb" ] || [ -f "bun.lock" ] && echo "Running bun install..." && bun install
+[ -f "Cargo.toml" ] && (grep -q "^\[workspace\]" "Cargo.toml" || [ -d "crates" ]) && echo "Running cargo check..." && cargo check
+
+echo "\nCloned to: $(pwd)"
+echo "Use 'jjcreate <name>' to create new workspaces"

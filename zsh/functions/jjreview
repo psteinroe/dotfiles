@@ -1,0 +1,62 @@
+# jj workspace helper - checkout a PR into a workspace for review
+# Usage: jjreview <pr-number>
+if [ -z "$1" ]; then
+  echo "Usage: jjreview <pr-number>"
+  echo "Creates a workspace to review a PR"
+  return 1
+fi
+
+if ! command -v gh >/dev/null 2>&1; then
+  echo "GitHub CLI (gh) required."
+  return 1
+fi
+
+local pr_number="$1"
+local workspace_name="review-$pr_number"
+
+# Find repo root
+local repo_root=$(jj workspace root 2>/dev/null)
+if [ -z "$repo_root" ]; then
+  echo "Not in a jj repository"
+  return 1
+fi
+
+# Get PR branch name
+local branch_name=$(gh pr view "$pr_number" --json headRefName -q '.headRefName' 2>/dev/null)
+if [ -z "$branch_name" ]; then
+  echo "Could not find PR #$pr_number"
+  return 1
+fi
+
+echo "PR #$pr_number: $branch_name"
+
+# Go to repo root
+local current_dir=$(pwd)
+cd "$repo_root"
+
+echo "Fetching latest changes..."
+jj git fetch --all-remotes
+
+local workspace_path="$repo_root/$workspace_name"
+
+echo "Creating workspace: $workspace_name"
+if ! jj workspace add "$workspace_name" "$workspace_path"; then
+  echo "Failed to create workspace"
+  cd "$current_dir"
+  return 1
+fi
+
+cd "$workspace_path"
+
+echo "Tracking and checking out branch: $branch_name"
+jj bookmark track "${branch_name}@origin" 2>/dev/null || true
+jj edit "$branch_name"
+
+# Install dependencies
+[ -f ".gitmodules" ] && echo "Updating submodules..." && git submodule update --init --recursive
+[ -f "pnpm-lock.yaml" ] && echo "Running pnpm install..." && pnpm install
+[ -f "bun.lockb" ] || [ -f "bun.lock" ] && echo "Running bun install..." && bun install
+[ -f "Cargo.toml" ] && (grep -q "^\[workspace\]" "Cargo.toml" || [ -d "crates" ]) && echo "Running cargo check..." && cargo check
+
+echo "\nReady to review PR #$pr_number at: $(pwd)"
+echo "Use 'jjclean' when done to remove the workspace"

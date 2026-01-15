@@ -1,0 +1,45 @@
+# jj workspace helper - creates a new workspace and navigates to it
+# Usage: jjcreate <workspace-name>  (supports nested: feat/xyz)
+if [ -z "$1" ]; then
+  echo "Usage: jjcreate <workspace-name>"
+  echo "Creates a jj workspace, bookmark, and navigates to it"
+  return 1
+fi
+
+local workspace_name="$1"
+
+# Find repo root (directory containing .jj)
+local repo_root=$(jj workspace root 2>/dev/null)
+if [ -z "$repo_root" ]; then
+  echo "Not in a jj repository"
+  return 1
+fi
+
+# Go to repo root to run workspace commands
+local current_dir=$(pwd)
+cd "$repo_root"
+
+echo "Fetching latest changes..."
+jj git fetch --all-remotes
+
+local workspace_path="$repo_root/$workspace_name"
+
+echo "Creating workspace: $workspace_name"
+if ! jj workspace add "$workspace_name" "$workspace_path"; then
+  echo "Failed to create workspace"
+  cd "$current_dir"
+  return 1
+fi
+
+cd "$workspace_path"
+
+echo "Creating bookmark: $workspace_name"
+jj bookmark create "$workspace_name" -r @
+
+# Install dependencies
+[ -f ".gitmodules" ] && echo "Updating submodules..." && git submodule update --init --recursive
+[ -f "pnpm-lock.yaml" ] && echo "Running pnpm install..." && pnpm install
+[ -f "bun.lockb" ] || [ -f "bun.lock" ] && echo "Running bun install..." && bun install
+[ -f "Cargo.toml" ] && (grep -q "^\[workspace\]" "Cargo.toml" || [ -d "crates" ]) && echo "Running cargo check..." && cargo check
+
+echo "\nCreated workspace at: $(pwd)"

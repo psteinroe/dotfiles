@@ -36,6 +36,11 @@
       autoload -Uz ccode
       autoload -Uz ccodex
       autoload -Uz rebuild
+      autoload -Uz jjclone
+      autoload -Uz jjlist
+      autoload -Uz jjcreate
+      autoload -Uz jjclean
+      autoload -Uz jjreview
     '';
   };
 

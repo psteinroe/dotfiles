@@ -41,3 +41,31 @@ alias as='atuin search'
 alias ast='atuin stats'
 alias asd='atuin search --cwd .'
 alias asw='atuin search --workspace'
+
+# jj (Jujutsu) - basics
+alias jjs='jj status'
+alias jjd='jj diff'
+alias jjl='jj log -r "trunk()..@"'
+alias jjla='jj log'
+
+# jj stack navigation
+alias jjn='jj next --edit'
+alias jjp='jj prev --edit'
+alias jje='jj edit'
+
+# jj creating/modifying stack
+alias jjnew='jj new'
+alias jjnewb='jj new -B'
+alias jjc='jj commit -m'
+alias jjb='jj bookmark create'
+alias jjbm='jj bookmark move'
+
+# jj rebasing - trunk() auto-detects main/master/etc
+alias jjr='jj rebase -d "trunk()"'
+alias jjf='jj git fetch --all-remotes'
+
+# jj-ryu (PR submission workflow)
+alias jjstack='ryu'
+alias jjtrack='ryu track'
+alias jjsubmit='ryu submit'
+alias jjsync='ryu sync'

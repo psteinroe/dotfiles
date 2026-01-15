@@ -1,0 +1,74 @@
+# jj workspace helper - lists workspaces and cleans up merged/closed PRs
+jj workspace list
+
+if ! command -v gh >/dev/null 2>&1; then
+  echo "\nGitHub CLI (gh) required for safe cleanup."
+  return 1
+fi
+
+local repo_root=$(jj workspace root 2>/dev/null)
+if [ -z "$repo_root" ]; then
+  echo "Not in a jj repository"
+  return 1
+fi
+
+echo "\nChecking PR status..."
+local temp_file=$(mktemp)
+
+# Get workspace names (excluding default)
+jj workspace list --quiet 2>/dev/null | while read workspace_name; do
+  # Skip main/default workspace
+  if [ "$workspace_name" = "main" ] || [ "$workspace_name" = "default" ]; then
+    continue
+  fi
+
+  # Check if there's a matching bookmark/branch
+  local pr_state=$(gh pr view "$workspace_name" --json state -q '.state' 2>/dev/null || echo "")
+  case "$pr_state" in
+    "MERGED") echo "Merged: $workspace_name"; echo "$workspace_name" >> "$temp_file" ;;
+    "CLOSED") echo "Closed: $workspace_name"; echo "$workspace_name" >> "$temp_file" ;;
+    "OPEN") echo "Active: $workspace_name" ;;
+    "")
+      # Also check review-* workspaces
+      if [[ "$workspace_name" == review-* ]]; then
+        local pr_num="${workspace_name#review-}"
+        pr_state=$(gh pr view "$pr_num" --json state -q '.state' 2>/dev/null || echo "")
+        case "$pr_state" in
+          "MERGED") echo "Merged: $workspace_name (PR #$pr_num)"; echo "$workspace_name" >> "$temp_file" ;;
+          "CLOSED") echo "Closed: $workspace_name (PR #$pr_num)"; echo "$workspace_name" >> "$temp_file" ;;
+          "OPEN") echo "Active: $workspace_name (PR #$pr_num)" ;;
+          *) echo "No PR: $workspace_name" ;;
+        esac
+      else
+        echo "No PR: $workspace_name"
+      fi
+      ;;
+  esac
+done
+
+if [ ! -s "$temp_file" ]; then
+  echo "\nNo merged/closed PRs found."
+  rm -f "$temp_file"
+  return 0
+fi
+
+echo "\nRemovable workspaces:"
+while read workspace_name; do
+  echo "  $workspace_name"
+done < "$temp_file"
+
+echo -n "\nRemove these? (y/N): "
+read response
+if [[ "$response" =~ ^[Yy]$ ]]; then
+  while read workspace_name; do
+    local workspace_path="$repo_root/$workspace_name"
+    echo "Removing $workspace_name..."
+    jj workspace forget "$workspace_name"
+    [ -d "$workspace_path" ] && rm -rf "$workspace_path"
+  done < "$temp_file"
+  echo "\nDone."
+else
+  echo "Cancelled."
+fi
+
+rm -f "$temp_file"

@@ -20,6 +20,13 @@ in
       ${pkgs.uv}/bin/uv tool install ty --quiet 2>/dev/null || true
       ${pkgs.uv}/bin/uv tool install ruff --quiet 2>/dev/null || true
     '';
+
+    # Install Rust tools via cargo (runs only on rebuild, not every shell)
+    activation.cargoTools = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      if command -v cargo >/dev/null 2>&1; then
+        cargo install jj-ryu --quiet 2>/dev/null || true
+      fi
+    '';
   };
 
   # Let Home Manager manage itself

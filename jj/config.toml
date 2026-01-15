@@ -3,3 +3,14 @@
 [user]
 name = "psteinroe"
 email = "philipp@steinroetter.com"
+
+[git]
+auto-local-bookmark = true
+
+[ui]
+default-command = "log"
+
+[aliases]
+s = ["status"]
+d = ["diff"]
+l = ["log", "-r", "trunk()..@"]
