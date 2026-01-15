@@ -57,9 +57,10 @@ in
     "Library/Application Support/lazygit/config.yml".source =
       config.lib.file.mkOutOfStoreSymlink "${dotfiles}/lazygit.yml";
 
-    # Claude (individual files - settings.json excluded, Claude overwrites symlinks)
+    # Claude (individual files, not whole directory - keeps cache/sessions local)
     ".claude/CLAUDE.md".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/claude/CLAUDE.md";
     ".claude/skills".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/claude/skills";
+    ".claude/settings.json".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/claude/settings.json";
     ".claude/hooks".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/claude/hooks";
   };
 }
