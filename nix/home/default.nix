@@ -35,10 +35,10 @@ in
   # XDG config files (symlinked for fast iteration)
   xdg.configFile = {
     "nvim".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/nvim";
-    "ghostty".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/ghostty";
+    "ghostty/config".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/ghostty.conf";
     "starship.toml".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/starship.toml";
-    "atuin".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/atuin";
-    "jj".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/jj";
+    "atuin/config.toml".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/atuin.toml";
+    "jj/config.toml".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/jj.toml";
   };
 
   # Home directory files (symlinked for fast iteration)

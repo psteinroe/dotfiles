@@ -26,7 +26,7 @@ alias week='date +%V'
 alias timer='echo "Timer started. Stop with Ctrl-D." && date && time cat && date'
 alias cleanup="find . -type f -name '*.DS_Store' -ls -delete"
 alias sb="supabase"
-alias explain='open $HOME/Developer/dotfiles/explain.html'
+alias explain='open $HOME/Developer/dotfiles/scripts/explain.html'
 
 # Git
 alias gc="git commit -m"
