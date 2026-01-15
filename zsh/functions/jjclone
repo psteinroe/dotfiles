@@ -40,6 +40,9 @@ if ! jj git init --git-repo=../.git; then
   return 1
 fi
 
+echo "Checking out trunk..."
+jj new "trunk()"
+
 # Install dependencies
 [ -f ".gitmodules" ] && echo "Updating submodules..." && git submodule update --init --recursive
 [ -f "pnpm-lock.yaml" ] && echo "Running pnpm install..." && pnpm install
