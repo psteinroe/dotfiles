@@ -90,7 +90,7 @@ jjtrack --all                    # track all bookmarks
 jjsubmit                         # create/update PRs
 
 # 7. After base PR merges
-jjf && jjsync                    # fetch + rebase remaining
+jjsync                           # fetch + rebase remaining
 
 # 8. Cleanup (removes merged workspaces)
 jjclean
