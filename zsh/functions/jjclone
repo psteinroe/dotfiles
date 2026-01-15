@@ -1,8 +1,8 @@
-# jj workspace helper - clones a repo with bare git backend
+# jj workspace helper - clones a repo for workspace-based workflow
 # Usage: jjclone <url> [name]
 if [ -z "$1" ]; then
   echo "Usage: jjclone <url> [name]"
-  echo "Clones a repo with jj colocated git backend for workspace workflow"
+  echo "Clones a repo with jj for workspace workflow"
   return 1
 fi
 
@@ -21,29 +21,23 @@ if [ -d "$target_dir" ]; then
   return 1
 fi
 
-echo "Creating $target_dir with bare git backend..."
-
-mkdir -p "$target_dir"
-cd "$target_dir"
-
-echo "Cloning bare git repository..."
-if ! git clone --bare "$url" .git; then
+echo "Cloning with jj..."
+if ! jj git clone "$url" "$target_dir"; then
   echo "Failed to clone repository"
-  cd ..
-  rm -rf "$target_dir"
   return 1
 fi
 
-echo "Initializing jj with git backend..."
-if ! jj git init --no-colocate --git-repo=.git; then
-  echo "Failed to initialize jj"
-  cd ..
-  rm -rf "$target_dir"
-  return 1
-fi
+cd "$target_dir"
 
 echo "Creating main workspace..."
 jj workspace add "./main"
+
+echo "Cleaning up root (moving to workspace-only)..."
+# Forget default workspace, keep only 'main'
+jj workspace forget default 2>/dev/null || jj workspace forget "$(basename "$target_dir")" 2>/dev/null || true
+
+# Remove working copy files from root, keep .jj and .git
+find . -maxdepth 1 ! -name '.' ! -name '.jj' ! -name '.git' ! -name 'main' -exec rm -rf {} +
 
 cd main
 
