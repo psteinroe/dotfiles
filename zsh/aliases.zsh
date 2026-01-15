@@ -68,5 +68,6 @@ alias jjf='jj git fetch --all-remotes'
 # jj-ryu (PR submission workflow)
 alias jjstack='ryu'
 alias jjtrack='ryu track'
+alias jjuntrack='ryu untrack'
 alias jjsubmit='ryu submit'
 alias jjsync='ryu sync'
