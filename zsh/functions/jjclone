@@ -35,7 +35,7 @@ if ! git clone --bare "$url" .git; then
 fi
 
 echo "Initializing jj with git backend..."
-if ! jj git init --git-repo=.git; then
+if ! jj git init --no-colocate --git-repo=.git; then
   echo "Failed to initialize jj"
   cd ..
   rm -rf "$target_dir"
