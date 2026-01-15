@@ -46,6 +46,7 @@ in
   home.file = {
     ".gitconfig".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/gitconfig";
     ".ripgreprc".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/ripgrep";
+    ".ssh/config".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/ssh_config";
     # zshrc is managed by home-manager (shell.nix) - sources zsh/*.zsh files
 
     # Lazygit (macOS path)
