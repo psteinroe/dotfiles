@@ -1,8 +1,8 @@
-# jj workspace helper - clones a repo for workspace-based workflow
+# jj workspace helper - clones a repo with bare git backend
 # Usage: jjclone <url> [name]
 if [ -z "$1" ]; then
   echo "Usage: jjclone <url> [name]"
-  echo "Clones a repo with jj. Root is default workspace, use jjcreate for more."
+  echo "Clones a repo with bare git backend. No files in root, only workspaces."
   return 1
 fi
 
@@ -21,13 +21,24 @@ if [ -d "$target_dir" ]; then
   return 1
 fi
 
-echo "Cloning with jj..."
-if ! jj git clone "$url" "$target_dir"; then
+echo "Creating $target_dir with bare git backend..."
+mkdir -p "$target_dir/main"
+
+echo "Cloning bare git repository..."
+if ! git clone --bare "$url" "$target_dir/.git"; then
   echo "Failed to clone repository"
+  rm -rf "$target_dir"
   return 1
 fi
 
-cd "$target_dir"
+echo "Initializing jj workspace in main/..."
+cd "$target_dir/main"
+if ! jj git init --git-repo=../.git; then
+  echo "Failed to initialize jj"
+  cd ..
+  rm -rf "$target_dir"
+  return 1
+fi
 
 # Install dependencies
 [ -f ".gitmodules" ] && echo "Updating submodules..." && git submodule update --init --recursive
@@ -36,4 +47,4 @@ cd "$target_dir"
 [ -f "Cargo.toml" ] && (grep -q "^\[workspace\]" "Cargo.toml" || [ -d "crates" ]) && echo "Running cargo check..." && cargo check
 
 echo "\nCloned to: $(pwd)"
-echo "This is the 'default' workspace. Use 'jjcreate <name>' for additional workspaces."
+echo "Use 'jjcreate <name>' for additional workspaces"
