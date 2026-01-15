@@ -29,6 +29,7 @@ if ! command -v nix &>/dev/null; then
 fi
 
 # Setup GitHub auth and SSH keys (use nix run since gh not installed yet)
+mkdir -p ~/.config/gh
 if ! nix run nixpkgs#gh -- auth status &>/dev/null 2>&1; then
   echo "Authenticating with GitHub..."
   nix run nixpkgs#gh -- auth login -p ssh -w
