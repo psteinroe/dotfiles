@@ -2,7 +2,7 @@
 # Usage: jjclone <url> [name]
 if [ -z "$1" ]; then
   echo "Usage: jjclone <url> [name]"
-  echo "Clones a repo with jj for workspace workflow"
+  echo "Clones a repo with jj. Root is default workspace, use jjcreate for more."
   return 1
 fi
 
@@ -29,18 +29,6 @@ fi
 
 cd "$target_dir"
 
-echo "Creating main workspace..."
-jj workspace add "./main"
-
-echo "Cleaning up root (moving to workspace-only)..."
-# Forget default workspace, keep only 'main'
-jj workspace forget default 2>/dev/null || jj workspace forget "$(basename "$target_dir")" 2>/dev/null || true
-
-# Remove working copy files from root, keep .jj and .git
-find . -maxdepth 1 ! -name '.' ! -name '.jj' ! -name '.git' ! -name 'main' -exec rm -rf {} +
-
-cd main
-
 # Install dependencies
 [ -f ".gitmodules" ] && echo "Updating submodules..." && git submodule update --init --recursive
 [ -f "pnpm-lock.yaml" ] && echo "Running pnpm install..." && pnpm install
@@ -48,4 +36,4 @@ cd main
 [ -f "Cargo.toml" ] && (grep -q "^\[workspace\]" "Cargo.toml" || [ -d "crates" ]) && echo "Running cargo check..." && cargo check
 
 echo "\nCloned to: $(pwd)"
-echo "Use 'jjcreate <name>' to create new workspaces"
+echo "This is the 'default' workspace. Use 'jjcreate <name>' for additional workspaces."
