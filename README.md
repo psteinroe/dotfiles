@@ -62,21 +62,45 @@ jjclone git@github.com:user/repo.git    # creates repo.jj/ with workspaces
 | `jjlist` | List workspaces |
 | `jjclean` | Remove merged/closed PR workspaces |
 
-### Stacked PR Workflow (jj-ryu)
+### Full Workspace Workflow
 
 ```bash
-# Create stack
-jjnew && jjb feat-auth           # first change
-jjc "Add auth"
-jjnew && jjb feat-session        # stack on top
-jjc "Add session"
+# 1. Start new feature (creates workspace + bookmark + installs deps)
+jjcreate my-feature
 
-# Submit PRs
-jjtrack --all                    # track bookmarks
-jjsubmit                         # create stacked PRs
+# 2. Make changes (jj auto-tracks all file changes)
+# ... edit files ...
 
-# After merge
-jjf && jjsync                    # sync remaining stack
+# 3. Commit your work
+jjc "Add initial feature"
+
+# 4. Stack more changes on top (optional)
+jjnew                            # new change on current
+jjc "Add tests"
+jjnew
+jjc "Add docs"
+
+# 5. Navigate stack
+jjp                              # go to previous change
+jjn                              # go to next change
+jjl                              # view your stack
+
+# 6. Submit PRs (stacked)
+jjtrack --all                    # track all bookmarks
+jjsubmit                         # create/update PRs
+
+# 7. After base PR merges
+jjf && jjsync                    # fetch + rebase remaining
+
+# 8. Cleanup (removes merged workspaces)
+jjclean
+```
+
+### Review a PR or Branch
+
+```bash
+jjcheckout 123                   # checkout PR #123 into workspace
+jjcheckout feat-other            # checkout branch into workspace
 ```
 
 ---
