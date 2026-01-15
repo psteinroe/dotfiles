@@ -28,23 +28,18 @@ in
       fi
     '';
 
-    # Symlink configs into existing directories (atuin/jj create their own dirs)
-    activation.configSymlinks = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      mkdir -p "$HOME/.config/atuin" "$HOME/.config/jj"
-      ln -sf "${dotfiles}/atuin.toml" "$HOME/.config/atuin/config.toml"
-      ln -sf "${dotfiles}/jj.toml" "$HOME/.config/jj/config.toml"
-    '';
   };
 
   # Let Home Manager manage itself
   programs.home-manager.enable = true;
 
   # XDG config files (symlinked for fast iteration)
-  # Note: atuin/jj use activation script (their dirs have other files)
   xdg.configFile = {
     "nvim".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/nvim";
     "ghostty/config".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/ghostty.conf";
     "starship.toml".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/starship.toml";
+    "atuin/config.toml".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/atuin.toml";
+    "jj/config.toml".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/jj.toml";
   };
 
   # Home directory files (symlinked for fast iteration)
