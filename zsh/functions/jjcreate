@@ -25,7 +25,7 @@ jj git fetch --all-remotes
 local workspace_path="$repo_root/$workspace_name"
 
 echo "Creating workspace: $workspace_name"
-if ! jj workspace add --name "$workspace_name" "$workspace_path"; then
+if ! jj workspace add "$workspace_path"; then
   echo "Failed to create workspace"
   cd "$current_dir"
   return 1
