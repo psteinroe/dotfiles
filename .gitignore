@@ -4,14 +4,19 @@ nvim/plugin
 # macOS
 .DS_Store
 
-# Claude
+# Claude runtime (keep only CLAUDE.md, settings.json, skills/, file-suggestion.sh)
 .claude-session-id
 claude/cache/
+claude/chrome/
 claude/debug/
 claude/file-history/
 claude/history.jsonl
+claude/plans/
 claude/plugins/
 claude/projects/
+claude/session-env/
 claude/shell-snapshots/
+claude/stats-cache.json
 claude/statsig/
+claude/telemetry/
 claude/todos/

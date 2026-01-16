@@ -30,17 +30,15 @@
       autoload -Uz keychain-environment-variable
       autoload -Uz set-keychain-environment-variable
       autoload -Uz video_to_gif
-      autoload -Uz wtlist
-      autoload -Uz wtclean
-      autoload -Uz wtcreate
       autoload -Uz ccode
       autoload -Uz ccodex
       autoload -Uz rebuild
-      autoload -Uz jjclone
-      autoload -Uz jjlist
-      autoload -Uz jjcreate
-      autoload -Uz jjclean
-      autoload -Uz jjcheckout
+      autoload -Uz wtclone
+      autoload -Uz wtcreate
+      autoload -Uz wtcheckout
+      autoload -Uz wtlist
+      autoload -Uz wtclean
+      autoload -Uz wtsetup
     '';
   };
 
@@ -68,5 +66,6 @@
     enable = true;
     enableZshIntegration = true;
     nix-direnv.enable = true;
+    silent = true;  # Suppress direnv output
   };
 }

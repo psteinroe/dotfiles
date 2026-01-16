@@ -3,53 +3,45 @@
 - Make the plan extremely concise. Sacrifice grammar for the sake of concision.
 - At the end of each plan, give me a list of unresolved questions to answer, if any.
 
+## Working with git
+
+- Never mention Claude Code in commit messages or pull request descriptions
+
 ## Version Control
 
-Detect repo type before using git commands:
-- If `.jj/` exists → use jj (Jujutsu) with custom functions below
-- Otherwise → use git
+Use git with worktrees for parallel development. Use git-town for stacked PRs.
 
-### Custom jj Functions (PREFER THESE)
+### Worktree Functions
 
 | Function | Purpose | Use Instead Of |
 |----------|---------|----------------|
-| `jjclone <url>` | Clone repo with jj backend, create main workspace | `git clone` |
-| `jjcreate <name>` | Create workspace + bookmark + install deps | `git checkout -b` |
-| `jjcheckout <branch\|pr#>` | Checkout branch/PR into workspace | `git checkout`, `gh pr checkout` |
-| `jjlist` | List all workspaces | `git worktree list` |
-| `jjclean` | Remove merged/closed PR workspaces | manual cleanup |
+| `wtclone <url>` | Clone as bare repo with main worktree | `git clone` |
+| `wtcreate <name>` | Create new branch worktree | `git checkout -b` |
+| `wtcheckout <branch\|pr#>` | Checkout existing branch/PR | `git checkout`, `gh pr checkout` |
+| `wtlist` | List worktrees | `git worktree list` |
+| `wtclean` | Clean up merged/closed PR worktrees | manual cleanup |
 
-### jj Aliases (for common operations)
+### Git Aliases
 
-| Alias | Command | git equivalent |
-|-------|---------|----------------|
-| `jjs` | `jj status` | `git status` |
-| `jjd` | `jj diff` | `git diff` |
-| `jjl` | `jj log -r "trunk()..@"` | `git log` (current stack) |
-| `jjc "msg"` | `jj commit -m "msg"` | `git add . && git commit -m` |
-| `jjf` | `jj git fetch --all-remotes` | `git fetch` |
-| `jjr` | `jj rebase -d "trunk()"` | `git rebase main` |
-| `jjn` | `jj next --edit` | navigate to next in stack |
-| `jjp` | `jj prev --edit` | navigate to previous in stack |
-| `jjnew` | `jj new` | start new change on top |
-| `jjb <name>` | `jj bookmark create` | `git branch` |
+| Alias | Purpose |
+|-------|---------|
+| `gc [msg]` | Commit with message (default: "progress") |
+| `gca [msg]` | Add all + commit (default: "progress") |
+| `gp` | Push |
+| `gl` | Pull |
+| `gs` | Status |
+| `gt` | git-town |
 
-### PR Workflow (jj-ryu aliases)
+### Quick PR Function
 
-| Alias | Command | Purpose |
-|-------|---------|---------|
-| `jjstack` | `ryu` | view tracked stack |
-| `jjtrack` | `ryu track` | track bookmarks for PR submission |
-| `jjsubmit` | `ryu submit` | create/update stacked PRs |
-| `jjsync` | `ryu sync` | sync after PR merge |
+| Command | Purpose |
+|---------|---------|
+| `gpr` | Commit "initial" + push + create PR on **current branch** |
+| `gpr -n` | Create **new random branch** + commit + push + create PR |
 
-### Pushing Changes
-After committing, push with: `jj git push`
-For new bookmarks: `jj git push --bookmark <name>`
-
-### Key Concepts
-- jj auto-tracks all changes (no staging/git add needed)
-- `jj commit` creates commit from working copy
-- `jj describe -m "msg"` changes current commit message
-- Bookmarks = branches (needed for pushing)
-- `trunk()` auto-detects main/master/develop
+### Typical PR Workflow
+1. `wtclone <url>` - Clone repo with bare setup
+2. `wtcreate feat/xxx` - Create worktree for feature
+3. Make changes, commit with `gc` or `gca`
+4. `gpr` - Push and create PR
+5. After merge: `gt sync` to sync, `wtclean` to cleanup

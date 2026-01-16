@@ -40,6 +40,7 @@ in
     ffmpeg
     awscli2
     pnpm
+    bun
 
     # Formatters
     stylua
@@ -76,8 +77,7 @@ in
     cargo-insta
 
     # Version control
-    jujutsu # jj - Git-compatible DVCS
-    git-stack
+    git-town # stacked PR workflow for git
 
     # Claude Code (via claude-code-nix)
     claude-code.default

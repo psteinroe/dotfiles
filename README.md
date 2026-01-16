@@ -23,84 +23,63 @@ rebuild
 
 ---
 
-## jj (Jujutsu) Workflow
+## Git Worktree Workflow
 
-Using jj with workspaces for stacked PRs via jj-ryu.
+Using bare git repos with worktrees for parallel development + git-town for stacked PRs.
 
 ### Setup a New Repo
 
 ```bash
-jjclone git@github.com:user/repo.git    # creates repo.jj/ with workspaces
+wtclone git@github.com:user/repo.git    # creates repo.git/ with main/ worktree
 ```
 
-### Common Aliases
-
-| Alias | Command | Purpose |
-|-------|---------|---------|
-| `jjs` | `jj status` | Show status |
-| `jjd` | `jj diff` | Show diff |
-| `jjl` | `jj log -r "trunk()..@"` | Log current stack |
-| `jjc "msg"` | `jj commit -m` | Commit changes |
-| `jjf` | `jj git fetch` | Fetch from remote |
-| `jjr` | `jj rebase -d trunk()` | Rebase onto main |
-
-### Stack Navigation
-
-| Alias | Command | Purpose |
-|-------|---------|---------|
-| `jjn` | `jj next --edit` | Go to next change |
-| `jjp` | `jj prev --edit` | Go to previous change |
-| `jjnew` | `jj new` | New change on top |
-| `jjb name` | `jj bookmark create` | Create bookmark |
-
-### Workspace Functions
+### Worktree Functions
 
 | Function | Purpose |
 |----------|---------|
-| `jjcreate <name>` | Create workspace + bookmark + deps |
-| `jjcheckout <branch\|pr#>` | Checkout branch/PR into workspace |
-| `jjlist` | List workspaces |
-| `jjclean` | Remove merged/closed PR workspaces |
+| `wtclone <url>` | Clone as bare repo with main worktree |
+| `wtcreate <name>` | Create new branch worktree |
+| `wtcheckout <branch\|pr#>` | Checkout branch/PR into worktree |
+| `wtlist` | List worktrees |
+| `wtclean` | Remove merged/closed PR worktrees |
 
-### Full Workspace Workflow
+### git-town Commands (Stacked PRs)
+
+| Alias | Command | Purpose |
+|-------|---------|---------|
+| `gts` | `git town sync` | Sync all branches |
+| `gth` | `git town hack` | Create feature branch |
+| `gtp` | `git town propose` | Create PR |
+| `gtsh` | `git town ship` | Merge shipped PR |
+
+### Full Workflow
 
 ```bash
-# 1. Start new feature (creates workspace + bookmark + installs deps)
-jjcreate my-feature
+# 1. Clone repo with bare setup
+wtclone git@github.com:user/repo.git
+cd repo.git/main
 
-# 2. Make changes (jj auto-tracks all file changes)
-# ... edit files ...
+# 2. Create feature branch
+wtcreate my-feature
+# or from root: wtcreate my-feature
 
-# 3. Commit your work
-jjc "Add initial feature"
+# 3. Make changes and commit normally
+git add -A
+git commit -m "Add feature"
 
-# 4. Stack more changes on top (optional)
-jjnew                            # new change on current
-jjc "Add tests"
-jjnew
-jjc "Add docs"
+# 4. Create PR
+gtp                              # opens PR in browser
 
-# 5. Navigate stack
-jjp                              # go to previous change
-jjn                              # go to next change
-jjl                              # view your stack
-
-# 6. Submit PRs (stacked)
-jjtrack --all                    # track all bookmarks
-jjsubmit                         # create/update PRs
-
-# 7. After base PR merges
-jjsync                           # fetch + rebase remaining
-
-# 8. Cleanup (removes merged workspaces)
-jjclean
+# 5. After merge, sync and cleanup
+gts                              # sync all branches
+wtclean                          # remove merged worktrees
 ```
 
 ### Review a PR or Branch
 
 ```bash
-jjcheckout 123                   # checkout PR #123 into workspace
-jjcheckout feat-other            # checkout branch into workspace
+wtcheckout 123                   # checkout PR #123
+wtcheckout feat-other            # checkout branch
 ```
 
 ---

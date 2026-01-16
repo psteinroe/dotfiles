@@ -5,8 +5,7 @@ alias reload="source $HOME/.zshrc"
 alias ...='cd ../..'
 alias ..='cd ..'
 alias cd..='cd ..'
-alias ll='eza -l -g --icons'
-alias lla='ll -a'
+alias ls='eza -a -1 --icons'
 alias mkdir='mkdir -p'
 
 # Vim
@@ -16,21 +15,16 @@ alias v='nvim'
 # Directory shortcuts
 alias dotfiles="cd $HOME/Developer/dotfiles"
 alias hellomateo="cd $HOME/Developer/hellomateo.git"
-alias sbch="cd $HOME/Developer/supabase-cache-helpers"
+alias sbch="cd $HOME/Developer/supabase-cache-helpers.git"
 alias pglsp="cd $HOME/Developer/postgres-language-server.git"
-alias pgconductor="cd $HOME/Developer/pgconductor"
+alias pgconductor="cd $HOME/Developer/postgres-conductor.git"
 
 # Tools
 alias j='just'
 alias week='date +%V'
 alias timer='echo "Timer started. Stop with Ctrl-D." && date && time cat && date'
 alias cleanup="find . -type f -name '*.DS_Store' -ls -delete"
-alias sb="supabase"
 alias explain='open $HOME/Developer/dotfiles/scripts/explain.html'
-
-# Git
-alias gc="git commit -m"
-alias gp="git push"
 
 # pnpm
 alias pn="pnpm"
@@ -43,31 +37,33 @@ alias ast='atuin stats'
 alias asd='atuin search --cwd .'
 alias asw='atuin search --workspace'
 
-# jj (Jujutsu) - basics
-alias jjs='jj status'
-alias jjd='jj diff'
-alias jjl='jj log -r "trunk()..@"'
-alias jjla='jj log'
+# git
+gc() { git commit -m "${1:-progress}"; }
+gca() { git add -A && git commit -m "${1:-progress}"; }
+alias gp='git push'
+alias gl='git pull'
+alias gs='git status'
 
-# jj stack navigation
-alias jjn='jj next --edit'
-alias jjp='jj prev --edit'
-alias jje='jj edit'
+# git-town (stacked PRs)
+alias gt='git town'
+# Quick PR: commits "initial", pushes, opens PR editor
+# Usage: gpr [-n]
+#   gpr    = commit to current branch + push + create PR
+#   gpr -n = create new random branch + commit + push + create PR
+gpr() {
+  if [ -z "$(git status --porcelain)" ]; then
+    echo "No changes to commit"
+    return 1
+  fi
 
-# jj creating/modifying stack
-alias jjnew='jj new'
-alias jjnewb='jj new -B'
-alias jjc='jj commit -m'
-alias jjb='jj bookmark create'
-alias jjbm='jj bookmark move'
-
-# jj rebasing - trunk() auto-detects main/master/etc
-alias jjr='jj rebase -d "trunk()"'
-alias jjf='jj git fetch --all-remotes'
-
-# jj-ryu (PR submission workflow)
-alias jjstack='ryu'
-alias jjtrack='ryu track'
-alias jjuntrack='ryu untrack'
-alias jjsubmit='ryu submit'
-alias jjsync='ryu sync'
+  if [ "$1" = "-n" ]; then
+    # Create new branch with random name
+    local adj=(quick bright calm cool dark fast free gold green happy keen loud mint neat pale pink pure red safe slim soft warm wild)
+    local noun=(ant bear bird bolt cave crow dawn deer dove duck fern fish frog hawk iris jade lake leaf lion lynx moon moth oak owl pine pond rain rock rose sage snow star swan tide tree vine wave wolf)
+    local branch="${adj[$RANDOM % ${#adj[@]} + 1]}-${noun[$RANDOM % ${#noun[@]} + 1]}"
+    git add -A && git town hack "$branch" -c -m "initial" && gh pr create -e
+  else
+    # Commit to current branch
+    git add -A && git commit -m "initial" && git push && gh pr create -e
+  fi
+}

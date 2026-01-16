@@ -1,0 +1,21 @@
+# Bare git clone for worktree workflow
+# Usage: wtclone <url> [name]
+if [ -z "$1" ]; then
+  echo "Usage: wtclone <url> [name]"
+  return 1
+fi
+
+local url="$1"
+local name="${2:-$(basename "$url" .git).git}"
+
+git clone --bare "$url" "$name" && cd "$name" && git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*" && git fetch
+
+local default_branch=$(gh repo view --json defaultBranchRef -q '.defaultBranchRef.name' 2>/dev/null)
+
+if [ -n "$default_branch" ]; then
+  git worktree add "$default_branch" "$default_branch"
+  cd "$default_branch"
+  # Set git-town main branch
+  git config git-town.main-branch "$default_branch"
+  wtsetup
+fi

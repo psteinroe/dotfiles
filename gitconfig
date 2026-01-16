@@ -31,7 +31,6 @@
 	prev = stack previous
 	reword = stack reword
 	amend = stack amend
-	sync = stack sync
 	run = stack run
 [apply]
   whitespace = fix
@@ -107,3 +106,10 @@
 	helper = !/opt/homebrew/bin/gh auth git-credential
 [init]
 	defaultBranch = main
+[git-town]
+	branch-prefix = psteinroe/
+	share-new-branches = no
+	ship-strategy = api
+	sync-feature-strategy = rebase
+	sync-perennial-strategy = rebase
+	push-hook = true

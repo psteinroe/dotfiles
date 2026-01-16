@@ -21,11 +21,17 @@ in
       ${pkgs.uv}/bin/uv tool install ruff --quiet 2>/dev/null || true
     '';
 
-    # Install Rust tools via cargo (runs only on rebuild, not every shell)
-    activation.cargoTools = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      if command -v cargo >/dev/null 2>&1; then
-        cargo install jj-ryu --quiet 2>/dev/null || true
-      fi
+    # Generate shell completions
+    activation.completions = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      mkdir -p $HOME/.zsh/completions
+      ${pkgs.git-town}/bin/git-town completions zsh > $HOME/.zsh/completions/_git-town 2>/dev/null || true
+      ${pkgs.just}/bin/just --completions zsh > $HOME/.zsh/completions/_just 2>/dev/null || true
+      ${pkgs.gh}/bin/gh completion -s zsh > $HOME/.zsh/completions/_gh 2>/dev/null || true
+      ${pkgs.rustup}/bin/rustup completions zsh > $HOME/.zsh/completions/_rustup 2>/dev/null || true
+      ${pkgs.rustup}/bin/rustup completions zsh cargo > $HOME/.zsh/completions/_cargo 2>/dev/null || true
+      ${pkgs.bun}/bin/bun completions > $HOME/.zsh/completions/_bun 2>/dev/null || true
+      ${pkgs.fd}/bin/fd --gen-completions zsh > $HOME/.zsh/completions/_fd 2>/dev/null || true
+      ${pkgs.ripgrep}/bin/rg --generate complete-zsh > $HOME/.zsh/completions/_rg 2>/dev/null || true
     '';
 
   };
@@ -39,7 +45,6 @@ in
     "ghostty/config".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/ghostty.conf";
     "starship.toml".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/starship.toml";
     "atuin/config.toml".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/atuin.toml";
-    "jj/config.toml".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/jj.toml";
   };
 
   # Home directory files (symlinked for fast iteration)
@@ -57,7 +62,6 @@ in
     ".claude/CLAUDE.md".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/claude/CLAUDE.md";
     ".claude/skills".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/claude/skills";
     ".claude/settings.json".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/claude/settings.json";
-    ".claude/hooks".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/claude/hooks";
     ".claude/file-suggestion.sh".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/claude/file-suggestion.sh";
   };
 }

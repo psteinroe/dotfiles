@@ -1,0 +1,7 @@
+# Setup worktree - direnv, submodules, dependencies
+# Called by wtclone, wtcreate, wtcheckout
+[ -f ".envrc" ] && command -v direnv >/dev/null && direnv allow . &>/dev/null
+[ -f ".gitmodules" ] && echo "Updating submodules..." && git submodule update --init --recursive
+[ -f "pnpm-lock.yaml" ] && echo "Running pnpm install..." && pnpm install
+[ -f "bun.lockb" ] || [ -f "bun.lock" ] && echo "Running bun install..." && bun install
+[ -f "Cargo.toml" ] && (grep -q "^\[workspace\]" "Cargo.toml" || [ -d "crates" ]) && echo "Running cargo check..." && cargo check

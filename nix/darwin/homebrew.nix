@@ -9,14 +9,9 @@
       upgrade = true;
     };
 
-    taps = [
-      "withgraphite/tap"
-    ];
-
     # macOS-specific CLIs (not in nixpkgs or need macOS integration)
     brews = [
-      "mas"       # Mac App Store CLI
-      "withgraphite/tap/graphite"  # Not in nixpkgs
+      "mas" # Mac App Store CLI
     ];
 
     casks = [

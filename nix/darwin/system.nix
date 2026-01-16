@@ -1,6 +1,13 @@
 { ... }:
 
 {
+  # Menu bar / Control Center
+  system.defaults.controlcenter = {
+    Bluetooth = true;
+    Sound = true;
+    BatteryShowPercentage = true;
+  };
+
   # Dock settings
   system.defaults.dock = {
     autohide = false;
@@ -13,6 +20,7 @@
       "/Applications/Slack.app"
       "/Applications/Spotify.app"
       "/Applications/Linear.app"
+      "/System/Applications/Notes.app"
     ];
   };
 
@@ -45,6 +53,14 @@
 
   # Disable desktop widgets
   system.defaults.CustomUserPreferences = {
+    # Mouse speed: range -1 (slowest) to 3 (fastest), default ~0.875
+    ".GlobalPreferences"."com.apple.mouse.scaling" = 2.0;
+    # Safari developer mode
+    "com.apple.Safari" = {
+      IncludeDevelopMenu = true;
+      WebKitDeveloperExtrasEnabledPreferenceKey = true;
+      "WebKitPreferences.developerExtrasEnabled" = true;
+    };
     "com.apple.WindowManager" = {
       StandardHideWidgets = 1;
       StageManagerHideWidgets = 1;

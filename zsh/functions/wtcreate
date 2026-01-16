@@ -2,7 +2,6 @@
 # Usage: wtcreate <branch-name>
 if [ -z "$1" ]; then
   echo "Usage: wtcreate <branch-name>"
-  echo "Creates a git worktree, navigates to it, and runs package manager install/check"
   return 1
 fi
 
@@ -29,11 +28,7 @@ fi
 if git worktree add "$worktree_path" -b "$branch_name"; then
   echo "Created worktree at: $worktree_path"
   cd "$worktree_path"
-
-  [ -f ".gitmodules" ] && echo "Updating submodules..." && git submodule update --init --recursive
-  [ -f "pnpm-lock.yaml" ] && echo "Running pnpm install..." && pnpm install
-  [ -f "bun.lockb" ] || [ -f "bun.lock" ] && echo "Running bun install..." && bun install
-  [ -f "Cargo.toml" ] && (grep -q "^\[workspace\]" "Cargo.toml" || [ -d "crates" ]) && echo "Running cargo check..." && cargo check
+  wtsetup
 else
   echo "Failed to create worktree"
   return 1

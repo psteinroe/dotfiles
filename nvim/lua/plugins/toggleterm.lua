@@ -53,12 +53,12 @@ return {
     end
 
     local claude_term = create_ai_terminal {
-      cmd = "zsh -c 'source ~/.dotfiles/zshrc && ccode'",
+      cmd = "zsh --login -i -c 'ccode'",
       count = 99,
     }
 
     local codex_term = create_ai_terminal {
-      cmd = "zsh -c 'source ~/.dotfiles/zshrc && ccodex'",
+      cmd = "zsh --login -i -c 'ccodex'",
       count = 98,
     }
 
