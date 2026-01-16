@@ -34,6 +34,19 @@ in
       ${pkgs.ripgrep}/bin/rg --generate complete-zsh > $HOME/.zsh/completions/_rg 2>/dev/null || true
     '';
 
+    # Claude config - copy all files (symlinks cause permission/perf issues)
+    # See: https://github.com/anthropics/claude-code/issues/3575
+    # Don't use home.file for .claude/* - it creates a symlink to the whole dotfiles/claude dir
+    activation.claudeConfig = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      mkdir -p $HOME/.claude
+      cp -f ${dotfiles}/claude/settings.json $HOME/.claude/settings.json
+      cp -f ${dotfiles}/claude/CLAUDE.md $HOME/.claude/CLAUDE.md
+      cp -f ${dotfiles}/claude/file-suggestion.sh $HOME/.claude/file-suggestion.sh
+      chmod +x $HOME/.claude/file-suggestion.sh
+      rm -rf $HOME/.claude/skills
+      cp -r ${dotfiles}/claude/skills $HOME/.claude/skills
+    '';
+
   };
 
   # Let Home Manager manage itself
@@ -58,10 +71,6 @@ in
     "Library/Application Support/lazygit/config.yml".source =
       config.lib.file.mkOutOfStoreSymlink "${dotfiles}/lazygit.yml";
 
-    # Claude (individual files, not whole directory - keeps cache/sessions local)
-    ".claude/CLAUDE.md".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/claude/CLAUDE.md";
-    ".claude/skills".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/claude/skills";
-    ".claude/settings.json".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/claude/settings.json";
-    ".claude/file-suggestion.sh".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/claude/file-suggestion.sh";
+    # Claude config managed via activation.claudeConfig (copies, not symlinks)
   };
 }

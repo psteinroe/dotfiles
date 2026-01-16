@@ -44,6 +44,19 @@ alias gp='git push'
 alias gl='git pull'
 alias gs='git status'
 
+# Clean up merged branches (detects main branch dynamically via gh)
+gclean() {
+  local main=$(gh repo view --json defaultBranchRef -q '.defaultBranchRef.name' 2>/dev/null || echo "main")
+  local branches=$(git branch --merged "$main" | grep -v "^\\*" | grep -v "^  $main$" | grep -v "^  production$")
+  [ -n "$branches" ] && echo "$branches" | xargs git branch -d || echo "No merged branches to clean"
+}
+
+# Reset to clean state: checkout main, pull, clean merged branches
+greset() {
+  local main=$(gh repo view --json defaultBranchRef -q '.defaultBranchRef.name' 2>/dev/null || echo "main")
+  git checkout "$main" && git pull && gclean
+}
+
 # git-town (stacked PRs)
 alias gt='git town'
 # Quick PR: commits "initial", pushes, opens PR editor
@@ -58,10 +71,11 @@ gpr() {
 
   if [ "$1" = "-n" ]; then
     # Create new branch with random name
+    local main=$(gh repo view --json defaultBranchRef -q '.defaultBranchRef.name' 2>/dev/null || echo "main")
     local adj=(quick bright calm cool dark fast free gold green happy keen loud mint neat pale pink pure red safe slim soft warm wild)
     local noun=(ant bear bird bolt cave crow dawn deer dove duck fern fish frog hawk iris jade lake leaf lion lynx moon moth oak owl pine pond rain rock rose sage snow star swan tide tree vine wave wolf)
     local branch="${adj[$RANDOM % ${#adj[@]} + 1]}-${noun[$RANDOM % ${#noun[@]} + 1]}"
-    git add -A && git town hack "$branch" -c -m "initial" && gh pr create -e
+    git checkout "$main" && git pull && git checkout -b "$branch" && git add -A && git commit -m "initial" && git push -u origin "$branch" && gh pr create -e
   else
     # Commit to current branch
     git add -A && git commit -m "initial" && git push && gh pr create -e

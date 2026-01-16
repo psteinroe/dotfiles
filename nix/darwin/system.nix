@@ -51,16 +51,12 @@
     TrackpadThreeFingerDrag = true;
   };
 
-  # Disable desktop widgets
+  # Custom preferences
   system.defaults.CustomUserPreferences = {
     # Mouse speed: range -1 (slowest) to 3 (fastest), default ~0.875
     ".GlobalPreferences"."com.apple.mouse.scaling" = 2.0;
-    # Safari developer mode
-    "com.apple.Safari" = {
-      IncludeDevelopMenu = true;
-      WebKitDeveloperExtrasEnabledPreferenceKey = true;
-      "WebKitPreferences.developerExtrasEnabled" = true;
-    };
+    # Safari: enable dev mode manually (Settings > Advanced > Show features for web developers)
+    # Can't be set via nix due to sandboxed preferences
     "com.apple.WindowManager" = {
       StandardHideWidgets = 1;
       StageManagerHideWidgets = 1;
