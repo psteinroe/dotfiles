@@ -6,6 +6,8 @@
 ## Working with git
 
 - Never mention Claude Code in commit messages or pull request descriptions
+- Always prefer rebase over merge to keep history clean
+- Use `gh repo view --json defaultBranchRef -q '.defaultBranchRef.name'` to detect the main branch (not always "main")
 
 ## Version Control
 

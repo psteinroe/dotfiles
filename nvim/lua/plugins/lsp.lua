@@ -60,6 +60,7 @@ return {
         "oxlint",
         "postgres_lsp",
         "nil_ls", -- Nix LSP
+        "jsonls", -- JSON with $schema support
       })
 
       -- Filter for React DTS (keep existing logic for gd)

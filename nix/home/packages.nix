@@ -34,6 +34,7 @@ in
     # Dev tools
     jq
     yq-go
+    postgresql
     just
     hugo
     cmake
@@ -41,6 +42,7 @@ in
     awscli2
     pnpm
     bun
+    nodePackages.vercel
 
     # Formatters
     stylua
@@ -64,6 +66,7 @@ in
     # Linters
     oxlint
     golangci-lint
+    luaPackages.luacheck
 
     # Go tools
     gotools # includes goimports

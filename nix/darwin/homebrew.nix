@@ -9,9 +9,14 @@
       upgrade = true;
     };
 
+    taps = [
+      "smudge/smudge"
+    ];
+
     # macOS-specific CLIs (not in nixpkgs or need macOS integration)
     brews = [
       "mas" # Mac App Store CLI
+      "smudge/smudge/nightlight"
     ];
 
     casks = [

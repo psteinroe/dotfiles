@@ -30,6 +30,7 @@
     ShowPathbar = true;
     FXPreferredViewStyle = "clmv"; # Column view
     _FXShowPosixPathInTitle = true;
+    FXRemoveOldTrashItems = true;
   };
 
   # Global settings
@@ -68,6 +69,12 @@
       raycastPreferredWindowMode = "default";
       showGettingStartedLink = 0;
     };
+  };
+
+  # Keyboard
+  system.keyboard = {
+    enableKeyMapping = true;
+    remapCapsLockToControl = true;
   };
 
   # Screensaver

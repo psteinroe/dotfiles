@@ -34,6 +34,7 @@
       autoload -Uz ccodex
       autoload -Uz rebuild
       autoload -Uz wtclone
+      autoload -Uz wtfork
       autoload -Uz wtcreate
       autoload -Uz wtcheckout
       autoload -Uz wtlist

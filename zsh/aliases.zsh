@@ -19,6 +19,9 @@ alias sbch="cd $HOME/Developer/supabase-cache-helpers.git"
 alias pglsp="cd $HOME/Developer/postgres-language-server.git"
 alias pgconductor="cd $HOME/Developer/postgres-conductor.git"
 
+# Nix
+alias ndc='nix develop -c'
+
 # Tools
 alias j='just'
 alias week='date +%V'

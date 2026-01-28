@@ -1,0 +1,58 @@
+# Fork and bare clone for worktree workflow (contributing to repos you don't own)
+# Usage: wtfork <repo> [name]
+# Example: wtfork owner/repo
+#          wtfork https://github.com/owner/repo
+if [ -z "$1" ]; then
+  echo "Usage: wtfork <repo> [name]"
+  echo "Example: wtfork owner/repo"
+  return 1
+fi
+
+local repo="$1"
+local name="${2:-$(basename "$repo" .git).git}"
+
+# Get GitHub username
+local username=$(gh api user -q '.login')
+if [ -z "$username" ]; then
+  echo "Failed to get GitHub username. Run 'gh auth login' first."
+  return 1
+fi
+
+# Extract repo name (handles both owner/repo and full URLs)
+local repo_name=$(basename "$repo" .git)
+
+# Fork URL follows predictable pattern
+local fork_url="https://github.com/$username/$repo_name"
+
+# Check if fork already exists
+if gh repo view "$username/$repo_name" &>/dev/null; then
+  echo "Using existing fork: $fork_url"
+else
+  echo "Forking $repo..."
+  gh repo fork "$repo" --clone=false || return 1
+fi
+
+# Bare clone your fork
+echo "Cloning fork..."
+git clone --bare "$fork_url" "$name" && cd "$name" && git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*" && git fetch
+
+# Add upstream remote (original repo)
+local upstream_url="https://github.com/$repo"
+[[ "$repo" == https://* ]] && upstream_url="$repo"
+git remote add upstream "$upstream_url"
+git fetch upstream
+
+local default_branch=$(gh repo view "$repo" --json defaultBranchRef -q '.defaultBranchRef.name' 2>/dev/null)
+
+if [ -n "$default_branch" ]; then
+  git worktree add "$default_branch" "$default_branch"
+  cd "$default_branch"
+  # Set git-town for fork workflow
+  git config git-town.main-branch "$default_branch"
+  git config git-town.push-hook false
+  wtsetup
+  echo ""
+  echo "Fork ready! Remotes:"
+  echo "  origin   -> your fork (push here)"
+  echo "  upstream -> original repo (pull from here)"
+fi

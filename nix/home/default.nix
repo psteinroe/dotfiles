@@ -1,4 +1,9 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   dotfiles = "/Users/psteinroe/Developer/dotfiles";
@@ -45,6 +50,26 @@ in
       chmod +x $HOME/.claude/file-suggestion.sh
       rm -rf $HOME/.claude/skills
       cp -r ${dotfiles}/claude/skills $HOME/.claude/skills
+
+      # Install Claude marketplaces and plugins (idempotent - skips if already installed)
+      if command -v claude &> /dev/null; then
+        # Marketplaces
+        claude plugin marketplace add anthropics/claude-code 2>/dev/null || true
+        claude plugin marketplace add anthropics/claude-plugins-official 2>/dev/null || true
+        claude plugin marketplace add Piebald-AI/claude-code-lsps 2>/dev/null || true
+
+        # Plugins (from claude-plugins-official)
+        claude plugin install linear@claude-plugins-official 2>/dev/null || true
+
+        # LSP plugins (from claude-code-lsps)
+        claude plugin install vtsls@claude-code-lsps 2>/dev/null || true
+        claude plugin install rust-analyzer@claude-code-lsps 2>/dev/null || true
+        claude plugin install gopls@claude-code-lsps 2>/dev/null || true
+        claude plugin install vscode-langservers@claude-code-lsps 2>/dev/null || true
+
+        # MCP servers (idempotent - claude mcp add updates if exists)
+        claude mcp add scryfall --scope user -- npx scryfall-mcp-server 2>/dev/null || true
+      fi
     '';
 
   };

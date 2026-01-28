@@ -1,2 +1,7 @@
 # Rebuild nix-darwin configuration
+# Usage: rebuild [-u|--update]
+if [[ "$1" == "-u" || "$1" == "--update" ]]; then
+  echo "Updating flake inputs..."
+  nix flake update --flake "$HOME/Developer/dotfiles"
+fi
 sudo HOME="$HOME" darwin-rebuild switch --flake "$HOME/Developer/dotfiles#psteinroe"

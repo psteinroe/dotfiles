@@ -1,6 +1,12 @@
 bindkey -v
 
-# Atuin handles Ctrl-R, use Alt-R for FZF as fallback
+# zsh-vi-mode overrides keybindings, so rebind after it initializes
+zvm_after_init_commands+=(
+  'bindkey -M viins "^r" atuin-search-viins'
+  'bindkey -M vicmd "^r" atuin-search-vicmd'
+)
+
+# Alt-R for FZF as fallback
 bindkey -M viins '^[r' fzf-history-widget
 bindkey -M viins '^f' fzf-file-widget
 bindkey -M viins '^z' fzf-cd-widget
