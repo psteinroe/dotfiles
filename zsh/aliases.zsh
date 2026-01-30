@@ -78,7 +78,7 @@ gpr() {
     local adj=(quick bright calm cool dark fast free gold green happy keen loud mint neat pale pink pure red safe slim soft warm wild)
     local noun=(ant bear bird bolt cave crow dawn deer dove duck fern fish frog hawk iris jade lake leaf lion lynx moon moth oak owl pine pond rain rock rose sage snow star swan tide tree vine wave wolf)
     local branch="${adj[$RANDOM % ${#adj[@]} + 1]}-${noun[$RANDOM % ${#noun[@]} + 1]}"
-    git checkout "$main" && git pull && git checkout -b "$branch" && git add -A && git commit -m "initial" && git push -u origin "$branch" && gh pr create -e
+    git checkout "$main" && git pull && git checkout -b "$branch" && git commit -m "initial" && git push -u origin "$branch" && gh pr create -e
   else
     # Commit to current branch
     git add -A && git commit -m "initial" && git push && gh pr create -e
