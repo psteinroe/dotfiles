@@ -81,6 +81,6 @@ gpr() {
     git checkout "$main" && git pull && git checkout -b "$branch" && git commit -m "initial" && git push -u origin "$branch" && gh pr create -e
   else
     # Commit to current branch
-    git add -A && git commit -m "initial" && git push && gh pr create -e
+    git commit -m "initial" && git push && gh pr create -e
   fi
 }
