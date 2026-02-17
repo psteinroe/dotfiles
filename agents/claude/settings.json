@@ -1,0 +1,12 @@
+{
+  "fileSuggestion": { "type": "command", "command": "~/.claude/file-suggestion.sh" },
+  "enabledPlugins": {},
+  "alwaysThinkingEnabled": true,
+  "addCoAuthoredBy": false,
+  "autoAcceptEdits": true,
+  "enableExtendedThinking": true,
+  "statusLineFormat": "${directoryName} ${gitBranch}",
+  "environmentVariables": {
+    "BASH_COMMAND_TIMEOUT_SECONDS": "300"
+  }
+}

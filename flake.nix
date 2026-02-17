@@ -22,9 +22,21 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # Claude Code CLI
+    # Claude Code CLI (pre-built binary)
     claude-code = {
       url = "github:sadjow/claude-code-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    # OpenAI Codex CLI (pre-built binary)
+    codex-cli = {
+      url = "github:sadjow/codex-cli-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    # Pi coding agent (from llm-agents.nix)
+    llm-agents = {
+      url = "github:numtide/llm-agents.nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
@@ -32,7 +44,7 @@
     ghostty-hm-module.url = "github:clo4/ghostty-hm-module";
   };
 
-  outputs = inputs@{ self, nixpkgs, nix-darwin, home-manager, nix-homebrew, nix-casks, claude-code, ghostty-hm-module, ... }:
+  outputs = inputs@{ self, nixpkgs, nix-darwin, home-manager, nix-homebrew, nix-casks, claude-code, codex-cli, llm-agents, ghostty-hm-module, ... }:
     let
       system = "aarch64-darwin";
       username = "psteinroe";

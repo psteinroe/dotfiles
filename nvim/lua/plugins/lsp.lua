@@ -15,13 +15,13 @@ return {
 
       -- Override postgres_lsp to use postgrestools
       vim.lsp.config("postgres_lsp", {
-        cmd = { "postgrestools", "lsp-proxy" },
+        cmd = { "postgres-language-server", "lsp-proxy" },
         filetypes = { "sql" },
-        root_markers = { "postgrestools.jsonc" },
+        root_markers = { "postgres-language-server.jsonc" },
       })
 
       -- Ensure lspconfig.util is loaded before vim.lsp.enable() uses lsp/* configs
-      require("lspconfig.util")
+      require "lspconfig.util"
 
       vim.lsp.config("gopls", {
         settings = {
@@ -50,10 +50,17 @@ return {
         filetypes = {},
       })
 
+      -- tsgo: native TypeScript language server (Go implementation)
+      vim.lsp.config("tsgo", {
+        cmd = { "tsgo", "--lsp", "--stdio" },
+        filetypes = { "javascript", "javascriptreact", "typescript", "typescriptreact" },
+        root_markers = { "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "bun.lockb", ".git" },
+      })
+
       -- Enable all LSP servers (nvim-lspconfig provides the base configs)
-      vim.lsp.enable({
+      vim.lsp.enable {
         "lua_ls",
-        "ts_ls",
+        "tsgo",
         "gopls",
         "ty", -- Python (astral.sh) - install via: uv tool install ty
         "tailwindcss",
@@ -61,7 +68,7 @@ return {
         "postgres_lsp",
         "nil_ls", -- Nix LSP
         "jsonls", -- JSON with $schema support
-      })
+      }
 
       -- Filter for React DTS (keep existing logic for gd)
       local function filter(arr, fn)
@@ -88,9 +95,9 @@ return {
         end
         vim.fn.setqflist({}, " ", { title = options.title, items = items, context = options.context })
         if #items > 1 then
-          vim.cmd("copen")
+          vim.cmd "copen"
         else
-          vim.cmd("cfirst")
+          vim.cmd "cfirst"
         end
       end
 

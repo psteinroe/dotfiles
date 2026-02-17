@@ -6,13 +6,14 @@
 }:
 
 let
-  dotfiles = "/Users/psteinroe/Developer/dotfiles";
+  dotfiles = "${config.home.homeDirectory}/Developer/dotfiles";
 in
 {
   imports = [
     ./packages.nix
     ./shell.nix
     ./git.nix
+    ./agents.nix
   ];
 
   home = {
@@ -39,39 +40,6 @@ in
       ${pkgs.ripgrep}/bin/rg --generate complete-zsh > $HOME/.zsh/completions/_rg 2>/dev/null || true
     '';
 
-    # Claude config - copy all files (symlinks cause permission/perf issues)
-    # See: https://github.com/anthropics/claude-code/issues/3575
-    # Don't use home.file for .claude/* - it creates a symlink to the whole dotfiles/claude dir
-    activation.claudeConfig = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      mkdir -p $HOME/.claude
-      cp -f ${dotfiles}/claude/settings.json $HOME/.claude/settings.json
-      cp -f ${dotfiles}/claude/CLAUDE.md $HOME/.claude/CLAUDE.md
-      cp -f ${dotfiles}/claude/file-suggestion.sh $HOME/.claude/file-suggestion.sh
-      chmod +x $HOME/.claude/file-suggestion.sh
-      rm -rf $HOME/.claude/skills
-      cp -r ${dotfiles}/claude/skills $HOME/.claude/skills
-
-      # Install Claude marketplaces and plugins (idempotent - skips if already installed)
-      if command -v claude &> /dev/null; then
-        # Marketplaces
-        claude plugin marketplace add anthropics/claude-code 2>/dev/null || true
-        claude plugin marketplace add anthropics/claude-plugins-official 2>/dev/null || true
-        claude plugin marketplace add Piebald-AI/claude-code-lsps 2>/dev/null || true
-
-        # Plugins (from claude-plugins-official)
-        claude plugin install linear@claude-plugins-official 2>/dev/null || true
-
-        # LSP plugins (from claude-code-lsps)
-        claude plugin install vtsls@claude-code-lsps 2>/dev/null || true
-        claude plugin install rust-analyzer@claude-code-lsps 2>/dev/null || true
-        claude plugin install gopls@claude-code-lsps 2>/dev/null || true
-        claude plugin install vscode-langservers@claude-code-lsps 2>/dev/null || true
-
-        # MCP servers (idempotent - claude mcp add updates if exists)
-        claude mcp add scryfall --scope user -- npx scryfall-mcp-server 2>/dev/null || true
-      fi
-    '';
-
   };
 
   # Let Home Manager manage itself
@@ -96,6 +64,6 @@ in
     "Library/Application Support/lazygit/config.yml".source =
       config.lib.file.mkOutOfStoreSymlink "${dotfiles}/lazygit.yml";
 
-    # Claude config managed via activation.claudeConfig (copies, not symlinks)
+    # Agent configs (Claude, OpenCode, Codex) managed via agents.nix
   };
 }

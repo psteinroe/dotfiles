@@ -1,0 +1,15 @@
+# marketplaces
+anthropics/claude-code
+anthropics/claude-plugins-official
+Piebald-AI/claude-code-lsps
+
+# plugins
+linear@claude-plugins-official
+vtsls@claude-code-lsps
+rust-analyzer@claude-code-lsps
+gopls@claude-code-lsps
+vscode-langservers@claude-code-lsps
+
+# mcps
+scryfall:pnpx scryfall-mcp-server
+linear:pnpx @anthropic/linear-mcp-server

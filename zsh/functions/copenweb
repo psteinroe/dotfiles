@@ -1,0 +1,277 @@
+# Manage a shared OpenCode web server for cross-device sessions.
+
+local state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/opencode"
+local pid_file="${state_dir}/web.pid"
+local meta_file="${state_dir}/web.meta"
+local log_file="${state_dir}/web.log"
+
+_copenweb_usage() {
+  cat <<'EOF'
+Usage: copenweb <command>
+
+Commands:
+  start      Start shared OpenCode web server in background
+  stop       Stop background server
+  restart    Restart background server
+  status     Show server status
+  logs       Tail server logs
+  url        Print local and Tailscale URLs
+
+Environment:
+  OPENCODE_WEB_HOSTNAME   Server hostname (default: 0.0.0.0)
+  OPENCODE_WEB_PORT       Server port (default: 4096)
+  OPENCODE_SERVER_URL     Optional override URL used by `copen`
+  OPENCODE_SERVER_PASSWORD Required unless Tailscale-only no-auth mode
+  OPENCODE_WEB_TAILSCALE_REQUIRE_PASSWORD=1  Keep auth on Tailscale host
+
+Passwordless mode:
+  If OPENCODE_WEB_HOSTNAME is set to your exact local Tailscale IPv4 (100.x.x.x),
+  copenweb starts without auth by default (even if password is configured).
+
+Tip:
+  Set password once in Keychain:
+    set-keychain-environment-variable OPENCODE_SERVER_PASSWORD
+EOF
+}
+
+_copenweb_is_loopback_host() {
+  local host="$1"
+  [[ "$host" == "127.0.0.1" || "$host" == "localhost" || "$host" == "::1" ]]
+}
+
+_copenweb_is_tailscale_ipv4() {
+  local host="$1"
+
+  [[ "$host" == 100.<->.<->.<-> ]] || return 1
+
+  local second_octet="${host#100.}"
+  second_octet="${second_octet%%.*}"
+  (( second_octet >= 64 && second_octet <= 127 )) || return 1
+
+  command -v tailscale >/dev/null 2>&1 || return 1
+
+  local -a ts_ips
+  ts_ips=("${(@f)$(tailscale ip -4 2>/dev/null)}")
+
+  local ip
+  for ip in "${ts_ips[@]}"; do
+    [[ "$ip" == "$host" ]] && return 0
+  done
+
+  return 1
+}
+
+_copenweb_running_pid() {
+  [[ -f "$pid_file" ]] || return 1
+
+  local pid
+  pid=$(<"$pid_file")
+  [[ -n "$pid" ]] || return 1
+
+  if kill -0 "$pid" 2>/dev/null; then
+    echo "$pid"
+    return 0
+  fi
+
+  rm -f "$pid_file"
+  return 1
+}
+
+_copenweb_read_meta() {
+  local default_host="${OPENCODE_WEB_HOSTNAME:-0.0.0.0}"
+  local default_port="${OPENCODE_WEB_PORT:-4096}"
+
+  if [[ -f "$meta_file" ]]; then
+    local host port
+    read -r host port < "$meta_file"
+    echo "${host:-$default_host} ${port:-$default_port}"
+    return 0
+  fi
+
+  echo "$default_host $default_port"
+}
+
+_copenweb_print_urls() {
+  local host="$1"
+  local port="$2"
+
+  if [[ "$host" == "0.0.0.0" ]]; then
+    echo "Local URL:      http://localhost:${port}"
+  else
+    echo "Local URL:      http://${host}:${port}"
+  fi
+
+  if command -v tailscale >/dev/null 2>&1; then
+    local -a ips
+    ips=("${(@f)$(tailscale ip -4 2>/dev/null)}")
+    if [[ -n "${ips[1]:-}" ]]; then
+      echo "Tailscale URL:  http://${ips[1]}:${port}"
+    fi
+  fi
+}
+
+_copenweb_health_code() {
+  local host="$1"
+  local port="$2"
+
+  local local_host="$host"
+  if [[ "$local_host" == "0.0.0.0" ]]; then
+    local_host="127.0.0.1"
+  fi
+
+  local username="${OPENCODE_SERVER_USERNAME:-opencode}"
+  local password="${OPENCODE_SERVER_PASSWORD:-}"
+  local url="http://${local_host}:${port}/global/health"
+  local code
+
+  code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 "$url" 2>/dev/null)
+  if [[ "$code" == "401" && -n "$password" ]]; then
+    code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 -u "${username}:${password}" "$url" 2>/dev/null)
+  fi
+
+  echo "$code"
+}
+
+_copenweb_start() {
+  local host="${OPENCODE_WEB_HOSTNAME:-0.0.0.0}"
+  local port="${OPENCODE_WEB_PORT:-4096}"
+  local allow_passwordless=0
+  local disable_auth=0
+  local force_password_on_tailscale="${OPENCODE_WEB_TAILSCALE_REQUIRE_PASSWORD:-0}"
+
+  mkdir -p "$state_dir"
+
+  local running_pid
+  if running_pid=$(_copenweb_running_pid); then
+    echo "OpenCode web already running (PID ${running_pid})"
+    local -a meta
+    meta=("${(@s: :)$(_copenweb_read_meta)}")
+    _copenweb_print_urls "${meta[1]}" "${meta[2]}"
+    return 0
+  fi
+
+  if _copenweb_is_tailscale_ipv4 "$host"; then
+    allow_passwordless=1
+  fi
+
+  if [[ "$allow_passwordless" -eq 1 && "$force_password_on_tailscale" != "1" ]]; then
+    disable_auth=1
+  fi
+
+  if [[ "$disable_auth" -eq 0 && -z "${OPENCODE_SERVER_PASSWORD:-}" ]]; then
+    local keychain_password
+    keychain_password=$(keychain-environment-variable OPENCODE_SERVER_PASSWORD 2>/dev/null)
+    if [[ -n "$keychain_password" ]]; then
+      export OPENCODE_SERVER_PASSWORD="$keychain_password"
+    fi
+  fi
+
+  if ! _copenweb_is_loopback_host "$host" && [[ "$disable_auth" -eq 0 ]] && [[ -z "${OPENCODE_SERVER_PASSWORD:-}" ]]; then
+    echo "Refusing to start without OPENCODE_SERVER_PASSWORD on ${host}."
+    echo "Run: set-keychain-environment-variable OPENCODE_SERVER_PASSWORD"
+    echo "Or set OPENCODE_WEB_HOSTNAME to your Tailscale 100.x.x.x IP for tailnet-only passwordless mode."
+    return 1
+  fi
+
+  if [[ "$disable_auth" -eq 1 ]]; then
+    echo "Starting without OPENCODE_SERVER_PASSWORD (Tailscale-only host: ${host}; ignoring configured password)."
+  fi
+
+  # Start from / to avoid project context - serves all projects
+  local pid
+  if [[ "$disable_auth" -eq 1 ]]; then
+    env -u OPENCODE_SERVER_PASSWORD -u OPENCODE_SERVER_USERNAME nohup sh -c 'cd / && exec opencode web --hostname "'"$host"'" --port "'"$port"'"' > "$log_file" 2>&1 &
+    pid=$!
+  else
+    nohup sh -c 'cd / && exec opencode web --hostname "'"$host"'" --port "'"$port"'"' > "$log_file" 2>&1 &
+    pid=$!
+  fi
+  echo "$pid" > "$pid_file"
+  echo "$host $port" > "$meta_file"
+
+  sleep 1
+  if ! kill -0 "$pid" 2>/dev/null; then
+    echo "Failed to start OpenCode web. Check logs: $log_file"
+    rm -f "$pid_file"
+    return 1
+  fi
+
+  local health_code
+  health_code=$(_copenweb_health_code "$host" "$port")
+
+  echo "Started OpenCode web (PID ${pid})"
+  _copenweb_print_urls "$host" "$port"
+  echo "Health:         HTTP ${health_code:-unknown}"
+  echo "Logs:           $log_file"
+  echo "Attach (local): copen"
+}
+
+_copenweb_stop() {
+  local pid
+  if ! pid=$(_copenweb_running_pid); then
+    echo "OpenCode web is not running"
+    return 0
+  fi
+
+  kill "$pid" 2>/dev/null || true
+  sleep 1
+
+  if kill -0 "$pid" 2>/dev/null; then
+    kill -9 "$pid" 2>/dev/null || true
+  fi
+
+  rm -f "$pid_file"
+  echo "Stopped OpenCode web"
+}
+
+local cmd="${1:-status}"
+shift || true
+
+case "$cmd" in
+  start)
+    _copenweb_start
+    ;;
+  stop)
+    _copenweb_stop
+    ;;
+  restart)
+    _copenweb_stop
+    _copenweb_start
+    ;;
+  status)
+    local pid
+    if pid=$(_copenweb_running_pid); then
+      local -a meta
+      meta=("${(@s: :)$(_copenweb_read_meta)}")
+      local health_code
+      health_code=$(_copenweb_health_code "${meta[1]}" "${meta[2]}")
+      echo "OpenCode web is running (PID ${pid})"
+      _copenweb_print_urls "${meta[1]}" "${meta[2]}"
+      echo "Health:         HTTP ${health_code:-unknown}"
+      echo "Logs:           $log_file"
+    else
+      echo "OpenCode web is not running"
+    fi
+    ;;
+  logs)
+    if [[ -f "$log_file" ]]; then
+      tail -f "$log_file"
+    else
+      echo "No log file found at $log_file"
+      return 1
+    fi
+    ;;
+  url)
+    local -a meta
+    meta=("${(@s: :)$(_copenweb_read_meta)}")
+    _copenweb_print_urls "${meta[1]}" "${meta[2]}"
+    ;;
+  -h|--help|help)
+    _copenweb_usage
+    ;;
+  *)
+    echo "Unknown command: $cmd"
+    _copenweb_usage
+    return 1
+    ;;
+esac

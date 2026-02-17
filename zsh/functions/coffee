@@ -1,0 +1,265 @@
+# coffee - Keep your Mac awake (Amphetamine alternative)
+# Uses macOS built-in caffeinate
+
+local PIDFILE="/tmp/coffee.pid"
+
+_coffee_usage() {
+    cat <<EOF
+Usage: coffee <command> [options]
+
+Commands:
+  start [duration]    Start keeping awake
+                      duration: NUMBER[m|h] (e.g., 30m, 2h)
+                      omit for indefinite
+
+  stop                Stop current session
+  status              Show current session status
+
+  app <app_name>      Keep awake while app is running
+                      e.g., coffee app "Google Chrome"
+
+  pid <pid>           Keep awake while process is running
+
+  until <HH:MM>       Keep awake until specific time (24h format)
+
+  lid on              Prevent sleep even when lid is closed (requires sudo)
+  lid off             Restore normal lid-close behavior (requires sudo)
+  lid status          Show current lid-close sleep setting
+
+Options:
+  -d, --display-sleep    Allow display to sleep (default: display stays on)
+  -h, --help             Show this help
+
+Examples:
+  coffee start            # Indefinitely, display on
+  coffee start 30m        # 30 minutes
+  coffee start 2h         # 2 hours
+  coffee start -d         # Indefinitely, allow display sleep
+  coffee app Safari       # While Safari is running
+  coffee until 17:30      # Until 5:30 PM
+  coffee stop             # End session
+  coffee lid on           # Prevent lid-close sleep (sudo)
+  coffee lid off          # Restore lid-close sleep (sudo)
+EOF
+}
+
+_coffee_get_pid_for_app() {
+    pgrep -x "$1" 2>/dev/null | head -1 || pgrep -f "$1" 2>/dev/null | head -1
+}
+
+_coffee_stop_session() {
+    if [[ -f "$PIDFILE" ]]; then
+        local pid=$(cat "$PIDFILE")
+        if kill -0 "$pid" 2>/dev/null; then
+            kill "$pid" 2>/dev/null || true
+            echo "Session ended (was PID $pid)"
+        else
+            echo "No active session"
+        fi
+        rm -f "$PIDFILE"
+    else
+        pkill -f "caffeinate" 2>/dev/null && echo "Session ended" || echo "No active session"
+    fi
+}
+
+_coffee_show_status() {
+    if [[ -f "$PIDFILE" ]]; then
+        local pid=$(cat "$PIDFILE")
+        if kill -0 "$pid" 2>/dev/null; then
+            echo "Session active (PID $pid)"
+            ps -p "$pid" -o etime=,command= 2>/dev/null | sed 's/^ */  Elapsed: /' || true
+            return 0
+        fi
+    fi
+    echo "No active session"
+    return 1
+}
+
+_coffee_start_caffeinate() {
+    local flags="$1"
+    local timeout="${2:-}"
+
+    _coffee_stop_session 2>/dev/null || true
+
+    if [[ -n "$timeout" ]]; then
+        caffeinate $flags -t "$timeout" &
+        echo "Keeping awake for $((timeout / 60)) minutes"
+    else
+        caffeinate $flags &
+        echo "Keeping awake indefinitely"
+    fi
+
+    echo $! > "$PIDFILE"
+    echo "Session started (PID $!)"
+    echo "Run 'coffee stop' to end"
+}
+
+_coffee_wait_for_pid() {
+    local target_pid="$1"
+    local flags="$2"
+
+    if ! kill -0 "$target_pid" 2>/dev/null; then
+        echo "Process $target_pid not found"
+        return 1
+    fi
+
+    _coffee_stop_session 2>/dev/null || true
+
+    caffeinate $flags -w "$target_pid" &
+    echo $! > "$PIDFILE"
+    echo "Keeping awake while PID $target_pid runs"
+    echo "Session started (PID $!)"
+}
+
+_coffee_parse_duration() {
+    local input="$1"
+    local num="${input%[mhMH]}"
+    local unit="${input##*[0-9]}"
+
+    if ! [[ "$num" =~ ^[0-9]+$ ]]; then
+        echo "Invalid duration: $input" >&2
+        return 1
+    fi
+
+    case "$unit" in
+        m|M) echo $((num * 60)) ;;
+        h|H) echo $((num * 3600)) ;;
+        "")  echo $((num * 60)) ;;
+        *)   echo "Invalid unit: $unit (use m or h)" >&2; return 1 ;;
+    esac
+}
+
+_coffee_calc_until_seconds() {
+    local target="$1"
+    local target_ts now_ts diff
+
+    target_ts=$(date -j -f "%H:%M" "$target" "+%s" 2>/dev/null) || {
+        echo "Invalid time format. Use HH:MM (24h)" >&2
+        return 1
+    }
+    now_ts=$(date "+%s")
+    diff=$((target_ts - now_ts))
+
+    if [[ $diff -le 0 ]]; then
+        diff=$((diff + 86400))
+    fi
+
+    echo "$diff"
+}
+
+_coffee_lid_status() {
+    local lid_state
+    lid_state=$(pmset -g | grep -i "disablesleep" | awk '{print $2}')
+    if [[ "$lid_state" == "1" ]]; then
+        echo "Lid-close sleep: DISABLED (Mac stays awake when lid closed)"
+        return 0
+    else
+        echo "Lid-close sleep: ENABLED (Mac sleeps when lid closed)"
+        return 1
+    fi
+}
+
+_coffee_lid_on() {
+    echo "Disabling lid-close sleep (requires sudo)..."
+    if sudo pmset -a disablesleep 1; then
+        echo "Lid-close sleep disabled. Mac will stay awake when lid is closed."
+        echo "Run 'coffee lid off' to restore normal behavior."
+    else
+        echo "Failed to disable lid-close sleep" >&2
+        return 1
+    fi
+}
+
+_coffee_lid_off() {
+    echo "Restoring lid-close sleep (requires sudo)..."
+    if sudo pmset -a disablesleep 0; then
+        echo "Lid-close sleep restored. Mac will sleep when lid is closed."
+    else
+        echo "Failed to restore lid-close sleep" >&2
+        return 1
+    fi
+}
+
+# Default: prevent both system and display sleep
+local FLAGS="-di"
+
+# Parse global options
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -d|--display-sleep)
+            FLAGS="-i"
+            shift
+            ;;
+        -h|--help)
+            _coffee_usage
+            return 0
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
+
+local cmd="${1:-}"
+shift || true
+
+case "$cmd" in
+    start)
+        if [[ $# -gt 0 && ! "$1" =~ ^- ]]; then
+            local timeout=$(_coffee_parse_duration "$1") || return 1
+            _coffee_start_caffeinate "$FLAGS" "$timeout"
+        else
+            _coffee_start_caffeinate "$FLAGS"
+        fi
+        ;;
+    stop)
+        _coffee_stop_session
+        ;;
+    status)
+        _coffee_show_status
+        ;;
+    app)
+        [[ $# -lt 1 ]] && { echo "Usage: coffee app <app_name>"; return 1; }
+        local app_pid=$(_coffee_get_pid_for_app "$1")
+        [[ -z "$app_pid" ]] && { echo "App '$1' not running"; return 1; }
+        _coffee_wait_for_pid "$app_pid" "$FLAGS"
+        echo "Tracking app: $1"
+        ;;
+    pid)
+        [[ $# -lt 1 ]] && { echo "Usage: coffee pid <pid>"; return 1; }
+        _coffee_wait_for_pid "$1" "$FLAGS"
+        ;;
+    until)
+        [[ $# -lt 1 ]] && { echo "Usage: coffee until <HH:MM>"; return 1; }
+        local secs=$(_coffee_calc_until_seconds "$1") || return 1
+        _coffee_start_caffeinate "$FLAGS" "$secs"
+        echo "Until $1 (~$((secs / 60)) minutes)"
+        ;;
+    lid)
+        local lid_cmd="${1:-status}"
+        case "$lid_cmd" in
+            on)
+                _coffee_lid_on
+                ;;
+            off)
+                _coffee_lid_off
+                ;;
+            status)
+                _coffee_lid_status
+                ;;
+            *)
+                echo "Usage: coffee lid [on|off|status]"
+                return 1
+                ;;
+        esac
+        ;;
+    "")
+        _coffee_usage
+        return 1
+        ;;
+    *)
+        echo "Unknown command: $cmd"
+        _coffee_usage
+        return 1
+        ;;
+esac

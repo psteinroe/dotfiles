@@ -16,6 +16,7 @@ fi
 echo "Fetching latest changes..."
 git fetch
 
+local main=$(gh repo view --json defaultBranchRef -q '.defaultBranchRef.name' 2>/dev/null || echo "main")
 local repo_name=$(basename "$repo_root")
 local worktree_parent=$(dirname "$repo_root")
 
@@ -25,7 +26,8 @@ else
   local worktree_path="$worktree_parent/$repo_name.git/$branch_name"
 fi
 
-if git worktree add "$worktree_path" -b "$branch_name"; then
+# Create worktree from origin/main (not local HEAD), without tracking origin/main
+if git worktree add "$worktree_path" -b "$branch_name" --no-track "origin/$main"; then
   echo "Created worktree at: $worktree_path"
   cd "$worktree_path"
   wtsetup

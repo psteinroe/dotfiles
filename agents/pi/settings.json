@@ -1,0 +1,8 @@
+{
+  "compaction": { "enabled": true },
+  "hideThinkingBlock": false,
+  "packages": [
+    "git:github.com/default-anton/pi-librarian",
+    "git:github.com/default-anton/pi-finder"
+  ]
+}

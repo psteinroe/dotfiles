@@ -1,0 +1,15 @@
+experimental_use_rmcp_client = true
+sandbox_mode = "workspace-write"
+tool_output_token_limit = 15000
+approval_policy = "on-failure"
+web_search = "live"
+personality = "pragmatic"
+
+[features]
+shell_snapshot = true
+steer = true
+collab = true
+
+[mcp_servers.linear]
+command = "pnpx"
+args = ["@anthropic/linear-mcp-server"]

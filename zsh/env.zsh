@@ -19,3 +19,6 @@ export PGT_LOG_PATH="$HOME/Library/Caches/dev.supabase-community.pgt/pgt-logs"
 
 # Anthropic API Key from keychain
 export ANTHROPIC_API_KEY=$(keychain-environment-variable ANTHROPIC_API_KEY 2>/dev/null || echo "");
+
+# OpenCode shared server auth from keychain
+export OPENCODE_SERVER_PASSWORD=$(keychain-environment-variable OPENCODE_SERVER_PASSWORD 2>/dev/null || echo "")

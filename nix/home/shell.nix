@@ -32,7 +32,10 @@
       autoload -Uz video_to_gif
       autoload -Uz ccode
       autoload -Uz ccodex
+      autoload -Uz copen
+      autoload -Uz copenweb
       autoload -Uz rebuild
+      autoload -Uz coffee
       autoload -Uz wtclone
       autoload -Uz wtfork
       autoload -Uz wtcreate
@@ -40,6 +43,7 @@
       autoload -Uz wtlist
       autoload -Uz wtclean
       autoload -Uz wtsetup
+      autoload -Uz cpi
     '';
   };
 
@@ -67,6 +71,6 @@
     enable = true;
     enableZshIntegration = true;
     nix-direnv.enable = true;
-    silent = true;  # Suppress direnv output
+    silent = true; # Suppress direnv output
   };
 }

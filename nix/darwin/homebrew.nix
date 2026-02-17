@@ -20,6 +20,7 @@
     ];
 
     casks = [
+      "ausweisapp"
       "ghostty"
       "logitech-options"
       "slack"
@@ -34,7 +35,10 @@
       "spotify"
       "google-chrome"
       "font-fira-code-nerd-font"
-      "tailscale-app"
+      {
+        name = "tailscale-app"; # GUI app + Network Extension (CLI comes from nixpkgs)
+        greedy = true; # keep auto-updating cask on rebuild
+      }
     ];
 
     masApps = {

@@ -1,0 +1,172 @@
+# Attach OpenCode to a shared server for the current project directory.
+# Per-directory session persistence (like ccode/ccodex).
+# Falls back to local `opencode` if the shared server is unreachable.
+
+local session_file=".opencode-session-id"
+local session_id=""
+local url="${OPENCODE_SERVER_URL:-}"
+local state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/opencode"
+local meta_file="${state_dir}/web.meta"
+local url_overridden=0
+local configured_host="${OPENCODE_WEB_HOSTNAME:-}"
+local configured_port="${OPENCODE_WEB_PORT:-}"
+local username="${OPENCODE_SERVER_USERNAME:-opencode}"
+local password="${OPENCODE_SERVER_PASSWORD:-}"
+local http_code=""
+
+# Ensure session file is always gitignored
+if [[ -f ".gitignore" ]]; then
+  grep -q "^\.opencode-session-id$" .gitignore 2>/dev/null || echo ".opencode-session-id" >> .gitignore
+else
+  echo ".opencode-session-id" > .gitignore
+fi
+
+# Read existing session ID if present
+if [[ -f "$session_file" ]]; then
+  session_id=$(<"$session_file")
+fi
+
+_copen_refresh_url_from_meta() {
+  [[ -f "$meta_file" ]] || return 1
+
+  local host port
+  read -r host port < "$meta_file"
+  [[ -n "$host" && -n "$port" ]] || return 1
+
+  if [[ "$host" == "0.0.0.0" ]]; then
+    url="http://127.0.0.1:${port}"
+  else
+    url="http://${host}:${port}"
+  fi
+
+  return 0
+}
+
+_copen_health_code() {
+  local target_url="$1"
+  local health_url="${target_url%/}/global/health"
+  local code
+
+  if command -v curl >/dev/null 2>&1; then
+    code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 "$health_url" 2>/dev/null)
+    if [[ "$code" == "401" && -n "$password" ]]; then
+      code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 -u "${username}:${password}" "$health_url" 2>/dev/null)
+    fi
+    echo "$code"
+  fi
+}
+
+_copen_session_exists() {
+  local target_url="$1"
+  local sid="$2"
+  local session_url="${target_url%/}/session/${sid}"
+  local code
+
+  if command -v curl >/dev/null 2>&1; then
+    code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 "$session_url" 2>/dev/null)
+    if [[ "$code" == "401" && -n "$password" ]]; then
+      code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 -u "${username}:${password}" "$session_url" 2>/dev/null)
+    fi
+    [[ "$code" == "200" ]] && return 0
+  fi
+  return 1
+}
+
+_copen_get_latest_session() {
+  local target_url="$1"
+  local dir="$2"
+  local session_url="${target_url%/}/session?directory=${dir}&limit=1"
+  local result
+
+  if command -v curl >/dev/null 2>&1; then
+    if [[ -n "$password" ]]; then
+      result=$(curl -s --max-time 2 -u "${username}:${password}" "$session_url" 2>/dev/null)
+    else
+      result=$(curl -s --max-time 2 "$session_url" 2>/dev/null)
+    fi
+    if command -v jq >/dev/null 2>&1; then
+      echo "$result" | jq -r '.[0].id // empty' 2>/dev/null
+    fi
+  fi
+}
+
+if [[ -z "$url" && ( -n "$configured_host" || -n "$configured_port" ) ]]; then
+  local host="${configured_host:-127.0.0.1}"
+  local port="${configured_port:-4096}"
+
+  if [[ "$host" == "0.0.0.0" ]]; then
+    host="127.0.0.1"
+  fi
+
+  url="http://${host}:${port}"
+fi
+
+if [[ -z "$url" ]]; then
+  _copen_refresh_url_from_meta >/dev/null 2>&1 || true
+fi
+
+if [[ -z "$url" ]]; then
+  url="http://127.0.0.1:${OPENCODE_WEB_PORT:-4096}"
+fi
+
+# Allow overriding URL as first argument.
+if [[ "$1" == http://* || "$1" == https://* ]]; then
+  url="$1"
+  url_overridden=1
+  shift
+fi
+
+local base_url="${url%/}"
+
+if [[ -z "$password" ]] && command -v keychain-environment-variable >/dev/null 2>&1; then
+  password=$(keychain-environment-variable OPENCODE_SERVER_PASSWORD 2>/dev/null)
+  if [[ -n "$password" ]]; then
+    export OPENCODE_SERVER_PASSWORD="$password"
+  fi
+fi
+
+http_code=$(_copen_health_code "$base_url")
+
+if [[ "$http_code" != "200" && "$http_code" != "401" && "$url_overridden" -eq 0 ]] && command -v copenweb >/dev/null 2>&1; then
+  echo "OpenCode server unavailable at ${base_url}. Starting shared server..."
+  if copenweb start; then
+    if [[ -z "${OPENCODE_SERVER_URL:-}" ]]; then
+      _copen_refresh_url_from_meta >/dev/null 2>&1 || true
+    fi
+    base_url="${url%/}"
+    http_code=$(_copen_health_code "$base_url")
+  fi
+fi
+
+if [[ "$http_code" != "200" && "$http_code" != "401" ]]; then
+  echo "OpenCode server unavailable at ${base_url}. Starting local opencode."
+  command opencode "$@"
+  return $?
+fi
+
+# Session resolution:
+# 1. If we have a saved session ID and it exists on server, resume it
+# 2. Otherwise, check if there's an existing session for this directory
+# 3. If found, save it and resume
+# 4. Otherwise, start fresh (opencode will create new session, we save it after)
+
+if [[ -n "$session_id" ]] && _copen_session_exists "$base_url" "$session_id"; then
+  echo "Resuming session in $(basename "$PWD"): $session_id"
+  command opencode attach "$base_url" --dir "$PWD" -s "$session_id" "$@"
+else
+  # Try to find latest session for this directory
+  local latest_session
+  latest_session=$(_copen_get_latest_session "$base_url" "$PWD")
+  
+  if [[ -n "$latest_session" ]]; then
+    echo "$latest_session" > "$session_file"
+    echo "Resuming latest session in $(basename "$PWD"): $latest_session"
+    command opencode attach "$base_url" --dir "$PWD" -s "$latest_session" "$@"
+  else
+    echo "Starting new session in $(basename "$PWD")..."
+    # Start without session flag; after first prompt, we could update the file
+    # but opencode doesn't easily expose the new session ID on CLI
+    # So we rely on _copen_get_latest_session next time
+    command opencode attach "$base_url" --dir "$PWD" "$@"
+  fi
+fi

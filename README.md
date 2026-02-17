@@ -21,6 +21,74 @@ curl -fsSL https://raw.githubusercontent.com/psteinroe/dotfiles/main/bootstrap.s
 rebuild
 ```
 
+## Tailscale (macOS)
+
+- GUI app is installed via Homebrew cask: `tailscale-app`
+- CLI is installed via Nix package: `tailscale`
+- First-time setup requires manual approval in macOS:
+  1. `open -a Tailscale`
+  2. Approve extension in `System Settings -> Privacy & Security`
+  3. Accept VPN/network configuration prompt
+- Verify with:
+
+```bash
+tailscale status
+systemextensionsctl list | rg -i tailscale
+```
+
+## OpenCode Shared Server (Mac + Phone)
+
+Use one shared OpenCode web backend and attach from each project locally.
+`oc` lazy-starts the backend if it is not running.
+
+### One-time setup
+
+```bash
+set-keychain-environment-variable OPENCODE_SERVER_PASSWORD
+rebuild
+```
+
+### Attach per project (local CLI, lazy start)
+
+```bash
+cd /path/to/project
+oc              # copen: attach with --dir "$PWD" (auto-starts ocweb if needed)
+```
+
+### Manual server controls
+
+```bash
+ocweb start      # starts `opencode web` in background on 0.0.0.0:4096
+ocweb status
+ocweb url        # prints localhost + Tailscale URL
+ocweb logs
+ocweb stop
+```
+
+Optional tailnet-only passwordless mode:
+
+```bash
+export OPENCODE_WEB_HOSTNAME="$(tailscale ip -4 | awk 'NR==1{print $1}')"
+ocweb start
+```
+
+This is allowed only when hostname is your exact local Tailscale IPv4 (100.x.x.x).
+In this mode, `ocweb` disables OpenCode basic auth by default even if
+`OPENCODE_SERVER_PASSWORD` is configured.
+
+To force auth on Tailscale host:
+
+```bash
+export OPENCODE_WEB_TAILSCALE_REQUIRE_PASSWORD=1
+ocweb restart
+```
+
+### Continue on phone
+
+1. Connect phone + Mac to Tailscale.
+2. Open the URL from `ocweb url` on your phone.
+3. Continue the same sessions from web while still attaching locally with `oc`.
+
 ---
 
 ## Git Worktree Workflow

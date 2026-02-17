@@ -1,0 +1,7 @@
+# Pi with per-directory session persistence
+local cwd_name="$(basename $(pwd))"
+
+if ! command pi -c 2>/dev/null; then
+  echo "Starting new Pi session in ${cwd_name}..."
+  command pi
+fi

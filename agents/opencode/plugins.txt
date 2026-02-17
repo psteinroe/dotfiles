@@ -1,0 +1,2 @@
+# plugins
+opencode-openai-codex-auth@latest

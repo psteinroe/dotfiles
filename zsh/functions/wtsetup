@@ -4,4 +4,19 @@
 [ -f ".gitmodules" ] && echo "Updating submodules..." && git submodule update --init --recursive
 [ -f "pnpm-lock.yaml" ] && echo "Running pnpm install..." && pnpm install
 [ -f "bun.lockb" ] || [ -f "bun.lock" ] && echo "Running bun install..." && bun install
-[ -f "Cargo.toml" ] && (grep -q "^\[workspace\]" "Cargo.toml" || [ -d "crates" ]) && echo "Running cargo check..." && cargo check
+
+# Rust: setup fast linker on macOS if not configured
+if [ -f "Cargo.toml" ] && [[ "$OSTYPE" == "darwin"* ]]; then
+  local lld_path=$(which ld64.lld 2>/dev/null)
+  if [ -n "$lld_path" ] && { [ ! -f ~/.cargo/config.toml ] || ! grep -q "ld64.lld" ~/.cargo/config.toml 2>/dev/null; }; then
+    echo "Setting up fast linker (lld) for Rust..."
+    mkdir -p ~/.cargo
+    cat >> ~/.cargo/config.toml << EOF
+
+[target.aarch64-apple-darwin]
+linker = "clang"
+rustflags = ["-C", "link-arg=-fuse-ld=$lld_path"]
+EOF
+  fi
+  (grep -q "^\[workspace\]" "Cargo.toml" || [ -d "crates" ]) && echo "Running cargo check..." && cargo check
+fi

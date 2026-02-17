@@ -1,8 +1,0 @@
-{
-  "fileSuggestion": {
-    "type": "command",
-    "command": "~/.claude/file-suggestion.sh"
-  },
-  "enabledPlugins": {},
-  "alwaysThinkingEnabled": true
-}
