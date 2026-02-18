@@ -36,6 +36,8 @@
 ## Working with git
 
 - Never mention AI agent name in commits or PR descriptions
+- Use conventional commits for commit messages and PR titles (e.g., `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`)
+- Keep PR descriptions concise: a short summary and test plan, nothing more
 - Prefer rebase over merge to keep history clean
 - `gh repo view --json defaultBranchRef -q '.defaultBranchRef.name'` to detect the main branch
 
