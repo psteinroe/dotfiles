@@ -1,13 +1,13 @@
 {
-  "$schema": "https://opencode.ai/config.json",
-  "bashPermissions": [
-    "git", "gh", "npm", "pnpm", "pnpx", "node", "python", "cargo", "go", "docker"
-  ],
-  "mcp": {
-    "linear": {
-      "type": "local",
-      "command": ["pnpx", "@anthropic/linear-mcp-server"],
-      "enabled": true
+    "$schema": "https://opencode.ai/config.json",
+    "mcp": {
+        "linear": {
+            "type": "local",
+            "command": [
+                "pnpx",
+                "@anthropic/linear-mcp-server"
+            ],
+            "enabled": true
+        }
     }
-  }
 }

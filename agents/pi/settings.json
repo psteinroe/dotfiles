@@ -4,6 +4,9 @@
   "packages": [
     "git:github.com/default-anton/pi-librarian",
     "git:github.com/default-anton/pi-finder",
-    "git:github.com/default-anton/pi-handoff"
+    "git:github.com/default-anton/pi-handoff",
+    "git:github.com/ogulcancelik/pi-ghostty-theme-sync",
+    "git:github.com/HazAT/pi-ghostty",
+    "git:github.com/nicobailon/pi-mcp-adapter"
   ]
 }

@@ -102,6 +102,7 @@ in
     cp -f ${agentsDir}/pi/AGENTS.md $HOME/.pi/agent/AGENTS.md
     cp -f ${agentsDir}/pi/SYSTEM.md $HOME/.pi/agent/SYSTEM.md
     cp -f ${agentsDir}/pi/settings.json $HOME/.pi/agent/settings.json
+    cp -f ${agentsDir}/pi/mcp.json $HOME/.pi/agent/mcp.json
 
     # Deploy skills in Pi's format (skills/name/SKILL.md — same as Claude)
     rm -rf $HOME/.pi/agent/skills
