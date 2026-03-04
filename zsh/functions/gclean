@@ -1,0 +1,4 @@
+# Clean up merged branches (detects main branch dynamically via gh)
+local main=$(gh repo view --json defaultBranchRef -q '.defaultBranchRef.name' 2>/dev/null || echo "main")
+local branches=$(git branch --merged "$main" | grep -v "^\\*" | grep -v "^  $main$" | grep -v "^  production$")
+[ -n "$branches" ] && echo "$branches" | xargs git branch -d || echo "No merged branches to clean"

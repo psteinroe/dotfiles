@@ -44,6 +44,9 @@
       autoload -Uz wtclean
       autoload -Uz wtsetup
       autoload -Uz cpi
+      autoload -Uz gpr
+      autoload -Uz gclean
+      autoload -Uz greset
     '';
   };
 
@@ -68,9 +71,6 @@
   };
 
   programs.direnv = {
-    enable = true;
-    enableZshIntegration = true;
-    nix-direnv.enable = true;
-    silent = true; # Suppress direnv output
+    enable = false;
   };
 }

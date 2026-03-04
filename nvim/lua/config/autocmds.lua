@@ -71,13 +71,8 @@ vim.api.nvim_create_autocmd("FileType", {
 
 vim.o.title = true
 
-local function update_title()
-  -- Get the current working directory and extract the last path component
-  local cwd = vim.fn.getcwd()
-  local project_name = vim.fn.fnamemodify(cwd, ":t")
-  vim.o.titlestring = project_name
-end
+local status_title = require "config.status-title"
 
 vim.api.nvim_create_autocmd({ "VimEnter", "DirChanged" }, {
-  callback = update_title,
+  callback = status_title.update_title,
 })

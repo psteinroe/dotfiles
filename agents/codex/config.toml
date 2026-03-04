@@ -9,7 +9,7 @@ personality = "pragmatic"
 shell_snapshot = true
 steer = true
 collab = true
+multi_agent = true
 
-[mcp_servers.linear]
-command = "pnpx"
-args = ["@anthropic/linear-mcp-server"]
+[projects."/Users/psteinroe/Developer"]
+trust_level = "trusted"

@@ -11,16 +11,20 @@
 
     taps = [
       "smudge/smudge"
+      "manaflow-ai/cmux"
+      "nikitabobko/tap"
     ];
 
     # macOS-specific CLIs (not in nixpkgs or need macOS integration)
     brews = [
       "mas" # Mac App Store CLI
+      "mole" # macOS cleanup & optimization
       "smudge/smudge/nightlight"
     ];
 
     casks = [
       "ausweisapp"
+      "nikitabobko/tap/aerospace"
       "ghostty"
       "logitech-options"
       "slack"
@@ -31,6 +35,7 @@
       "timing"
       "linear-linear"
       "bruno"
+      "cmux"
       "orbstack"
       "spotify"
       "google-chrome"

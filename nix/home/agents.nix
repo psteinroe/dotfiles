@@ -2,12 +2,16 @@
   config,
   lib,
   pkgs,
+  inputs,
+  system,
   ...
 }:
 
 let
   dotfiles = "${config.home.homeDirectory}/Developer/dotfiles";
   agentsDir = "${dotfiles}/agents";
+  claude-code = inputs.claude-code.packages.${system};
+  claude-bin = "${claude-code.default}/bin/claude";
 in
 {
   home.activation.agentConfigs = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
@@ -19,6 +23,11 @@ in
     cp -f ${agentsDir}/claude/file-suggestion.sh $HOME/.claude/file-suggestion.sh
     chmod +x $HOME/.claude/file-suggestion.sh
 
+    # Deploy hooks
+    mkdir -p $HOME/.claude/hooks
+    cp -f ${agentsDir}/claude/hooks/*.sh $HOME/.claude/hooks/
+    chmod +x $HOME/.claude/hooks/*.sh
+
     # Deploy skills in Claude's format (skills/name/SKILL.md)
     rm -rf $HOME/.claude/skills
     mkdir -p $HOME/.claude/skills
@@ -29,30 +38,28 @@ in
     done
 
     # Install Claude plugins from declarative plugins.txt
-    if command -v claude &> /dev/null; then
-      plugins_file="${agentsDir}/claude/plugins.txt"
-      section=""
-      while IFS= read -r line || [ -n "$line" ]; do
-        [[ -z "$line" || "$line" =~ ^[[:space:]]*$ ]] && continue
-        if [[ "$line" =~ ^#\ (.+) ]]; then
-          section="''${BASH_REMATCH[1]}"
-          continue
-        fi
-        case "$section" in
-          marketplaces)
-            claude plugin marketplace add "$line" 2>/dev/null || true
-            ;;
-          plugins)
-            claude plugin install "$line" 2>/dev/null || true
-            ;;
-          mcps)
-            name="''${line%%:*}"
-            cmd="''${line#*:}"
-            claude mcp add "$name" --scope user -- $cmd 2>/dev/null || true
-            ;;
-        esac
-      done < "$plugins_file"
-    fi
+    plugins_file="${agentsDir}/claude/plugins.txt"
+    section=""
+    while IFS= read -r line || [ -n "$line" ]; do
+      [[ -z "$line" || "$line" =~ ^[[:space:]]*$ ]] && continue
+      if [[ "$line" =~ ^#\ (.+) ]]; then
+        section="''${BASH_REMATCH[1]}"
+        continue
+      fi
+      case "$section" in
+        marketplaces)
+          ${claude-bin} plugin marketplace add "$line" 2>/dev/null || true
+          ;;
+        plugins)
+          ${claude-bin} plugin install "$line" 2>/dev/null || true
+          ;;
+        mcps)
+          name="''${line%%:*}"
+          cmd="''${line#*:}"
+          ${claude-bin} mcp add "$name" --scope user -- $cmd 2>/dev/null || true
+          ;;
+      esac
+    done < "$plugins_file"
 
     # === OpenCode ===
     mkdir -p $HOME/.config/opencode

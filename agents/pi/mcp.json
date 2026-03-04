@@ -1,12 +1,10 @@
 {
-  "mcpServers": {
-    "linear": {
-      "command": "pnpx",
-      "args": ["@anthropic/linear-mcp-server"]
-    },
-    "scryfall": {
-      "command": "pnpx",
-      "args": ["scryfall-mcp-server"]
+    "mcpServers": {
+        "scryfall": {
+            "command": "pnpx",
+            "args": [
+                "scryfall-mcp-server"
+            ]
+        }
     }
-  }
 }

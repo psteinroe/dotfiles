@@ -1,5 +1,8 @@
 {
-  "fileSuggestion": { "type": "command", "command": "~/.claude/file-suggestion.sh" },
+  "fileSuggestion": {
+    "type": "command",
+    "command": "~/.claude/file-suggestion.sh"
+  },
   "enabledPlugins": {},
   "alwaysThinkingEnabled": true,
   "addCoAuthoredBy": false,
@@ -8,5 +11,55 @@
   "statusLineFormat": "${directoryName} ${gitBranch}",
   "environmentVariables": {
     "BASH_COMMAND_TIMEOUT_SECONDS": "300"
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/notify.sh",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/caffeinate.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/notify.sh",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/caffeinate.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/notify.sh",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/caffeinate.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
   }
 }

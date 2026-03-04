@@ -48,7 +48,7 @@
 
   # Trackpad settings
   system.defaults.trackpad = {
-    Clicking = true; # Tap to click
+    Clicking = false; # Require physical click (no tap)
     TrackpadThreeFingerDrag = true;
   };
 

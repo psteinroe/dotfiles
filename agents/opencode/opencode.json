@@ -1,13 +1,3 @@
 {
     "$schema": "https://opencode.ai/config.json",
-    "mcp": {
-        "linear": {
-            "type": "local",
-            "command": [
-                "pnpx",
-                "@anthropic/linear-mcp-server"
-            ],
-            "enabled": true
-        }
-    }
 }

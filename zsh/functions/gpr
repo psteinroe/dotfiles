@@ -1,0 +1,96 @@
+# Quick PR: commits "initial", pushes, creates PR with AI-generated title/body
+# Usage: gpr [-a] [-n] [-e] [-f <issue>]
+#   gpr             = commit (if changes) + push + create PR
+#   gpr -a          = git add -A first
+#   gpr -n          = new random branch first
+#   gpr -e          = edit title/body in $EDITOR before creating PR
+#   gpr -f <issue>  = add "Fixes <issue>" to PR body
+local ai_timeout="${GPR_AI_TIMEOUT_SECONDS:-45}"
+local add_all=false new_branch=false edit=false fixes=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -a) add_all=true; shift ;;
+    -n) new_branch=true; shift ;;
+    -e|--edit) edit=true; shift ;;
+    -f|--fixes) fixes="$2"; shift 2 ;;
+    *) shift ;;
+  esac
+done
+
+$add_all && git add -A
+
+local main=$(gh repo view --json defaultBranchRef -q '.defaultBranchRef.name' 2>/dev/null || echo "main")
+
+if $new_branch; then
+  local adj=(quick bright calm cool dark fast free gold green happy keen loud mint neat pale pink pure red safe slim soft warm wild)
+  local noun=(ant bear bird bolt cave crow dawn deer dove duck fern fish frog hawk iris jade lake leaf lion lynx moon moth oak owl pine pond rain rock rose sage snow star swan tide tree vine wave wolf)
+  local branch="${adj[$RANDOM % ${#adj[@]} + 1]}-${noun[$RANDOM % ${#noun[@]} + 1]}"
+  git checkout "$main" && git pull && git checkout -b "$branch"
+fi
+
+[ -n "$(git status --porcelain)" ] && git commit -m "initial"
+
+local branch=$(git branch --show-current)
+git push -u origin "$branch" || return 1
+
+echo "Collecting changes..."
+git fetch origin "$main" --quiet
+local log=$(git log "origin/$main"..HEAD --oneline 2>/dev/null)
+local diff=$(git diff "origin/$main"...HEAD 2>/dev/null | head -2000)
+
+local prompt='Generate a GitHub PR title and body from these changes.
+Title: use conventional commits (feat:, fix:, chore:, docs:, refactor:), under 70 chars.
+Body: 2-4 concise bullet points summarizing the changes.
+Output EXACTLY this format, no fences, no extra text:
+TITLE: <title here>
+BODY:
+- <bullet>
+- <bullet>'
+
+echo "Generating title and description..."
+local ai_output
+local ai_input
+ai_input=$(printf "Commits:\n%s\n\nDiff:\n%s" "$log" "$diff")
+
+ai_output=$(printf "%s" "$ai_input" | perl -e 'alarm shift; exec @ARGV' "$ai_timeout" claude -p "$prompt" 2>/dev/null)
+local claude_exit=$?
+
+local title=$(echo "$ai_output" | sed -n 's/^TITLE: //p' | head -1)
+local body=$(echo "$ai_output" | sed -n '/^BODY:/,$ { /^BODY:/d; p; }')
+
+if [[ -z "$title" && $claude_exit -eq 142 ]]; then
+  echo "Claude timed out after ${ai_timeout}s. Falling back to Codex..."
+  local codex_output_file
+  codex_output_file=$(mktemp)
+  printf "%s\n\n%s" "$prompt" "$ai_input" | codex exec - --output-last-message "$codex_output_file" >/dev/null 2>&1
+  if [[ -s "$codex_output_file" ]]; then
+    ai_output=$(cat "$codex_output_file")
+    title=$(echo "$ai_output" | sed -n 's/^TITLE: //p' | head -1)
+    body=$(echo "$ai_output" | sed -n '/^BODY:/,$ { /^BODY:/d; p; }')
+  fi
+  rm -f "$codex_output_file"
+fi
+
+[[ -n "$fixes" ]] && body="${body}"$'\n\n'"Fixes ${fixes}"
+
+if [[ -z "$title" ]]; then
+  echo "AI generation failed. Falling back to editor."
+  gh pr create -e
+  return
+fi
+
+echo "\n  \033[1m$title\033[0m\n$body\n"
+
+if $edit; then
+  local tmpfile=$(mktemp)
+  printf '%s\n\n%s' "$title" "$body" > "$tmpfile"
+  ${EDITOR:-vim} "$tmpfile"
+  title=$(head -1 "$tmpfile")
+  body=$(tail -n +3 "$tmpfile")
+  rm -f "$tmpfile"
+  echo "Creating PR..."
+  gh pr create --title "$title" --body "$body"
+else
+  echo "Creating PR..."
+  gh pr create --title "$title" --body "$body"
+fi

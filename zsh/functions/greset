@@ -1,0 +1,3 @@
+# Reset to clean state: checkout main, pull, clean merged branches
+local main=$(gh repo view --json defaultBranchRef -q '.defaultBranchRef.name' 2>/dev/null || echo "main")
+git checkout "$main" && git pull && gclean

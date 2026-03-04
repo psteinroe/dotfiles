@@ -1,12 +1,17 @@
 {
-  "compaction": { "enabled": true },
-  "hideThinkingBlock": false,
-  "packages": [
-    "git:github.com/default-anton/pi-librarian",
-    "git:github.com/default-anton/pi-finder",
-    "git:github.com/default-anton/pi-handoff",
-    "git:github.com/ogulcancelik/pi-ghostty-theme-sync",
-    "git:github.com/HazAT/pi-ghostty",
-    "git:github.com/nicobailon/pi-mcp-adapter"
-  ]
+    "compaction": {
+        "enabled": true
+    },
+    "hideThinkingBlock": false,
+    "shellPath": "/bin/zsh",
+    "shellCommandPrefix": "fpath=($HOME/Developer/dotfiles/zsh/functions $fpath); autoload -Uz gpr coffee",
+    "packages": [
+        "git:github.com/default-anton/pi-librarian",
+        "git:github.com/default-anton/pi-finder",
+        "git:github.com/default-anton/pi-handoff",
+        "git:github.com/ogulcancelik/pi-ghostty-theme-sync",
+        "git:github.com/HazAT/pi-ghostty",
+        "git:github.com/nicobailon/pi-mcp-adapter",
+        "git:github.com/Whamp/pi-token-burden"
+    ]
 }
