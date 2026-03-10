@@ -49,6 +49,8 @@ in
   xdg.configFile = {
     "nvim".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/nvim";
     "ghostty/config".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/ghostty.conf";
+    "aerospace/aerospace.toml".source =
+      config.lib.file.mkOutOfStoreSymlink "${dotfiles}/aerospace.toml";
     "starship.toml".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/starship.toml";
     "atuin/config.toml".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/atuin.toml";
   };

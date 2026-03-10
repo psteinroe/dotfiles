@@ -38,6 +38,7 @@
       "cmux"
       "orbstack"
       "spotify"
+      "codex-app"
       "google-chrome"
       "font-fira-code-nerd-font"
       {

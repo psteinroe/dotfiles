@@ -1,11 +1,11 @@
 ---
 name: weekly-update
-description: Generate a weekly status update from PRs. Use when the user wants a summary of their work for the past week. The user must specify the repository (owner/repo).
+description: Generate a two-week status update from PRs. Use when the user wants a summary of their work for the last two weeks. The user must specify the repository (owner/repo).
 ---
 
-# Weekly Update Skill
+# Two-Week Update Skill
 
-Generates a concise weekly update from merged and in-progress PRs for a given repository.
+Generates a concise two-week update from merged and in-progress PRs for a given repository.
 
 ## Input
 
@@ -16,25 +16,24 @@ The user must provide the target repository as `owner/repo` (e.g. `acme/backend`
 1. **Resolve the User**
    - Run `gh api user -q '.login'` to get the GitHub username
 
-2. **Calculate the Week Range**
-   - If today is Friday/Saturday/Sunday, report on THIS week (Saturday–Friday)
-   - If today is Monday–Thursday, report on the PREVIOUS week (Saturday–Friday)
+2. **Calculate the Two-Week Range**
+   - Use the most recent Friday as the end date:
+     - Friday/Saturday/Sunday → this week's Friday
+     - Monday/Tuesday/Wednesday/Thursday → previous week's Friday
+   - Start date is 13 days before that Friday (Saturday), giving two full Saturday–Friday weeks.
 
    ```bash
    current_day=$(date +%u)  # 1=Monday, 7=Sunday
-   if [ $current_day -ge 5 ]; then
-     week_saturday=$(date -v-$(($(date +%u) % 7))d +%Y-%m-%d)
-     week_friday=$(date -v+$((6 - $(date +%u) % 7))d +%Y-%m-%d)
-   else
-     week_saturday=$(date -v-$(($(date +%u) % 7 + 7))d +%Y-%m-%d)
-     week_friday=$(date -v-$(($(date +%u) % 7 + 1))d +%Y-%m-%d)
-   fi
+   days_since_friday=$(( (current_day + 2) % 7 ))
+
+   range_end=$(date -v-"${days_since_friday}"d +%Y-%m-%d)
+   range_start=$(date -v-"$((days_since_friday + 13))"d +%Y-%m-%d)
    ```
 
 3. **Fetch Merged PRs**
    ```bash
    gh pr list --repo <owner/repo> --author <username> --state merged \
-     --search "merged:${week_saturday}..${week_friday}" \
+     --search "merged:${range_start}..${range_end}" \
      --json number,title,url,body,mergedAt --limit 100
    ```
 
@@ -43,7 +42,7 @@ The user must provide the target repository as `owner/repo` (e.g. `acme/backend`
    gh pr list --repo <owner/repo> --author <username> --state open \
      --json number,title,url,body,updatedAt --limit 50
    ```
-   Filter to PRs updated within the week range.
+   Filter to PRs updated within the same two-week range.
 
 5. **Generate the Update**
    - Summarize each PR from its title and body — do not fetch individual commits
@@ -54,7 +53,7 @@ The user must provide the target repository as `owner/repo` (e.g. `acme/backend`
 ## Output Format
 
 ```markdown
-# Week: Jan 13 – Jan 17, 2026
+# Two Weeks: Jan 04 – Jan 17, 2026
 
 ## Merged
 
@@ -73,4 +72,4 @@ The user must provide the target repository as `owner/repo` (e.g. `acme/backend`
 - Target audience: team leads and management — focus on clarity, not technical details
 - Keep descriptions direct and factual
 - No cliche, flowery, or marketing language
-- If no PRs found for the week, say so clearly
+- If no PRs found for the two-week range, say so clearly

@@ -5,7 +5,13 @@
 #   gpr -n          = new random branch first
 #   gpr -e          = edit title/body in $EDITOR before creating PR
 #   gpr -f <issue>  = add "Fixes <issue>" to PR body
-local ai_timeout="${GPR_AI_TIMEOUT_SECONDS:-45}"
+# Env:
+#   GPR_PI_MODEL              = Pi model (default: openai-codex/gpt-5.4)
+#   GPR_PI_THINKING           = Pi thinking level (default: low)
+#   GPR_AI_TIMEOUT_SECONDS    = generation timeout (default: 60)
+local ai_timeout="${GPR_AI_TIMEOUT_SECONDS:-60}"
+local pi_model="${GPR_PI_MODEL:-openai-codex/gpt-5.4}"
+local pi_thinking="${GPR_PI_THINKING:-low}"
 local add_all=false new_branch=false edit=false fixes=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -17,7 +23,13 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-$add_all && git add -A
+local repo_root
+repo_root=$(git rev-parse --show-toplevel 2>/dev/null) || {
+  echo "Not in a git repository."
+  return 1
+}
+
+$add_all && git -C "$repo_root" add -A :/
 
 local main=$(gh repo view --json defaultBranchRef -q '.defaultBranchRef.name' 2>/dev/null || echo "main")
 
@@ -28,7 +40,13 @@ if $new_branch; then
   git checkout "$main" && git pull && git checkout -b "$branch"
 fi
 
-[ -n "$(git status --porcelain)" ] && git commit -m "initial"
+if [ -n "$(git status --porcelain)" ]; then
+  if git diff --cached --quiet; then
+    echo "Working tree has unstaged changes. Stage them or run gpr -a."
+    return 1
+  fi
+  git commit -m "initial" || return 1
+fi
 
 local branch=$(git branch --show-current)
 git push -u origin "$branch" || return 1
@@ -47,34 +65,28 @@ BODY:
 - <bullet>
 - <bullet>'
 
-echo "Generating title and description..."
-local ai_output
-local ai_input
-ai_input=$(printf "Commits:\n%s\n\nDiff:\n%s" "$log" "$diff")
+echo "Generating title and description with Pi (${pi_model}, thinking=${pi_thinking})..."
+local ai_prompt_file
+ai_prompt_file=$(mktemp)
+printf "%s\n\nCommits:\n%s\n\nDiff:\n%s" "$prompt" "$log" "$diff" > "$ai_prompt_file"
 
-ai_output=$(printf "%s" "$ai_input" | perl -e 'alarm shift; exec @ARGV' "$ai_timeout" claude -p "$prompt" 2>/dev/null)
-local claude_exit=$?
+local ai_output
+ai_output=$(perl -e 'alarm shift; exec @ARGV' "$ai_timeout" pi --no-session --no-tools --model "$pi_model" --thinking "$pi_thinking" -p "@$ai_prompt_file" 2>/dev/null)
+local ai_exit=$?
+rm -f "$ai_prompt_file"
 
 local title=$(echo "$ai_output" | sed -n 's/^TITLE: //p' | head -1)
 local body=$(echo "$ai_output" | sed -n '/^BODY:/,$ { /^BODY:/d; p; }')
 
-if [[ -z "$title" && $claude_exit -eq 142 ]]; then
-  echo "Claude timed out after ${ai_timeout}s. Falling back to Codex..."
-  local codex_output_file
-  codex_output_file=$(mktemp)
-  printf "%s\n\n%s" "$prompt" "$ai_input" | codex exec - --output-last-message "$codex_output_file" >/dev/null 2>&1
-  if [[ -s "$codex_output_file" ]]; then
-    ai_output=$(cat "$codex_output_file")
-    title=$(echo "$ai_output" | sed -n 's/^TITLE: //p' | head -1)
-    body=$(echo "$ai_output" | sed -n '/^BODY:/,$ { /^BODY:/d; p; }')
-  fi
-  rm -f "$codex_output_file"
-fi
-
 [[ -n "$fixes" ]] && body="${body}"$'\n\n'"Fixes ${fixes}"
 
 if [[ -z "$title" ]]; then
-  echo "AI generation failed. Falling back to editor."
+  if [[ $ai_exit -eq 142 ]]; then
+    echo "Pi timed out after ${ai_timeout}s."
+  else
+    echo "Pi generation failed (exit ${ai_exit})."
+  fi
+  echo "Falling back to editor."
   gh pr create -e
   return
 fi

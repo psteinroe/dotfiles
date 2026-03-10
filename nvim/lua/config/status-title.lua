@@ -5,7 +5,6 @@ local status = nil
 local status_icons = {
   working = "◉",
   done = "✓",
-  waiting = "⏸",
 }
 
 function M.update_title()

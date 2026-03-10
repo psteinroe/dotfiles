@@ -21,7 +21,7 @@ case "$EVENT" in
   Notification)
     TITLE="$PROJECT"
     MESSAGE=$(echo "$EVENT_JSON" | jq -r '.message // "Needs attention"')
-    STATUS="waiting"
+    STATUS="done"
     ;;
   *)
     exit 0
@@ -35,5 +35,5 @@ fi
 
 # Update neovim titlestring via parent socket
 if [ -n "${NVIM:-}" ]; then
-  nvim --server "$NVIM" --remote-expr "luaeval('require(\"config.status-title\").set(\"$STATUS\")')" 2>/dev/null || true
+  timeout 2 nvim --server "$NVIM" --remote-expr "luaeval('require(\"config.status-title\").set(\"$STATUS\")')" 2>/dev/null || true
 fi

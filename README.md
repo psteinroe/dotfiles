@@ -195,6 +195,39 @@ Custom nvim-like keybindings.
 
 ---
 
+## AeroSpace
+
+- Installed via Homebrew cask: `nikitabobko/tap/aerospace`
+- Config is tracked in repo at `aerospace.toml`
+- Nix symlinks it to `~/.config/aerospace/aerospace.toml`
+
+Apply changes:
+
+```bash
+rebuild
+```
+
+Useful runtime commands:
+
+```bash
+aerospace reload-config
+aerospace list-workspaces --all
+aerospace list-windows --all
+```
+
+Current app-to-workspace defaults:
+
+- `1`: Ghostty
+- `2`: Chrome
+- `3`: Slack + Discord
+- `4`: Linear
+- `5`: Bruno
+- `9`: Spotify
+
+Important: AeroSpace fails if both `~/.aerospace.toml` and `~/.config/aerospace/aerospace.toml` exist. Keep only the XDG one.
+
+---
+
 ## License
 
 MIT

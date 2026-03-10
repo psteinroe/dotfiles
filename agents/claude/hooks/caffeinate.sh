@@ -23,7 +23,7 @@ _kill_caffeinate() {
 case "$EVENT" in
   UserPromptSubmit)
     _kill_caffeinate
-    caffeinate -di &
+    caffeinate -di >/dev/null 2>&1 &
     echo $! > "$PIDFILE"
     ;;
   Stop|Notification)

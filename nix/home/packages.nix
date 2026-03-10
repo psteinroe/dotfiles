@@ -51,7 +51,6 @@ in
     tailscale
     pnpm
     bun
-    nodePackages.vercel
 
     # Formatters
     stylua
