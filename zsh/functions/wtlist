@@ -1,2 +1,4 @@
-# List git worktrees
-git worktree list
+# List git worktrees with fzf search, cd into selected worktree
+local selected
+selected=$(git worktree list | fzf --prompt="Worktree> " --height=40% --reverse) || return 0
+cd "$(echo "$selected" | awk '{print $1}')"
