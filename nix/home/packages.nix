@@ -30,7 +30,9 @@ in
     lua
     elixir
     # ruby  # conflicts with gotools (both have bin/bundle)
-    rustup
+    (rust-bin.stable.latest.default.override {
+      extensions = [ "rust-src" "rust-analyzer" "clippy" ];
+    })
 
     # Python
     uv
@@ -68,7 +70,7 @@ in
     yaml-language-server
     nil # Nix LSP
     gopls
-    # rust-analyzer provided by rustup
+    # rust-analyzer provided by rust-overlay (see rust-bin in Languages)
     # ty (Python) installed via: uv tool install ty
 
     # Linters

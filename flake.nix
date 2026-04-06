@@ -40,11 +40,17 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    # Rust toolchain (declarative, replaces rustup)
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     # Ghostty config management (binary via Homebrew)
     ghostty-hm-module.url = "github:clo4/ghostty-hm-module";
   };
 
-  outputs = inputs@{ self, nixpkgs, nix-darwin, home-manager, nix-homebrew, nix-casks, claude-code, codex-cli, llm-agents, ghostty-hm-module, ... }:
+  outputs = inputs@{ self, nixpkgs, nix-darwin, home-manager, nix-homebrew, nix-casks, claude-code, codex-cli, llm-agents, rust-overlay, ghostty-hm-module, ... }:
     let
       system = "aarch64-darwin";
       username = "psteinroe";

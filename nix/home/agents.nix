@@ -29,6 +29,7 @@ in
     mkdir -p "$HOME/.claude"
 
     sync_optional_file "${agentsDir}/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
+    sync_optional_file "${agentsDir}/claude/RTK.md" "$HOME/.claude/RTK.md"
     sync_optional_file "${agentsDir}/claude/settings.json" "$HOME/.claude/settings.json"
     sync_optional_file "${agentsDir}/claude/file-suggestion.sh" "$HOME/.claude/file-suggestion.sh"
     if [ -f "$HOME/.claude/file-suggestion.sh" ]; then
@@ -100,6 +101,16 @@ in
       done
     fi
 
+    # Deploy plugins as .ts files
+    rm -rf "$HOME/.config/opencode/plugins"
+    mkdir -p "$HOME/.config/opencode/plugins"
+    if [ -d "${agentsDir}/opencode/plugins" ]; then
+      for plugin in "${agentsDir}"/opencode/plugins/*.ts; do
+        [ -f "$plugin" ] || continue
+        cp -f "$plugin" "$HOME/.config/opencode/plugins/"
+      done
+    fi
+
     # Install OpenCode plugins from declarative plugins.txt
     if command -v opencode &> /dev/null && command -v pnpx &> /dev/null; then
       plugins_file="${agentsDir}/opencode/plugins.txt"
@@ -124,6 +135,7 @@ in
     mkdir -p "$HOME/.codex"
 
     sync_optional_file "${agentsDir}/codex/AGENTS.md" "$HOME/.codex/AGENTS.md"
+    sync_optional_file "${agentsDir}/codex/RTK.md" "$HOME/.codex/RTK.md"
     sync_optional_file "${agentsDir}/codex/config.toml" "$HOME/.codex/config.toml"
 
     # Deploy skills as plain .md files

@@ -17,7 +17,6 @@
 
     # macOS-specific CLIs (not in nixpkgs or need macOS integration)
     brews = [
-      "mas" # Mac App Store CLI
       "mole" # macOS cleanup & optimization
       "smudge/smudge/nightlight"
     ];
@@ -47,10 +46,5 @@
         greedy = true; # keep auto-updating cask on rebuild
       }
     ];
-
-    masApps = {
-      "Xcode" = 497799835;
-      "WhatsApp" = 310633997;
-    };
   };
 }
