@@ -24,6 +24,14 @@ let
 in
 {
   home.activation.agentConfigs = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    remove_path() {
+      target="$1"
+      if [ -e "$target" ]; then
+        chmod -R u+w "$target" 2>/dev/null || true
+        rm -rf "$target"
+      fi
+    }
+
     sync_optional_file() {
       src="$1"
       dst="$2"
@@ -42,8 +50,9 @@ in
       [ -d "$src" ] || return
       [ -f "$src/SKILL.md" ] || return
 
-      rm -rf "$dst/$name"
+      remove_path "$dst/$name"
       cp -R "$src" "$dst/$name"
+      chmod -R u+w "$dst/$name" 2>/dev/null || true
     }
 
     deploy_local_skill_dir() {
@@ -67,8 +76,9 @@ in
       while IFS=$'\t' read -r name src; do
         [ -n "$name" ] || continue
         [ -d "$src" ] || continue
-        rm -rf "$dst/$name"
+        remove_path "$dst/$name"
         cp -R "$src" "$dst/$name"
+        chmod -R u+w "$dst/$name" 2>/dev/null || true
       done <<EOF
 $specs
 EOF
@@ -79,7 +89,7 @@ EOF
       dst="$2"
       remote_specs="$3"
 
-      rm -rf "$dst"
+      remove_path "$dst"
       mkdir -p "$dst"
 
       deploy_remote_skill_specs "$remote_specs" "$dst"

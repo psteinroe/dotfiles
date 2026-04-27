@@ -34,7 +34,7 @@ local function get_toggleterm_terminals()
     return Terminal:new {
       cmd = opts.cmd,
       direction = "float",
-      shell = "zsh --login",
+      shell = vim.o.shell .. " --login",
       hidden = true,
       count = opts.count,
       on_open = function()

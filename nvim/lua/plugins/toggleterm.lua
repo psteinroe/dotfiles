@@ -7,9 +7,11 @@ return {
       open_mapping = [[<c-ö>]],
       -- open_mapping = [[<c-\>]],
       shade_terminals = false,
-      -- add --login so ~/.zprofile is loaded
+      -- Add --login so ~/.zprofile is loaded. Use Neovim's resolved shell
+      -- path instead of bare "zsh"; in Neovim, bare "zsh" resolves to the
+      -- Nix zsh on PATH, which can hang while /bin/zsh starts normally.
       -- https://vi.stackexchange.com/questions/16019/neovim-terminal-not-reading-bash-profile/16021#16021
-      shell = "zsh --login",
+      shell = vim.o.shell .. " --login",
       direction = "float",
       size = function(term)
         if term.direction == "horizontal" then
