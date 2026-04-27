@@ -1,5 +1,6 @@
 {
   pkgs,
+  lib,
   inputs,
   system,
   ...
@@ -9,6 +10,7 @@ let
   claude-code = inputs.claude-code.packages.${system};
   codex-cli = inputs.codex-cli.packages.${system};
   llm-agents = inputs.llm-agents.packages.${system};
+  plannotator = pkgs.callPackage ../packages/plannotator.nix { };
 in
 {
   home.packages = with pkgs; [
@@ -39,6 +41,7 @@ in
 
     # Editor
     neovim
+    tree-sitter
 
     # Dev tools
     jq
@@ -79,7 +82,6 @@ in
     luaPackages.luacheck
 
     # Go tools
-    gotools # includes goimports
     delve # debugger
 
     # Debuggers
@@ -98,8 +100,18 @@ in
     codex-cli.default   # pre-built binary via sadjow/codex-cli-nix
     opencode            # from nixpkgs
     llm-agents.pi       # from numtide/llm-agents.nix
+    plannotator         # custom: prebuilt binary from GitHub releases
 
     # GUI Apps - moved to Homebrew casks for reliability
     # nix-casks can be unreliable, using homebrew.nix instead
   ];
+
+  # Expose pi-coding-agent's bundled node_modules to user-installed pi
+  # extensions in ~/.pi/agent/extensions/, which otherwise cannot resolve
+  # imports like `diff` or `@sinclair/typebox`.
+  home.activation.piExtensionDeps = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    $DRY_RUN_CMD mkdir -p $HOME/.pi/agent
+    $DRY_RUN_CMD ln -sfn ${llm-agents.pi}/lib/node_modules/@mariozechner/pi-coding-agent/node_modules \
+      $HOME/.pi/agent/node_modules
+  '';
 }

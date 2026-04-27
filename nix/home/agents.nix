@@ -12,6 +12,15 @@ let
   agentsDir = "${dotfiles}/agents";
   claude-code = inputs.claude-code.packages.${system};
   claude-bin = "${claude-code.default}/bin/claude";
+  remoteSkills = import ./remote-skills.nix { inherit inputs; };
+  serializeSkillSpecs = skills:
+    lib.concatMapStringsSep "\n" (skill: "${skill.name}\t${skill.path}") skills;
+  remoteSkillSpecs = {
+    claude = serializeSkillSpecs (remoteSkills.shared ++ remoteSkills.claude);
+    codex = serializeSkillSpecs (remoteSkills.shared ++ remoteSkills.codex);
+    opencode = serializeSkillSpecs (remoteSkills.shared ++ remoteSkills.opencode);
+    pi = serializeSkillSpecs (remoteSkills.shared ++ remoteSkills.pi);
+  };
 in
 {
   home.activation.agentConfigs = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
@@ -25,11 +34,63 @@ in
       fi
     }
 
+    deploy_skill_bundle() {
+      src="$1"
+      dst="$2"
+      name=$(basename "$src")
+
+      [ -d "$src" ] || return
+      [ -f "$src/SKILL.md" ] || return
+
+      rm -rf "$dst/$name"
+      cp -R "$src" "$dst/$name"
+    }
+
+    deploy_local_skill_dir() {
+      src_dir="$1"
+      dst="$2"
+
+      [ -d "$src_dir" ] || return
+
+      for skill in "$src_dir"/*; do
+        [ -d "$skill" ] || continue
+        deploy_skill_bundle "$skill" "$dst"
+      done
+    }
+
+    deploy_remote_skill_specs() {
+      specs="$1"
+      dst="$2"
+
+      [ -n "$specs" ] || return
+
+      while IFS=$'\t' read -r name src; do
+        [ -n "$name" ] || continue
+        [ -d "$src" ] || continue
+        rm -rf "$dst/$name"
+        cp -R "$src" "$dst/$name"
+      done <<EOF
+$specs
+EOF
+    }
+
+    deploy_skills() {
+      agent="$1"
+      dst="$2"
+      remote_specs="$3"
+
+      rm -rf "$dst"
+      mkdir -p "$dst"
+
+      deploy_remote_skill_specs "$remote_specs" "$dst"
+      deploy_local_skill_dir "${agentsDir}/skills" "$dst"
+      deploy_local_skill_dir "${agentsDir}/$agent/skills" "$dst"
+    }
+
     # === Claude Code ===
     mkdir -p "$HOME/.claude"
 
     sync_optional_file "${agentsDir}/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
-    sync_optional_file "${agentsDir}/claude/RTK.md" "$HOME/.claude/RTK.md"
     sync_optional_file "${agentsDir}/claude/settings.json" "$HOME/.claude/settings.json"
     sync_optional_file "${agentsDir}/claude/file-suggestion.sh" "$HOME/.claude/file-suggestion.sh"
     if [ -f "$HOME/.claude/file-suggestion.sh" ]; then
@@ -47,17 +108,10 @@ in
       done
     fi
 
-    # Deploy skills in Claude's format (skills/name/SKILL.md)
-    rm -rf "$HOME/.claude/skills"
-    mkdir -p "$HOME/.claude/skills"
-    if [ -d "${agentsDir}/claude/skills" ]; then
-      for skill in "${agentsDir}"/claude/skills/*.md; do
-        [ -f "$skill" ] || continue
-        name=$(basename "$skill" .md)
-        mkdir -p "$HOME/.claude/skills/$name"
-        cp "$skill" "$HOME/.claude/skills/$name/SKILL.md"
-      done
-    fi
+    # Deploy pinned upstream skills first, then local shared skills, then
+    # Claude-specific overrides. All agents use the standard skills bundle
+    # layout: skills/<name>/SKILL.md (+ optional scripts/references).
+    deploy_skills "claude" "$HOME/.claude/skills" '${remoteSkillSpecs.claude}'
 
     # Install Claude plugins from declarative plugins.txt
     plugins_file="${agentsDir}/claude/plugins.txt"
@@ -91,15 +145,9 @@ in
     sync_optional_file "${agentsDir}/opencode/AGENTS.md" "$HOME/.config/opencode/AGENTS.md"
     sync_optional_file "${agentsDir}/opencode/opencode.json" "$HOME/.config/opencode/opencode.json"
 
-    # Deploy skills as plain .md files
-    rm -rf "$HOME/.config/opencode/skills"
-    mkdir -p "$HOME/.config/opencode/skills"
-    if [ -d "${agentsDir}/opencode/skills" ]; then
-      for skill in "${agentsDir}"/opencode/skills/*.md; do
-        [ -f "$skill" ] || continue
-        cp -f "$skill" "$HOME/.config/opencode/skills/"
-      done
-    fi
+    # Deploy pinned upstream skills first, then local shared skills, then
+    # OpenCode-specific overrides.
+    deploy_skills "opencode" "$HOME/.config/opencode/skills" '${remoteSkillSpecs.opencode}'
 
     # Deploy plugins as .ts files
     rm -rf "$HOME/.config/opencode/plugins"
@@ -135,18 +183,11 @@ in
     mkdir -p "$HOME/.codex"
 
     sync_optional_file "${agentsDir}/codex/AGENTS.md" "$HOME/.codex/AGENTS.md"
-    sync_optional_file "${agentsDir}/codex/RTK.md" "$HOME/.codex/RTK.md"
     sync_optional_file "${agentsDir}/codex/config.toml" "$HOME/.codex/config.toml"
 
-    # Deploy skills as plain .md files
-    rm -rf "$HOME/.codex/skills"
-    mkdir -p "$HOME/.codex/skills"
-    if [ -d "${agentsDir}/codex/skills" ]; then
-      for skill in "${agentsDir}"/codex/skills/*.md; do
-        [ -f "$skill" ] || continue
-        cp -f "$skill" "$HOME/.codex/skills/"
-      done
-    fi
+    # Deploy pinned upstream skills first, then local shared skills, then
+    # Codex-specific overrides.
+    deploy_skills "codex" "$HOME/.codex/skills" '${remoteSkillSpecs.codex}'
 
     # === Pi ===
     mkdir -p "$HOME/.pi/agent"
@@ -166,16 +207,8 @@ in
       done
     fi
 
-    # Deploy skills in Pi's format (skills/name/SKILL.md — same as Claude)
-    rm -rf "$HOME/.pi/agent/skills"
-    mkdir -p "$HOME/.pi/agent/skills"
-    if [ -d "${agentsDir}/pi/skills" ]; then
-      for skill in "${agentsDir}"/pi/skills/*.md; do
-        [ -f "$skill" ] || continue
-        name=$(basename "$skill" .md)
-        mkdir -p "$HOME/.pi/agent/skills/$name"
-        cp "$skill" "$HOME/.pi/agent/skills/$name/SKILL.md"
-      done
-    fi
+    # Deploy pinned upstream skills first, then local shared skills, then
+    # Pi-specific overrides.
+    deploy_skills "pi" "$HOME/.pi/agent/skills" '${remoteSkillSpecs.pi}'
   '';
 }

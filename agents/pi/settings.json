@@ -12,9 +12,9 @@
         "git:github.com/ogulcancelik/pi-ghostty-theme-sync",
         "git:github.com/HazAT/pi-ghostty",
         "git:github.com/nicobailon/pi-mcp-adapter",
-        "git:github.com/Whamp/pi-token-burden",
         "npm:@plannotator/pi-extension",
-        "npm:@sherif-fanous/pi-rtk",
+        "npm:pi-codex-web-search",
+        "npm:pi-slopchop",
         "git:github.com/davebcn87/pi-autoresearch"
     ]
 }

@@ -127,9 +127,9 @@ local function select_agent()
   end
 
   local choices = {
+    { id = "pi", label = "Pi" },
     { id = "claude", label = "Claude" },
     { id = "codex", label = "Codex" },
-    { id = "pi", label = "Pi" },
     { id = "opencode", label = "OpenCode" },
   }
 

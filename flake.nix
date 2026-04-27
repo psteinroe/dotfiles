@@ -40,6 +40,22 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    # Remote skill sources
+    agent-browser-skills = {
+      url = "github:vercel-labs/agent-browser";
+      flake = false;
+    };
+
+    getsentry-skills = {
+      url = "github:getsentry/skills";
+      flake = false;
+    };
+
+    mattpocock-skills = {
+      url = "github:mattpocock/skills";
+      flake = false;
+    };
+
     # Rust toolchain (declarative, replaces rustup)
     rust-overlay = {
       url = "github:oxalica/rust-overlay";

@@ -60,6 +60,13 @@ in
     ".gitconfig".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/gitconfig";
     ".ripgreprc".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/ripgrep";
     ".ssh/config".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/ssh_config";
+
+    # Redirect npm global installs to a user-writable prefix.
+    # nix-packaged node has a read-only store prefix, so `npm install -g`
+    # (used by e.g. pi extension installs) fails with EACCES otherwise.
+    ".npmrc".text = ''
+      prefix=''${HOME}/.npm-global
+    '';
     # zshrc is managed by home-manager (shell.nix) - sources zsh/*.zsh files
 
     # Lazygit (macOS path)
