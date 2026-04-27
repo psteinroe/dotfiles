@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cwd_name="$(basename "$PWD")"
+
+if ! command pi -c "$@" 2>/dev/null; then
+  echo "Starting new Pi session in ${cwd_name}..."
+  exec pi "$@"
+fi

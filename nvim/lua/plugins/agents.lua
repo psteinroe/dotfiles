@@ -1,4 +1,5 @@
 local split_min_columns = 180
+local dotfiles_bin = vim.fn.expand "~/Developer/dotfiles/bin"
 
 local function agent_win_for_width()
   if vim.o.columns >= split_min_columns then
@@ -47,15 +48,15 @@ local function get_toggleterm_terminals()
 
   state.terminals = {
     claude = create_agent_terminal {
-      cmd = "zsh --login -i -c 'ccode'",
+      cmd = dotfiles_bin .. "/ccode",
       count = 99,
     },
     codex = create_agent_terminal {
-      cmd = "zsh --login -i -c 'ccodex'",
+      cmd = dotfiles_bin .. "/ccodex",
       count = 98,
     },
     pi = create_agent_terminal {
-      cmd = "zsh --login -i -c 'cpi'",
+      cmd = dotfiles_bin .. "/cpi",
       count = 97,
     },
   }

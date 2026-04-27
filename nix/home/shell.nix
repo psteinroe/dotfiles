@@ -3,7 +3,7 @@
 {
   programs.zsh = {
     enable = true;
-    enableCompletion = true;
+    enableCompletion = false;
     autosuggestion.enable = true;
     syntaxHighlighting.enable = true;
 
@@ -18,12 +18,19 @@
     initContent = ''
       # Source modular zsh config
       ZSH_DIR="$HOME/Developer/dotfiles/zsh"
+      source "$ZSH_DIR/completions.zsh"
+
+      # `compdump` hangs in this environment as soon as we have any custom
+      # completion files in fpath. Use `compinit -D` to keep completions fully
+      # working without writing/refreshing ~/.zcompdump.
+      autoload -U compinit
+      compinit -D
+
       source "$ZSH_DIR/env.zsh"
       source "$ZSH_DIR/path.zsh"
       source "$ZSH_DIR/options.zsh"
       source "$ZSH_DIR/keybindings.zsh"
       source "$ZSH_DIR/aliases.zsh"
-      source "$ZSH_DIR/completions.zsh"
 
       # Autoload custom functions
       fpath=($HOME/Developer/dotfiles/zsh/functions $fpath)
