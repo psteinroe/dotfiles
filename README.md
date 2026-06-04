@@ -45,14 +45,17 @@ rebuild
 
 ## Remote Dev Workflow
 
-Set a local SSH alias named `dev` for the generic remote VM, or override per command with `RDEV_HOST`.
+The local SSH alias `rdev` points at the generic remote VM. Override per command with `RDEV_HOST` if needed.
 
 ```bash
+ssh rdev
+rrebuild
 rwtclone https://github.com/org/app.git app
 rwtcreate app feature-x
 rwtcheckout app 123
 rwtlist app
 rdev app feature-x
+rpicodexauth   # copy local Pi Codex subscription auth to the remote
 ```
 
 Each `rdev`/`rwt*` attach opens a remote tmux session inside the selected worktree. Closing the local Ghostty tab detaches SSH but leaves remote zsh/Neovim running.

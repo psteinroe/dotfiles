@@ -5,7 +5,7 @@ if [[ $# -lt 1 ]]; then
   return 1
 fi
 
-local host="${RDEV_HOST:-dev}"
+local host="${RDEV_HOST:-rdev}"
 local remote_home="${RDEV_HOME:-/home/psteinroe}"
 local repo="${1%.git}"
 local bare="${repo}.git"

@@ -1,0 +1,13 @@
+# Rebuild the generic remote dev machine.
+# Usage: rrebuild [host]
+local host="${1:-${RDEV_HOST:-rdev}}"
+local remote_user="${RDEV_REMOTE_USER:-psteinroe}"
+local dotfiles="${RDEV_DOTFILES:-/home/${remote_user}/Developer/dotfiles}"
+
+if [[ $# -gt 1 ]]; then
+  echo "Usage: rrebuild [host]" >&2
+  return 1
+fi
+
+local remote_cmd="cd ${(q)dotfiles} || exit 1; git pull --ff-only; rebuild"
+ssh -t "$host" "sudo -iu ${(q)remote_user} zsh -lc ${(q)remote_cmd}"

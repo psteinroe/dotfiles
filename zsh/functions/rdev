@@ -5,4 +5,4 @@ if [[ $# -lt 2 ]]; then
   return 1
 fi
 
-rdev-host "${RDEV_HOST:-dev}" "$@"
+rdev-host "${RDEV_HOST:-rdev}" "$@"

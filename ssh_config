@@ -3,6 +3,11 @@
 # This won't be added again if you remove it.
 Include ~/.orbstack/ssh/config
 
+Host rdev
+  HostName psteinroe-dev.exe.xyz
+  User exedev
+  RequestTTY yes
+
 Host github.com
   AddKeysToAgent yes
   UseKeychain yes
