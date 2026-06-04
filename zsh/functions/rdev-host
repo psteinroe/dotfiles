@@ -26,21 +26,6 @@ local session="${repo}-${worktree_name}"
 session="${session//\//-}"
 session="${session//[^A-Za-z0-9_.-]/-}"
 
-local inner_cmd="
-repo_dir=${(q)repo_dir}
-dotfiles=${(q)dotfiles}
-dir=${(q)dir}
-requested=${(q)requested}
-session=${(q)session}
-
-if [ ! -d \"\$dir\" ]; then
-  cd \"\$repo_dir\" || { echo \"Remote repo not found: \$repo_dir\" >&2; exit 1; }
-  wtsetup() { source \"\$dotfiles/zsh/functions/wtsetup\" \"\$@\"; }
-  source \"\$dotfiles/zsh/functions/wtcheckout\" \"\$requested\" || exit 1
-fi
-
-cd \"\$dir\" || { echo \"Remote worktree not found after upsert: \$dir\" >&2; exit 1; }
-exec tmux new-session -A -s \"\$session\" -c \"\$dir\"
-"
+local inner_cmd="repo_dir=${(q)repo_dir}; dotfiles=${(q)dotfiles}; dir=${(q)dir}; requested=${(q)requested}; session=${(q)session}; if [ ! -d \"\$dir\" ]; then cd \"\$repo_dir\" || { echo \"Remote repo not found: \$repo_dir\" >&2; exit 1; }; wtsetup() { source \"\$dotfiles/zsh/functions/wtsetup\" \"\$@\"; }; source \"\$dotfiles/zsh/functions/wtcheckout\" \"\$requested\" || exit 1; fi; cd \"\$dir\" || { echo \"Remote worktree not found after upsert: \$dir\" >&2; exit 1; }; exec tmux new-session -A -s \"\$session\" -c \"\$dir\""
 
 ssh -t "$host" "sudo -iu ${(q)remote_user} zsh -lc ${(q)inner_cmd}"

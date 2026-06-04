@@ -13,11 +13,7 @@ local repo="${1%.git}"
 local branch="$2"
 local repo_dir="${remote_home}/Developer/${repo}.git"
 
-local remote_cmd="
-cd ${(q)repo_dir} || exit 1
-wtsetup() { source ${(q)dotfiles}/zsh/functions/wtsetup \"\$@\"; }
-source ${(q)dotfiles}/zsh/functions/wtcreate ${(q)branch}
-"
+local remote_cmd="cd ${(q)repo_dir} || exit 1; wtsetup() { source ${(q)dotfiles}/zsh/functions/wtsetup \"\$@\"; }; source ${(q)dotfiles}/zsh/functions/wtcreate ${(q)branch}"
 ssh -t "$host" "sudo -iu ${(q)remote_user} zsh -lc ${(q)remote_cmd}" || return
 
 rdev-host "$host" "$repo" "$branch"

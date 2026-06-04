@@ -16,11 +16,7 @@ local repo_name="${bare%.git}"
 local dev_dir="${remote_home}/Developer"
 local repo_dir="${dev_dir}/${bare}"
 
-local remote_cmd="
-mkdir -p ${(q)dev_dir} && cd ${(q)dev_dir} || exit 1
-wtsetup() { source ${(q)dotfiles}/zsh/functions/wtsetup \"\$@\"; }
-source ${(q)dotfiles}/zsh/functions/wtclone ${(q)url} ${(q)bare}
-"
+local remote_cmd="mkdir -p ${(q)dev_dir} && cd ${(q)dev_dir} || exit 1; wtsetup() { source ${(q)dotfiles}/zsh/functions/wtsetup \"\$@\"; }; source ${(q)dotfiles}/zsh/functions/wtclone ${(q)url} ${(q)bare}"
 ssh -t "$host" "sudo -iu ${(q)remote_user} zsh -lc ${(q)remote_cmd}" || return
 
 local default_branch_cmd="cd ${(q)repo_dir} || exit 1; git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##' || printf main"

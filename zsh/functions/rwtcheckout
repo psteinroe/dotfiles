@@ -20,11 +20,7 @@ else
   worktree="${input//\//-}"
 fi
 
-local remote_cmd="
-cd ${(q)repo_dir} || exit 1
-wtsetup() { source ${(q)dotfiles}/zsh/functions/wtsetup \"\$@\"; }
-source ${(q)dotfiles}/zsh/functions/wtcheckout ${(q)input}
-"
+local remote_cmd="cd ${(q)repo_dir} || exit 1; wtsetup() { source ${(q)dotfiles}/zsh/functions/wtsetup \"\$@\"; }; source ${(q)dotfiles}/zsh/functions/wtcheckout ${(q)input}"
 ssh -t "$host" "sudo -iu ${(q)remote_user} zsh -lc ${(q)remote_cmd}" || return
 
 rdev-host "$host" "$repo" "$worktree"

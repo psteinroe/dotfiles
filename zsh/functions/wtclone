@@ -8,7 +8,10 @@ fi
 local url="$1"
 local name="${2:-$(basename "$url" .git).git}"
 
-git clone --bare "$url" "$name" && cd "$name" && git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*" && git fetch
+git clone --bare "$url" "$name" || return 1
+cd "$name" || return 1
+git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*" || return 1
+git fetch || return 1
 
 local default_branch=$(gh repo view --json defaultBranchRef -q '.defaultBranchRef.name' 2>/dev/null)
 if [ -z "$default_branch" ]; then
