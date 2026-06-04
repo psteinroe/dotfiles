@@ -12,6 +12,7 @@ local requested="$3"
 local remote_user="${RDEV_REMOTE_USER:-psteinroe}"
 local remote_home="${RDEV_HOME:-/home/${remote_user}}"
 local repo_dir="${remote_home}/Developer/${repo}.git"
+local dotfiles="${RDEV_DOTFILES:-${remote_home}/Developer/dotfiles}"
 local worktree_name="$requested"
 
 if [[ "$requested" =~ ^[0-9]+$ ]]; then
@@ -27,13 +28,15 @@ session="${session//[^A-Za-z0-9_.-]/-}"
 
 local inner_cmd="
 repo_dir=${(q)repo_dir}
+dotfiles=${(q)dotfiles}
 dir=${(q)dir}
 requested=${(q)requested}
 session=${(q)session}
 
 if [ ! -d \"\$dir\" ]; then
   cd \"\$repo_dir\" || { echo \"Remote repo not found: \$repo_dir\" >&2; exit 1; }
-  wtcheckout \"\$requested\" || exit 1
+  wtsetup() { source \"\$dotfiles/zsh/functions/wtsetup\" \"\$@\"; }
+  source \"\$dotfiles/zsh/functions/wtcheckout\" \"\$requested\" || exit 1
 fi
 
 cd \"\$dir\" || { echo \"Remote worktree not found after upsert: \$dir\" >&2; exit 1; }

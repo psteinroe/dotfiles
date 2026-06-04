@@ -9,5 +9,5 @@ if [[ $# -gt 1 ]]; then
   return 1
 fi
 
-local remote_cmd="cd ${(q)dotfiles} || exit 1; git pull --ff-only; rebuild"
+local remote_cmd="cd ${(q)dotfiles} || exit 1; git pull --ff-only; source ${(q)dotfiles}/zsh/functions/rebuild"
 ssh -t "$host" "sudo -iu ${(q)remote_user} zsh -lc ${(q)remote_cmd}"
