@@ -1,5 +1,5 @@
-# Attach/create a persistent remote tmux session for a repo worktree on an explicit host.
-# Upserts the worktree: if it does not exist, create it with wtcheckout first.
+# Internal helper: same as rdev, but with an explicit SSH host for wrappers.
+# Upserts a remote worktree and attaches/creates its remote tmux session.
 # Usage: rdev-host <host> <repo> <worktree|branch|pr-number>
 if [[ $# -lt 3 ]]; then
   echo "Usage: rdev-host <host> <repo> <worktree|branch|pr-number>" >&2

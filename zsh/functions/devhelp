@@ -1,0 +1,61 @@
+# List dotfiles helper commands and what they do.
+# Usage: devhelp [remote|worktree|tmux|auth|all]
+local topic="${1:-all}"
+
+if [[ $# -gt 1 ]]; then
+  echo "Usage: devhelp [remote|worktree|tmux|auth|all]" >&2
+  return 1
+fi
+
+_case_header() {
+  print -P "%F{cyan}$1%f"
+}
+
+_case_row() {
+  printf '  %-28s %s\n' "$1" "$2"
+}
+
+case "$topic" in
+  all|remote|worktree|tmux|auth) ;;
+  *)
+    echo "Unknown devhelp topic: $topic" >&2
+    echo "Usage: devhelp [remote|worktree|tmux|auth|all]" >&2
+    return 1
+    ;;
+esac
+
+if [[ "$topic" == all || "$topic" == remote ]]; then
+  _case_header "Remote-from-Mac helpers"
+  _case_row "rdev <repo> <branch|pr>" "upsert remote worktree and attach/create its remote tmux session"
+  _case_row "rwtclone <url> [repo]" "clone repo on remote VM, set up default worktree, attach remote tmux"
+  _case_row "rwtcreate <repo> <branch>" "create new remote branch worktree, attach remote tmux"
+  _case_row "rwtcheckout <repo> <branch|pr>" "checkout existing remote branch/PR worktree, attach remote tmux"
+  _case_row "rwtlist <repo>" "pick a remote worktree with local fzf, then attach remote tmux"
+  _case_row "rwtclean <repo>" "run wtclean on the remote repo"
+  _case_row "rrebuild [host]" "pull dotfiles and rebuild Home Manager on the remote VM"
+  _case_row "rdev-host <host> <repo> <branch|pr>" "internal explicit-host variant used by wrappers"
+  [[ "$topic" == all ]] && print
+fi
+
+if [[ "$topic" == all || "$topic" == worktree ]]; then
+  _case_header "Worktree helpers on the current machine"
+  _case_row "wtclone <url> [name]" "bare clone into worktree layout"
+  _case_row "wtcreate <branch>" "create a new worktree branch"
+  _case_row "wtcheckout <branch|pr>" "checkout an existing branch or PR into a worktree"
+  _case_row "wtlist" "list/select existing worktrees without tmux behavior"
+  _case_row "wtclean" "clean merged/closed worktrees"
+  [[ "$topic" == all ]] && print
+fi
+
+if [[ "$topic" == all || "$topic" == tmux ]]; then
+  _case_header "Explicit tmux helpers, mainly for the remote VM"
+  _case_row "wttmux <branch|pr>" "upsert worktree in current repo and attach/create its tmux session"
+  _case_row "wttmuxlist" "pick existing worktree in current repo and attach/create its tmux session"
+  [[ "$topic" == all ]] && print
+fi
+
+if [[ "$topic" == all || "$topic" == auth ]]; then
+  _case_header "Auth/helper utilities"
+  _case_row "rpicodexauth [host]" "copy local Pi openai-codex auth to the remote psteinroe user"
+  _case_row "devhelp [topic]" "show this command reference"
+fi

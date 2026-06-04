@@ -1,4 +1,4 @@
-# Clone a repo on the remote using the canonical wtclone helper, then attach to its default branch.
+# From Mac: clone a repo on the remote VM, then attach to the default branch's remote tmux session.
 # Usage: rwtclone <url> [repo]
 if [[ $# -lt 1 ]]; then
   echo "Usage: rwtclone <url> [repo]" >&2

@@ -1,4 +1,4 @@
-# Select a remote worktree with local fzf, then attach to it.
+# From Mac: list remote worktrees with local fzf, then attach/create the selected remote tmux session.
 # Usage: rwtlist <repo>
 if [[ $# -lt 1 ]]; then
   echo "Usage: rwtlist <repo>" >&2

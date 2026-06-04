@@ -1,4 +1,4 @@
-# Create a worktree on the remote using wtcreate, then attach to it.
+# From Mac: create a new branch worktree on the remote VM, then attach/create its remote tmux session.
 # Usage: rwtcreate <repo> <branch>
 if [[ $# -lt 2 ]]; then
   echo "Usage: rwtcreate <repo> <branch>" >&2

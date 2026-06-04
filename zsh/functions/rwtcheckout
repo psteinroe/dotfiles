@@ -1,4 +1,4 @@
-# Checkout a remote branch/PR into a remote worktree, then attach to it.
+# From Mac: checkout an existing remote branch/PR worktree, then attach/create its remote tmux session.
 # Usage: rwtcheckout <repo> <branch-name|pr-number>
 if [[ $# -lt 2 ]]; then
   echo "Usage: rwtcheckout <repo> <branch-name|pr-number>" >&2

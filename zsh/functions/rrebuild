@@ -1,4 +1,4 @@
-# Rebuild the generic remote dev machine.
+# From Mac: pull latest dotfiles on the remote VM and run its Home Manager rebuild.
 # Usage: rrebuild [host]
 local host="${1:-${RDEV_HOST:-rdev}}"
 local remote_user="${RDEV_REMOTE_USER:-psteinroe}"

@@ -1,4 +1,4 @@
-# Copy local Pi OpenAI Codex subscription auth to the remote.
+# From Mac: copy local Pi OpenAI Codex auth to the remote psteinroe user.
 # Usage: rpicodexauth [host]
 #
 # Copies only the openai-codex entry from ~/.pi/agent/auth.json and merges it

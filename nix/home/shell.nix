@@ -42,6 +42,7 @@
       autoload -Uz copen
       autoload -Uz copenweb
       autoload -Uz rebuild
+      autoload -Uz devhelp
       autoload -Uz coffee
       autoload -Uz wtclone
       autoload -Uz wtfork
@@ -51,6 +52,7 @@
       autoload -Uz wtclean
       autoload -Uz wtsetup
       autoload -Uz wttmux
+      autoload -Uz wttmuxlist
       autoload -Uz cpi
       autoload -Uz gpr
       autoload -Uz gclean

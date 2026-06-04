@@ -1,6 +1,6 @@
-# Attach/create a persistent remote tmux session for a repo worktree.
-# Upserts the worktree: if it does not exist, create it with wtcheckout first.
+# From Mac: upsert a worktree on the remote VM and attach/create its remote tmux session.
 # Usage: rdev <repo> <worktree|branch|pr-number>
+# Example: rdev hellomateo dev
 if [[ $# -lt 2 ]]; then
   echo "Usage: rdev <repo> <worktree|branch|pr-number>" >&2
   return 1
