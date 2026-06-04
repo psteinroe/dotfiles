@@ -55,5 +55,5 @@ if [[ -n "$TMUX" ]]; then
   tmux has-session -t "$session" 2>/dev/null || tmux new-session -d -s "$session" -c "$PWD"
   tmux switch-client -t "$session"
 else
-  exec tmux new-session -A -s "$session" -c "$PWD"
+  tmux new-session -A -s "$session" -c "$PWD"
 fi
