@@ -7,9 +7,7 @@ fi
 
 # Be robust when launched from mobile SSH/sudo shells that do not source the
 # normal Home Manager PATH. `tmux` may live in /usr/bin or the Nix profile.
-path=("$HOME/.local/bin" "$HOME/.nix-profile/bin" /nix/var/nix/profiles/default/bin /usr/local/sbin /usr/local/bin /usr/sbin /usr/bin /sbin /bin $path)
-typeset -U path
-export PATH
+export PATH="$HOME/.local/bin:$HOME/.nix-profile/bin:/nix/var/nix/profiles/default/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}"
 
 local input="$1"
 local worktree_name="$input"

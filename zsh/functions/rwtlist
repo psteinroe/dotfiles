@@ -29,11 +29,11 @@ selected=$(ssh -T "$host" "$runner" | awk '
   /^bare$/ { printf "%s\t%s\n", "bare", path }
 ' | fzf --prompt="Remote worktree> " --height=40% --reverse --with-nth=1,2) || return 0
 
-local path="${selected#*$'\t'}"
-local worktree="${path#${repo_dir}/}"
+local selected_path="${selected#*$'\t'}"
+local worktree="${selected_path#${repo_dir}/}"
 
-if [[ -z "$worktree" || "$worktree" == "$path" || "$worktree" == "." ]]; then
-  echo "Cannot attach to selected worktree: $path" >&2
+if [[ -z "$worktree" || "$worktree" == "$selected_path" || "$worktree" == "." ]]; then
+  echo "Cannot attach to selected worktree: $selected_path" >&2
   return 1
 fi
 

@@ -12,9 +12,7 @@ fi
 # Be robust when launched from mobile SSH/sudo shells that do not source the
 # normal Home Manager PATH. `basename` lives in /usr/bin and `tmux` may live in
 # either /usr/bin or the Nix profile depending on the machine.
-path=("$HOME/.local/bin" "$HOME/.nix-profile/bin" /nix/var/nix/profiles/default/bin /usr/local/sbin /usr/local/bin /usr/sbin /usr/bin /sbin /bin $path)
-typeset -U path
-export PATH
+export PATH="$HOME/.local/bin:$HOME/.nix-profile/bin:/nix/var/nix/profiles/default/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}"
 
 local repo_root
 repo_root=$(git worktree list --porcelain 2>/dev/null | awk '/^worktree / { print substr($0, 10); exit }')
