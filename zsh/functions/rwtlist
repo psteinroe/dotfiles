@@ -8,13 +8,14 @@ fi
 local host="${RDEV_HOST:-rdev}"
 local remote_user="${RDEV_REMOTE_USER:-psteinroe}"
 local remote_home="${RDEV_HOME:-/home/${remote_user}}"
+local remote_path="${remote_home}/.local/bin:${remote_home}/.nix-profile/bin:/nix/var/nix/profiles/default/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 local repo="${1%.git}"
 local bare="${repo}.git"
 local repo_dir="${remote_home}/Developer/${bare}"
 local remote_cmd="cd ${(q)repo_dir} && git worktree list --porcelain"
 local encoded
 encoded=$(printf '%s' "$remote_cmd" | base64 | tr -d '\n') || return
-local runner="encoded=${(q)encoded}; cmd=\$(printf %s \"\$encoded\" | base64 -d); sudo -u ${(q)remote_user} HOME=${(q)remote_home} USER=${(q)remote_user} LOGNAME=${(q)remote_user} ${(q)remote_home}/.nix-profile/bin/zsh -lc \"\$cmd\""
+local runner="encoded=${(q)encoded}; cmd=\$(printf %s \"\$encoded\" | base64 -d); sudo -u ${(q)remote_user} HOME=${(q)remote_home} USER=${(q)remote_user} LOGNAME=${(q)remote_user} PATH=${(q)remote_path} ${(q)remote_home}/.nix-profile/bin/zsh -lc \"\$cmd\""
 
 local selected
 selected=$(ssh -T "$host" "$runner" | awk '
