@@ -12,12 +12,9 @@ local dotfiles="${RDEV_DOTFILES:-${remote_home}/Developer/dotfiles}"
 local repo="${1%.git}"
 local repo_dir="${remote_home}/Developer/${repo}.git"
 
-local remote_cmd="
-cd ${(q)repo_dir} || exit 1
-worktree=\$(git worktree list --porcelain | awk '/^worktree / { path = substr(\$0, 10) } /^branch / { print path; exit }')
-[ -n \"\$worktree\" ] || { echo \"No branch worktree found for ${(q)repo}\" >&2; exit 1; }
-cd \"\$worktree\" || exit 1
-source ${(q)dotfiles}/zsh/functions/wtclean
-"
+local remote_cmd="cd ${(q)repo_dir} || exit 1; worktree=\$(git worktree list --porcelain | awk '/^worktree / { path = substr(\$0, 10) } /^branch / { print path; exit }'); [ -n \"\$worktree\" ] || { echo \"No branch worktree found for ${(q)repo}\" >&2; exit 1; }; cd \"\$worktree\" || exit 1; source ${(q)dotfiles}/zsh/functions/wtclean"
+local encoded
+encoded=$(printf '%s' "$remote_cmd" | base64 | tr -d '\n') || return
+local runner="encoded=${(q)encoded}; cmd=\$(printf %s \"\$encoded\" | base64 -d); sudo -u ${(q)remote_user} HOME=${(q)remote_home} USER=${(q)remote_user} LOGNAME=${(q)remote_user} ${(q)remote_home}/.nix-profile/bin/zsh -lc \"\$cmd\""
 
-ssh -t "$host" "sudo -iu ${(q)remote_user} zsh -lc ${(q)remote_cmd}" || return
+ssh -t "$host" "$runner" || return

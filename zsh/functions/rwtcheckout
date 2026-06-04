@@ -21,6 +21,9 @@ else
 fi
 
 local remote_cmd="cd ${(q)repo_dir} || exit 1; wtsetup() { source ${(q)dotfiles}/zsh/functions/wtsetup \"\$@\"; }; source ${(q)dotfiles}/zsh/functions/wtcheckout ${(q)input}"
-ssh -t "$host" "sudo -iu ${(q)remote_user} zsh -lc ${(q)remote_cmd}" || return
+local encoded
+encoded=$(printf '%s' "$remote_cmd" | base64 | tr -d '\n') || return
+local runner="encoded=${(q)encoded}; cmd=\$(printf %s \"\$encoded\" | base64 -d); sudo -u ${(q)remote_user} HOME=${(q)remote_home} USER=${(q)remote_user} LOGNAME=${(q)remote_user} ${(q)remote_home}/.nix-profile/bin/zsh -lc \"\$cmd\""
+ssh -t "$host" "$runner" || return
 
 rdev-host "$host" "$repo" "$worktree"
