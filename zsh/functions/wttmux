@@ -1,7 +1,7 @@
 # Upsert a worktree in the current repo and attach/create a tmux session for it.
-# Usage: wtdev <worktree|branch|pr-number>
+# Usage: wttmux <worktree|branch|pr-number>
 if [[ $# -lt 1 ]]; then
-  echo "Usage: wtdev <worktree|branch|pr-number>" >&2
+  echo "Usage: wttmux <worktree|branch|pr-number>" >&2
   return 1
 fi
 
