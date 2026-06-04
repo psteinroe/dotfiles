@@ -6,7 +6,9 @@ if [[ $# -lt 1 ]]; then
 fi
 
 local host="${RDEV_HOST:-rdev}"
-local remote_home="${RDEV_HOME:-/home/psteinroe}"
+local remote_user="${RDEV_REMOTE_USER:-psteinroe}"
+local remote_home="${RDEV_HOME:-/home/${remote_user}}"
+local dotfiles="${RDEV_DOTFILES:-${remote_home}/Developer/dotfiles}"
 local url="$1"
 local repo="${2:-$(basename "$url" .git)}"
 local bare="${repo%.git}.git"
@@ -14,12 +16,16 @@ local repo_name="${bare%.git}"
 local dev_dir="${remote_home}/Developer"
 local repo_dir="${dev_dir}/${bare}"
 
-local remote_cmd="mkdir -p ${(q)dev_dir} && cd ${(q)dev_dir} && wtclone ${(q)url} ${(q)bare}"
-ssh -t "$host" "zsh -lic ${(q)remote_cmd}" || return
+local remote_cmd="
+mkdir -p ${(q)dev_dir} && cd ${(q)dev_dir} || exit 1
+wtsetup() { source ${(q)dotfiles}/zsh/functions/wtsetup \"\$@\"; }
+source ${(q)dotfiles}/zsh/functions/wtclone ${(q)url} ${(q)bare}
+"
+ssh -t "$host" "sudo -iu ${(q)remote_user} zsh -lc ${(q)remote_cmd}" || return
 
 local default_branch_cmd="cd ${(q)repo_dir} || exit 1; git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##' || printf main"
 local default_branch
-default_branch=$(ssh "$host" "zsh -lc ${(q)default_branch_cmd}" | tr -d '\r' | tail -1) || return
+default_branch=$(ssh -T "$host" "sudo -iu ${(q)remote_user} zsh -lc ${(q)default_branch_cmd}" | tr -d '\r' | tail -1) || return
 default_branch="${default_branch:-main}"
 
 rdev-host "$host" "$repo_name" "$default_branch"

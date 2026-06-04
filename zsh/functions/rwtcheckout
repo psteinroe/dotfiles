@@ -6,7 +6,9 @@ if [[ $# -lt 2 ]]; then
 fi
 
 local host="${RDEV_HOST:-rdev}"
-local remote_home="${RDEV_HOME:-/home/psteinroe}"
+local remote_user="${RDEV_REMOTE_USER:-psteinroe}"
+local remote_home="${RDEV_HOME:-/home/${remote_user}}"
+local dotfiles="${RDEV_DOTFILES:-${remote_home}/Developer/dotfiles}"
 local repo="${1%.git}"
 local input="$2"
 local repo_dir="${remote_home}/Developer/${repo}.git"
@@ -18,7 +20,11 @@ else
   worktree="${input//\//-}"
 fi
 
-local remote_cmd="cd ${(q)repo_dir} || exit 1; wtcheckout ${(q)input}"
-ssh -t "$host" "zsh -lic ${(q)remote_cmd}" || return
+local remote_cmd="
+cd ${(q)repo_dir} || exit 1
+wtsetup() { source ${(q)dotfiles}/zsh/functions/wtsetup \"\$@\"; }
+source ${(q)dotfiles}/zsh/functions/wtcheckout ${(q)input}
+"
+ssh -t "$host" "sudo -iu ${(q)remote_user} zsh -lc ${(q)remote_cmd}" || return
 
 rdev-host "$host" "$repo" "$worktree"

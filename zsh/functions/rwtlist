@@ -6,13 +6,15 @@ if [[ $# -lt 1 ]]; then
 fi
 
 local host="${RDEV_HOST:-rdev}"
-local remote_home="${RDEV_HOME:-/home/psteinroe}"
+local remote_user="${RDEV_REMOTE_USER:-psteinroe}"
+local remote_home="${RDEV_HOME:-/home/${remote_user}}"
 local repo="${1%.git}"
 local bare="${repo}.git"
 local repo_dir="${remote_home}/Developer/${bare}"
+local remote_cmd="cd ${(q)repo_dir} && git worktree list --porcelain"
 
 local selected
-selected=$(ssh "$host" "cd ${(q)repo_dir} && git worktree list --porcelain" | awk '
+selected=$(ssh -T "$host" "sudo -iu ${(q)remote_user} zsh -lc ${(q)remote_cmd}" | awk '
   /^worktree / { path = substr($0, 10) }
   /^branch / {
     branch = $0

@@ -6,7 +6,9 @@ if [[ $# -lt 1 ]]; then
 fi
 
 local host="${RDEV_HOST:-rdev}"
-local remote_home="${RDEV_HOME:-/home/psteinroe}"
+local remote_user="${RDEV_REMOTE_USER:-psteinroe}"
+local remote_home="${RDEV_HOME:-/home/${remote_user}}"
+local dotfiles="${RDEV_DOTFILES:-${remote_home}/Developer/dotfiles}"
 local repo="${1%.git}"
 local repo_dir="${remote_home}/Developer/${repo}.git"
 
@@ -15,7 +17,7 @@ cd ${(q)repo_dir} || exit 1
 worktree=\$(git worktree list --porcelain | awk '/^worktree / { path = substr(\$0, 10) } /^branch / { print path; exit }')
 [ -n \"\$worktree\" ] || { echo \"No branch worktree found for ${(q)repo}\" >&2; exit 1; }
 cd \"\$worktree\" || exit 1
-wtclean
+source ${(q)dotfiles}/zsh/functions/wtclean
 "
 
-ssh -t "$host" "zsh -lic ${(q)remote_cmd}" || return
+ssh -t "$host" "sudo -iu ${(q)remote_user} zsh -lc ${(q)remote_cmd}" || return
