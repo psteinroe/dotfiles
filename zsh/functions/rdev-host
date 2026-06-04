@@ -1,19 +1,43 @@
 # Attach/create a persistent remote tmux session for a repo worktree on an explicit host.
-# Usage: rdev-host <host> <repo> <worktree>
+# Upserts the worktree: if it does not exist, create it with wtcheckout first.
+# Usage: rdev-host <host> <repo> <worktree|branch|pr-number>
 if [[ $# -lt 3 ]]; then
-  echo "Usage: rdev-host <host> <repo> <worktree>" >&2
+  echo "Usage: rdev-host <host> <repo> <worktree|branch|pr-number>" >&2
   return 1
 fi
 
 local host="$1"
-local repo="$2"
-local worktree="$3"
+local repo="${2%.git}"
+local requested="$3"
 local remote_user="${RDEV_REMOTE_USER:-psteinroe}"
 local remote_home="${RDEV_HOME:-/home/${remote_user}}"
-local dir="${remote_home}/Developer/${repo}.git/${worktree}"
-local session="${repo}-${worktree}"
+local repo_dir="${remote_home}/Developer/${repo}.git"
+local worktree_name="$requested"
+
+if [[ "$requested" =~ ^[0-9]+$ ]]; then
+  worktree_name="pr-$requested"
+else
+  worktree_name="${requested//\//-}"
+fi
+
+local dir="${repo_dir}/${worktree_name}"
+local session="${repo}-${worktree_name}"
 session="${session//\//-}"
 session="${session//[^A-Za-z0-9_.-]/-}"
 
-local inner_cmd="cd ${(q)dir} && exec tmux new-session -A -s ${(q)session} -c ${(q)dir}"
+local inner_cmd="
+repo_dir=${(q)repo_dir}
+dir=${(q)dir}
+requested=${(q)requested}
+session=${(q)session}
+
+if [ ! -d \"\$dir\" ]; then
+  cd \"\$repo_dir\" || { echo \"Remote repo not found: \$repo_dir\" >&2; exit 1; }
+  wtcheckout \"\$requested\" || exit 1
+fi
+
+cd \"\$dir\" || { echo \"Remote worktree not found after upsert: \$dir\" >&2; exit 1; }
+exec tmux new-session -A -s \"\$session\" -c \"\$dir\"
+"
+
 ssh -t "$host" "sudo -iu ${(q)remote_user} zsh -lc ${(q)inner_cmd}"

@@ -58,7 +58,7 @@ rdev app feature-x
 rpicodexauth   # copy local Pi Codex subscription auth to the remote
 ```
 
-Each `rdev`/`rwt*` attach opens a remote tmux session inside the selected worktree. Closing the local Ghostty tab detaches SSH but leaves remote zsh/Neovim running.
+`rdev` upserts the requested remote worktree: if `~/Developer/<repo>.git/<branch>` does not exist, it runs remote `wtcheckout <branch>` first, then attaches tmux. Closing the local Ghostty tab detaches SSH but leaves remote zsh/Neovim running.
 
 ## Tailscale (macOS)
 

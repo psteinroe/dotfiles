@@ -1,7 +1,8 @@
 # Attach/create a persistent remote tmux session for a repo worktree.
-# Usage: rdev <repo> <worktree>
+# Upserts the worktree: if it does not exist, create it with wtcheckout first.
+# Usage: rdev <repo> <worktree|branch|pr-number>
 if [[ $# -lt 2 ]]; then
-  echo "Usage: rdev <repo> <worktree>" >&2
+  echo "Usage: rdev <repo> <worktree|branch|pr-number>" >&2
   return 1
 fi
 
