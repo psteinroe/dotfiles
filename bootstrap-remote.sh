@@ -12,7 +12,7 @@ DOTFILES_HTTPS_REPO="${DOTFILES_HTTPS_REPO:-https://github.com/psteinroe/dotfile
 DOTFILES_DIR="${DOTFILES_DIR:-/home/${DEV_USER}/Developer/dotfiles}"
 HM_FLAKE_ATTR="${HM_FLAKE_ATTR:-psteinroe@linux-x86_64}"
 RUN_HOME_MANAGER="${RUN_HOME_MANAGER:-1}"
-ALLOW_HOME_MANAGER_SKIP="${ALLOW_HOME_MANAGER_SKIP:-1}"
+ALLOW_HOME_MANAGER_SKIP="${ALLOW_HOME_MANAGER_SKIP:-0}"
 # Default to no in-VM GitHub auth. exe.dev provides GitHub access via
 # integration proxy hosts, and public dotfiles can be cloned over HTTPS.
 # Set GITHUB_AUTH=1 on generic remotes if you want gh auth + SSH key upload.
@@ -169,10 +169,11 @@ if [ "$RUN_HOME_MANAGER" = "1" ]; then
   if as_dev 'cd "$DOTFILES_DIR" && nix run nixpkgs#home-manager -- switch --flake "$DOTFILES_DIR#$HM_FLAKE_ATTR"'; then
     echo "Home Manager switch completed."
   elif [ "$ALLOW_HOME_MANAGER_SKIP" = "1" ]; then
-    warn "Home Manager switch failed or ${HM_FLAKE_ATTR} is not defined yet."
-    warn "This is expected until the Linux Home Manager flake output lands. Re-run with:"
+    warn "Home Manager switch failed. Continuing only because ALLOW_HOME_MANAGER_SKIP=1."
+    warn "Re-run with:"
     warn "  sudo -iu ${DEV_USER} bash -lc 'cd ${DOTFILES_DIR} && nix run nixpkgs#home-manager -- switch --flake .#${HM_FLAKE_ATTR}'"
   else
+    warn "Home Manager switch failed. Re-run with ALLOW_HOME_MANAGER_SKIP=1 only if you intentionally want a partial bootstrap."
     exit 1
   fi
 fi

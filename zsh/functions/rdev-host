@@ -1,0 +1,17 @@
+# Attach/create a persistent remote tmux session for a repo worktree on an explicit host.
+# Usage: rdev-host <host> <repo> <worktree>
+if [[ $# -lt 3 ]]; then
+  echo "Usage: rdev-host <host> <repo> <worktree>" >&2
+  return 1
+fi
+
+local host="$1"
+local repo="$2"
+local worktree="$3"
+local remote_home="${RDEV_HOME:-/home/psteinroe}"
+local dir="${remote_home}/Developer/${repo}.git/${worktree}"
+local session="${repo}-${worktree}"
+session="${session//\//-}"
+session="${session//[^A-Za-z0-9_.-]/-}"
+
+ssh -t "$host" "cd ${(q)dir} && exec tmux new-session -A -s ${(q)session} -c ${(q)dir}"

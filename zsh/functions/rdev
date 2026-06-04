@@ -1,0 +1,8 @@
+# Attach/create a persistent remote tmux session for a repo worktree.
+# Usage: rdev <repo> <worktree>
+if [[ $# -lt 2 ]]; then
+  echo "Usage: rdev <repo> <worktree>" >&2
+  return 1
+fi
+
+rdev-host "${RDEV_HOST:-dev}" "$@"

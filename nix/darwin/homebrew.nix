@@ -39,7 +39,6 @@
       "timing"
       "linear"
       "notion"
-      "bruno"
       "orbstack"
       "spotify"
       "steam"

@@ -3,14 +3,16 @@
   lib,
   inputs,
   system,
+  isLinux ? false,
   ...
 }:
 
 let
-  claude-code = inputs.claude-code.packages.${system};
-  codex-cli = inputs.codex-cli.packages.${system};
-  llm-agents = inputs.llm-agents.packages.${system};
-  tuicr = inputs.tuicr.defaultPackage.${system};
+  claudeCode = lib.attrByPath [ system "default" ] null inputs.claude-code.packages;
+  codexCli = lib.attrByPath [ system "default" ] null inputs.codex-cli.packages;
+  piAgent = lib.attrByPath [ system "pi" ] null inputs.llm-agents.packages;
+  tuicr = lib.attrByPath [ system ] null inputs.tuicr.defaultPackage;
+  optionalPackage = pkg: lib.optional (pkg != null) pkg;
   piWebToolsNodeModules = pkgs.buildNpmPackage {
     pname = "pi-web-tools-extension-deps";
     version = "0.1.0";
@@ -26,115 +28,119 @@ let
   };
 in
 {
-  home.packages = with pkgs; [
-    # Shell utilities
-    bat
-    eza
-    tree
-    wget
-    curl
-    htop
+  home = {
+    packages =
+      with pkgs;
+      [
+        # Shell utilities
+        bat
+        eza
+        tree
+        wget
+        curl
+        htop
 
-    # Search
-    ripgrep
-    fd
+        # Search
+        ripgrep
+        fd
 
-    # Languages
-    nodejs_24
-    go
-    lua
-    elixir
-    # ruby  # conflicts with gotools (both have bin/bundle)
-    (rust-bin.stable.latest.default.override {
-      extensions = [
-        "rust-src"
-        "rust-analyzer"
-        "clippy"
-      ];
-    })
+        # Languages
+        nodejs_24
+        go
+        lua
+        elixir
+        # ruby  # conflicts with gotools (both have bin/bundle)
+        (rust-bin.stable.latest.default.override {
+          extensions = [
+            "rust-src"
+            "rust-analyzer"
+            "clippy"
+          ];
+        })
 
-    # Python
-    uv
+        # Python
+        uv
 
-    # Editor
-    neovim
-    tree-sitter
+        # Editor
+        neovim
+        tree-sitter
 
-    # Dev tools
-    jq
-    yq-go
-    postgresql
-    just
-    hugo
-    cmake
-    ffmpeg
-    imagemagick
-    awscli2
-    tailscale
-    pnpm
-    bun
+        # Dev tools
+        jq
+        yq-go
+        postgresql
+        just
+        hugo
+        cmake
+        ffmpeg
+        imagemagick
+        awscli2
+        tailscale
+        pnpm
+        bun
 
-    # Formatters
-    stylua
-    shfmt
-    prettierd
-    nixfmt
-    oxfmt # JS/TS formatter (oxc)
+        # Formatters
+        stylua
+        shfmt
+        prettierd
+        nixfmt
+        oxfmt # JS/TS formatter (oxc)
 
-    # LSPs
-    lua-language-server
-    vscode-langservers-extracted
-    typescript-go # tsgo - native TS language server
-    tailwindcss-language-server
-    dockerfile-language-server
-    yaml-language-server
-    nil # Nix LSP
-    gopls
-    # rust-analyzer provided by rust-overlay (see rust-bin in Languages)
-    # ty (Python) installed via: uv tool install ty
+        # LSPs
+        lua-language-server
+        vscode-langservers-extracted
+        typescript-go # tsgo - native TS language server
+        tailwindcss-language-server
+        dockerfile-language-server
+        yaml-language-server
+        nil # Nix LSP
+        gopls
+        # rust-analyzer provided by rust-overlay (see rust-bin in Languages)
+        # ty (Python) installed via: uv tool install ty
 
-    # Linters
-    oxlint
-    golangci-lint
-    luaPackages.luacheck
+        # Linters
+        oxlint
+        golangci-lint
+        luaPackages.luacheck
 
-    # Go tools
-    delve # debugger
+        # Go tools
+        delve # debugger
 
-    # Debuggers
-    # codelldb: run `uv tool install codelldb` or use Mason for now
+        # Debuggers
+        # codelldb: run `uv tool install codelldb` or use Mason for now
 
-    # Rust tools
-    cargo-expand
-    cargo-insta
-    llvmPackages.lld # fast linker for Rust
+        # Rust tools
+        cargo-expand
+        cargo-insta
+        llvmPackages.lld # fast linker for Rust
 
-    # Version control
-    diffnav # GitHub-like diff pager for git/gh PR diffs
-    git-town # stacked PR workflow for git
-    tuicr # terminal UI for code review
+        # Version control
+        diffnav # GitHub-like diff pager for git/gh PR diffs
+        git-town # stacked PR workflow for git
 
-    # AI coding assistants
-    claude-code.default # pre-built binary via sadjow/claude-code-nix
-    codex-cli.default # pre-built binary via sadjow/codex-cli-nix
-    opencode # from nixpkgs
-    llm-agents.pi # from numtide/llm-agents.nix
+        # AI coding assistants from nixpkgs
+        opencode
+      ]
+      ++ lib.optional isLinux tmux
+      ++ optionalPackage tuicr
+      ++ optionalPackage claudeCode
+      ++ optionalPackage codexCli
+      ++ optionalPackage piAgent;
 
-    # GUI Apps - moved to Homebrew casks for reliability
-    # nix-casks can be unreliable, using homebrew.nix instead
-  ];
+  }
+  // lib.optionalAttrs (piAgent != null) {
+    # Expose pi-coding-agent's bundled node_modules to user-installed pi
+    # extensions in ~/.pi/agent/extensions/, which otherwise cannot resolve
+    # imports like `diff` or `@sinclair/typebox`.
+    activation.piExtensionDeps = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      $DRY_RUN_CMD mkdir -p $HOME/.pi/agent
+      $DRY_RUN_CMD ln -sfn ${piAgent}/lib/node_modules/@earendil-works/pi-coding-agent/node_modules \
+        $HOME/.pi/agent/node_modules
 
-  # Expose pi-coding-agent's bundled node_modules to user-installed pi
-  # extensions in ~/.pi/agent/extensions/, which otherwise cannot resolve
-  # imports like `diff` or `@sinclair/typebox`.
-  home.activation.piExtensionDeps = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-    $DRY_RUN_CMD mkdir -p $HOME/.pi/agent
-    $DRY_RUN_CMD ln -sfn ${llm-agents.pi}/lib/node_modules/@earendil-works/pi-coding-agent/node_modules \
-      $HOME/.pi/agent/node_modules
-
-    if [ -d "$HOME/.pi/agent/extensions/web-tools" ]; then
-      $DRY_RUN_CMD ln -sfn ${piWebToolsNodeModules}/node_modules \
-        "$HOME/.pi/agent/extensions/web-tools/node_modules"
-    fi
-  '';
+      if [ -d "$HOME/.pi/agent/extensions/web-tools" ]; then
+        $DRY_RUN_CMD ln -sfn ${piWebToolsNodeModules}/node_modules \
+          "$HOME/.pi/agent/extensions/web-tools/node_modules"
+      fi
+    '';
+  };
 }

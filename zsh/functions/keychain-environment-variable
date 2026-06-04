@@ -1,2 +1,6 @@
 # Get environment variable from macOS keychain
+if [[ "$(uname -s)" != "Darwin" ]]; then
+  return 1
+fi
+
 security find-generic-password -w -a ${USER} -D "environment variable" -s "${1}"

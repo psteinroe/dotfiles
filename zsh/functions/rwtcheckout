@@ -1,0 +1,24 @@
+# Checkout a remote branch/PR into a remote worktree, then attach to it.
+# Usage: rwtcheckout <repo> <branch-name|pr-number>
+if [[ $# -lt 2 ]]; then
+  echo "Usage: rwtcheckout <repo> <branch-name|pr-number>" >&2
+  return 1
+fi
+
+local host="${RDEV_HOST:-dev}"
+local remote_home="${RDEV_HOME:-/home/psteinroe}"
+local repo="${1%.git}"
+local input="$2"
+local repo_dir="${remote_home}/Developer/${repo}.git"
+local worktree="$input"
+
+if [[ "$input" =~ ^[0-9]+$ ]]; then
+  worktree="pr-$input"
+else
+  worktree="${input//\//-}"
+fi
+
+local remote_cmd="cd ${(q)repo_dir} || exit 1; wtcheckout ${(q)input}"
+ssh -t "$host" "zsh -lic ${(q)remote_cmd}" || return
+
+rdev-host "$host" "$repo" "$worktree"

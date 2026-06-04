@@ -1,0 +1,24 @@
+{
+    "compaction": {
+        "enabled": true
+    },
+    "retry": {
+        "enabled": true,
+        "maxRetries": 50
+    },
+    "hideThinkingBlock": false,
+    "shellPath": "/bin/zsh",
+    "shellCommandPrefix": "fpath=($HOME/Developer/dotfiles/zsh/functions $fpath); autoload -Uz gpr",
+    "packages": [
+        "git:github.com/default-anton/pi-librarian",
+        "git:github.com/default-anton/pi-finder",
+        "git:github.com/default-anton/pi-handoff",
+        "git:github.com/nicobailon/pi-mcp-adapter@v2.8.0",
+        "git:github.com/davebcn87/pi-autoresearch",
+        "npm:pi-dynamic-workflows"
+    ],
+    "lastChangelogVersion": "0.75.3",
+    "defaultProvider": "openai-codex",
+    "defaultModel": "gpt-5.5",
+    "defaultThinkingLevel": "high"
+}

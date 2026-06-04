@@ -1,5 +1,5 @@
 {
-  description = "psteinroe's Darwin system configuration";
+  description = "psteinroe's cross-platform system and home configuration";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
@@ -72,16 +72,62 @@
     ghostty-hm-module.url = "github:clo4/ghostty-hm-module";
   };
 
-  outputs = inputs@{ self, nixpkgs, nix-darwin, home-manager, nix-homebrew, nix-casks, claude-code, codex-cli, llm-agents, rust-overlay, ghostty-hm-module, ... }:
+  outputs =
+    inputs@{
+      self,
+      nixpkgs,
+      nix-darwin,
+      home-manager,
+      nix-homebrew,
+      rust-overlay,
+      ...
+    }:
     let
-      system = "aarch64-darwin";
       username = "psteinroe";
       hostname = "psteinroe";
+      darwinSystem = "aarch64-darwin";
+      linuxX86System = "x86_64-linux";
+      darwinHomeDirectory = "/Users/${username}";
+      darwinDotfilesPath = "${darwinHomeDirectory}/Developer/dotfiles";
+      darwinSpecialArgs = {
+        inherit inputs username;
+        system = darwinSystem;
+        homeDirectory = darwinHomeDirectory;
+        dotfilesPath = darwinDotfilesPath;
+        isDarwin = true;
+        isLinux = false;
+      };
+
+      mkHome =
+        {
+          system,
+          homeDirectory,
+          isDarwin ? false,
+          isLinux ? false,
+        }:
+        home-manager.lib.homeManagerConfiguration {
+          pkgs = import nixpkgs {
+            inherit system;
+            overlays = [ rust-overlay.overlays.default ];
+          };
+          extraSpecialArgs = {
+            inherit
+              inputs
+              system
+              username
+              homeDirectory
+              isDarwin
+              isLinux
+              ;
+            dotfilesPath = "${homeDirectory}/Developer/dotfiles";
+          };
+          modules = [ ./nix/home ];
+        };
     in
     {
       darwinConfigurations.${hostname} = nix-darwin.lib.darwinSystem {
-        inherit system;
-        specialArgs = { inherit inputs system username; };
+        system = darwinSystem;
+        specialArgs = darwinSpecialArgs;
         modules = [
           ./nix/darwin
 
@@ -99,11 +145,17 @@
             home-manager = {
               useGlobalPkgs = true;
               useUserPackages = true;
-              extraSpecialArgs = { inherit inputs system username; };
+              extraSpecialArgs = darwinSpecialArgs;
               users.${username} = import ./nix/home;
             };
           }
         ];
+      };
+
+      homeConfigurations."${username}@linux-x86_64" = mkHome {
+        system = linuxX86System;
+        homeDirectory = "/home/${username}";
+        isLinux = true;
       };
 
       # Expose the package set

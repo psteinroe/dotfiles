@@ -1,6 +1,11 @@
 # coffee - Keep your Mac awake (Amphetamine alternative)
 # Uses macOS built-in caffeinate
 
+if [[ "$(uname -s)" != "Darwin" ]]; then
+    echo "coffee is only available on macOS" >&2
+    return 1
+fi
+
 local PIDFILE="/tmp/coffee.pid"
 
 _coffee_usage() {

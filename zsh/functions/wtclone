@@ -11,11 +11,13 @@ local name="${2:-$(basename "$url" .git).git}"
 git clone --bare "$url" "$name" && cd "$name" && git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*" && git fetch
 
 local default_branch=$(gh repo view --json defaultBranchRef -q '.defaultBranchRef.name' 2>/dev/null)
-
-if [ -n "$default_branch" ]; then
-  git worktree add "$default_branch" "$default_branch"
-  cd "$default_branch"
-  # Set git-town main branch
-  git config git-town.main-branch "$default_branch"
-  wtsetup
+if [ -z "$default_branch" ]; then
+  default_branch=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')
 fi
+[ -n "$default_branch" ] || default_branch="main"
+
+git worktree add "$default_branch" "$default_branch"
+cd "$default_branch"
+# Set git-town main branch
+git config git-town.main-branch "$default_branch"
+wtsetup

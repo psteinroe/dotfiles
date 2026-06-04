@@ -1,0 +1,34 @@
+# Select a remote worktree with local fzf, then attach to it.
+# Usage: rwtlist <repo>
+if [[ $# -lt 1 ]]; then
+  echo "Usage: rwtlist <repo>" >&2
+  return 1
+fi
+
+local host="${RDEV_HOST:-dev}"
+local remote_home="${RDEV_HOME:-/home/psteinroe}"
+local repo="${1%.git}"
+local bare="${repo}.git"
+local repo_dir="${remote_home}/Developer/${bare}"
+
+local selected
+selected=$(ssh "$host" "cd ${(q)repo_dir} && git worktree list --porcelain" | awk '
+  /^worktree / { path = substr($0, 10) }
+  /^branch / {
+    branch = $0
+    sub(/^branch refs\/heads\//, "", branch)
+    printf "%s\t%s\n", branch, path
+  }
+  /^detached$/ { printf "%s\t%s\n", "detached", path }
+  /^bare$/ { printf "%s\t%s\n", "bare", path }
+' | fzf --prompt="Remote worktree> " --height=40% --reverse --with-nth=1,2) || return 0
+
+local path="${selected#*$'\t'}"
+local worktree="${path#${repo_dir}/}"
+
+if [[ -z "$worktree" || "$worktree" == "$path" || "$worktree" == "." ]]; then
+  echo "Cannot attach to selected worktree: $path" >&2
+  return 1
+fi
+
+rdev-host "$host" "$repo" "$worktree"

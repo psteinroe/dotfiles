@@ -365,8 +365,8 @@ Do not use one shared SSH config for both platforms if it requires conditionals 
 Recommended files:
 
 ```text
-ssh_config.darwin
-ssh_config.linux
+ssh_config        # Darwin/current local config
+ssh_config.linux  # Linux remote config
 ```
 
 Darwin can keep:
@@ -389,22 +389,17 @@ ssh -G github.com >/dev/null
 
 works on Linux.
 
-### 9. Git config split or include strategy
+### 9. Shared Git config
 
-Current `gitconfig` includes macOS-oriented tools and browser commands.
+Use one shared `gitconfig` for both platforms now that editor, diff, merge, and credential config are portable.
 
-Clean options:
+Shared defaults:
 
-1. Generate `.gitconfig` from Home Manager with platform-specific includes.
-2. Keep common `gitconfig` plus:
-   - `gitconfig.darwin`
-   - `gitconfig.linux`
+- editor: `nvim`
+- merge tool: `nvim`
+- credential helper: `!gh auth git-credential`
 
-Linux should not reference:
-
-- Kaleidoscope
-- `open`
-- hardcoded macOS `gh` paths
+Linux should not reference macOS-only GUI tools or commands.
 
 Acceptance criteria:
 

@@ -1,4 +1,9 @@
 # Set environment variable in macOS keychain
+if [[ "$(uname -s)" != "Darwin" ]]; then
+  print "set-keychain-environment-variable is only available on macOS" >&2
+  return 1
+fi
+
 [ -n "$1" ] || print "Missing environment variable name"
 read -s "?Enter Value for ${1}: " secret
 ( [ -n "$1" ] && [ -n "$secret" ] ) || return 1

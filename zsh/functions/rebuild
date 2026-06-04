@@ -1,19 +1,33 @@
-# Rebuild nix-darwin configuration
+# Rebuild platform configuration
 # Usage: rebuild [-u|--update]
+local dotfiles="$HOME/Developer/dotfiles"
+
 if [[ "$1" == "-u" || "$1" == "--update" ]]; then
   echo "Updating flake inputs..."
-  nix flake update --flake "$HOME/Developer/dotfiles"
+  nix flake update --flake "$dotfiles"
 
-  if command -v brew >/dev/null 2>&1; then
+  if [[ "$(uname -s)" == "Darwin" ]] && command -v brew >/dev/null 2>&1; then
     echo "Updating Homebrew metadata..."
     brew update
   fi
 fi
-# `sudo` can start the root-side Nix client with macOS launchd's low
-# maxfiles limit (often 256). Flake evaluation then fails in root's
-# tarball cache with "Too many open files". Raise the limit inside the
-# privileged shell before invoking darwin-rebuild.
-sudo HOME="$HOME" /bin/sh -c '
-  ulimit -n 1048575 2>/dev/null || ulimit -n 65536 2>/dev/null || true
-  exec darwin-rebuild switch --flake "$HOME/Developer/dotfiles#psteinroe"
-'
+
+case "$(uname -s)" in
+  Darwin)
+    # `sudo` can start the root-side Nix client with macOS launchd's low
+    # maxfiles limit (often 256). Flake evaluation then fails in root's
+    # tarball cache with "Too many open files". Raise the limit inside the
+    # privileged shell before invoking darwin-rebuild.
+    sudo HOME="$HOME" /bin/sh -c '
+      ulimit -n 1048575 2>/dev/null || ulimit -n 65536 2>/dev/null || true
+      exec darwin-rebuild switch --flake "$HOME/Developer/dotfiles#psteinroe"
+    '
+    ;;
+  Linux)
+    home-manager switch --flake "$dotfiles#psteinroe@linux-x86_64"
+    ;;
+  *)
+    echo "Unsupported platform: $(uname -s)" >&2
+    return 1
+    ;;
+esac

@@ -1,0 +1,21 @@
+# Run wtclean for a remote repo.
+# Usage: rwtclean <repo>
+if [[ $# -lt 1 ]]; then
+  echo "Usage: rwtclean <repo>" >&2
+  return 1
+fi
+
+local host="${RDEV_HOST:-dev}"
+local remote_home="${RDEV_HOME:-/home/psteinroe}"
+local repo="${1%.git}"
+local repo_dir="${remote_home}/Developer/${repo}.git"
+
+local remote_cmd="
+cd ${(q)repo_dir} || exit 1
+worktree=\$(git worktree list --porcelain | awk '/^worktree / { path = substr(\$0, 10) } /^branch / { print path; exit }')
+[ -n \"\$worktree\" ] || { echo \"No branch worktree found for ${(q)repo}\" >&2; exit 1; }
+cd \"\$worktree\" || exit 1
+wtclean
+"
+
+ssh -t "$host" "zsh -lic ${(q)remote_cmd}" || return

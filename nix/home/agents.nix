@@ -4,14 +4,19 @@
   pkgs,
   inputs,
   system,
+  dotfilesPath,
+  isDarwin ? false,
   ...
 }:
 
 let
-  dotfiles = "${config.home.homeDirectory}/Developer/dotfiles";
-  agentsDir = "${dotfiles}/agents";
-  claude-code = inputs.claude-code.packages.${system};
-  claude-bin = "${claude-code.default}/bin/claude";
+  agentsDir = "${dotfilesPath}/agents";
+  claudeCode = lib.attrByPath [ system "default" ] null inputs.claude-code.packages;
+  claude-bin = if claudeCode != null then "${claudeCode}/bin/claude" else "claude";
+  claudeSettings =
+    if isDarwin then "${agentsDir}/claude/settings.json" else "${agentsDir}/claude/settings.linux.json";
+  piSettings =
+    if isDarwin then "${agentsDir}/pi/settings.json" else "${agentsDir}/pi/settings.linux.json";
   remoteSkills = import ./remote-skills.nix { inherit inputs; };
   serializeSkillSpecs =
     skills: lib.concatMapStringsSep "\n" (skill: "${skill.name}\t${skill.path}") skills;
@@ -21,30 +26,30 @@ let
     opencode = serializeSkillSpecs (remoteSkills.shared ++ remoteSkills.opencode);
     pi = serializeSkillSpecs (remoteSkills.shared ++ remoteSkills.pi);
   };
-  remoteSkillSources = lib.concatMap
-    (group: map (skill: skill // { inherit (group) groupName; }) group.skills)
-    [
-      {
-        groupName = "shared";
-        skills = remoteSkills.shared;
-      }
-      {
-        groupName = "claude";
-        skills = remoteSkills.claude;
-      }
-      {
-        groupName = "codex";
-        skills = remoteSkills.codex;
-      }
-      {
-        groupName = "opencode";
-        skills = remoteSkills.opencode;
-      }
-      {
-        groupName = "pi";
-        skills = remoteSkills.pi;
-      }
-    ];
+  remoteSkillSources =
+    lib.concatMap (group: map (skill: skill // { inherit (group) groupName; }) group.skills)
+      [
+        {
+          groupName = "shared";
+          skills = remoteSkills.shared;
+        }
+        {
+          groupName = "claude";
+          skills = remoteSkills.claude;
+        }
+        {
+          groupName = "codex";
+          skills = remoteSkills.codex;
+        }
+        {
+          groupName = "opencode";
+          skills = remoteSkills.opencode;
+        }
+        {
+          groupName = "pi";
+          skills = remoteSkills.pi;
+        }
+      ];
   remoteSkillAssertions = map (skill: {
     assertion = builtins.pathExists skill.path && builtins.pathExists "${skill.path}/SKILL.md";
     message = "Remote ${skill.groupName} skill '${skill.name}' is missing or has no SKILL.md at ${skill.path}. Update nix/home/remote-skills.nix.";
@@ -142,16 +147,16 @@ in
         mkdir -p "$HOME/.claude"
 
         sync_optional_file "${agentsDir}/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
-        sync_optional_file "${agentsDir}/claude/settings.json" "$HOME/.claude/settings.json"
+        sync_optional_file "${claudeSettings}" "$HOME/.claude/settings.json"
         sync_optional_file "${agentsDir}/claude/file-suggestion.sh" "$HOME/.claude/file-suggestion.sh"
         if [ -f "$HOME/.claude/file-suggestion.sh" ]; then
           chmod +x "$HOME/.claude/file-suggestion.sh"
         fi
 
-        # Deploy hooks
+        # Deploy macOS-only hooks. Linux settings do not reference them.
         rm -rf "$HOME/.claude/hooks"
         mkdir -p "$HOME/.claude/hooks"
-        if [ -d "${agentsDir}/claude/hooks" ]; then
+        if [ "${if isDarwin then "1" else "0"}" = "1" ] && [ -d "${agentsDir}/claude/hooks" ]; then
           for hook in "${agentsDir}"/claude/hooks/*.sh; do
             [ -f "$hook" ] || continue
             cp -f "$hook" "$HOME/.claude/hooks/"
@@ -176,15 +181,15 @@ in
             fi
             case "$section" in
               marketplaces)
-                ${claude-bin} plugin marketplace add "$line" 2>/dev/null || true
+                if command -v ${claude-bin} >/dev/null 2>&1; then ${claude-bin} plugin marketplace add "$line" 2>/dev/null || true; fi
                 ;;
               plugins)
-                ${claude-bin} plugin install "$line" 2>/dev/null || true
+                if command -v ${claude-bin} >/dev/null 2>&1; then ${claude-bin} plugin install "$line" 2>/dev/null || true; fi
                 ;;
               mcps)
                 name="''${line%%:*}"
                 cmd="''${line#*:}"
-                ${claude-bin} mcp add "$name" --scope user -- $cmd 2>/dev/null || true
+                if command -v ${claude-bin} >/dev/null 2>&1; then ${claude-bin} mcp add "$name" --scope user -- $cmd 2>/dev/null || true; fi
                 ;;
             esac
           done < "$plugins_file"
@@ -248,7 +253,7 @@ in
         # Nix generation change just to copy files again.
         link_optional_path "${agentsDir}/pi/AGENTS.md" "$HOME/.pi/agent/AGENTS.md"
         link_optional_path "${agentsDir}/pi/SYSTEM.md" "$HOME/.pi/agent/SYSTEM.md"
-        link_optional_path "${agentsDir}/pi/settings.json" "$HOME/.pi/agent/settings.json"
+        link_optional_path "${piSettings}" "$HOME/.pi/agent/settings.json"
         link_optional_path "${agentsDir}/pi/models.json" "$HOME/.pi/agent/models.json"
         link_optional_path "${agentsDir}/pi/mcp.json" "$HOME/.pi/agent/mcp.json"
         link_optional_path "${agentsDir}/pi/extensions" "$HOME/.pi/agent/extensions"

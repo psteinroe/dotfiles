@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs, dotfilesPath, ... }:
 
 {
   programs.zsh = {
@@ -17,7 +17,7 @@
 
     initContent = ''
       # Source modular zsh config
-      ZSH_DIR="$HOME/Developer/dotfiles/zsh"
+      ZSH_DIR="${dotfilesPath}/zsh"
       source "$ZSH_DIR/completions.zsh"
 
       # `compdump` hangs in this environment as soon as we have any custom
@@ -33,7 +33,7 @@
       source "$ZSH_DIR/aliases.zsh"
 
       # Autoload custom functions
-      fpath=($HOME/Developer/dotfiles/zsh/functions $fpath)
+      fpath=(${dotfilesPath}/zsh/functions $fpath)
       autoload -Uz keychain-environment-variable
       autoload -Uz set-keychain-environment-variable
       autoload -Uz video_to_gif
@@ -54,6 +54,13 @@
       autoload -Uz gpr
       autoload -Uz gclean
       autoload -Uz greset
+      autoload -Uz rdev-host
+      autoload -Uz rdev
+      autoload -Uz rwtclone
+      autoload -Uz rwtcreate
+      autoload -Uz rwtcheckout
+      autoload -Uz rwtlist
+      autoload -Uz rwtclean
     '';
   };
 

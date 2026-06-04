@@ -14,11 +14,16 @@ export FZF_CTRL_T_OPTS="--preview 'bat --color=always --style=numbers {}' --bind
 export FZF_ALT_C_COMMAND="fd --type d $FD_OPTIONS --color=never --hidden"
 export FZF_ALT_C_OPTS="--preview 'tree -C {} | head -50'"
 
-# Postgres Language Server
-export PGT_LOG_PATH="$HOME/Library/Caches/dev.supabase-community.pgt/pgt-logs"
+case "$(uname -s)" in
+  Darwin)
+    # Postgres Language Server
+    export PGT_LOG_PATH="$HOME/Library/Caches/dev.supabase-community.pgt/pgt-logs"
 
-# Anthropic API Key from keychain
-export ANTHROPIC_API_KEY=$(keychain-environment-variable ANTHROPIC_API_KEY 2>/dev/null || echo "");
-
-# OpenCode shared server auth from keychain
-export OPENCODE_SERVER_PASSWORD=$(keychain-environment-variable OPENCODE_SERVER_PASSWORD 2>/dev/null || echo "")
+    # API keys from macOS Keychain
+    export ANTHROPIC_API_KEY=$(keychain-environment-variable ANTHROPIC_API_KEY 2>/dev/null || echo "")
+    export OPENCODE_SERVER_PASSWORD=$(keychain-environment-variable OPENCODE_SERVER_PASSWORD 2>/dev/null || echo "")
+    ;;
+  Linux)
+    export PGT_LOG_PATH="${XDG_CACHE_HOME:-$HOME/.cache}/dev.supabase-community.pgt/pgt-logs"
+    ;;
+esac

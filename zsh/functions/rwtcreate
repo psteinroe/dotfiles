@@ -1,0 +1,17 @@
+# Create a worktree on the remote using wtcreate, then attach to it.
+# Usage: rwtcreate <repo> <branch>
+if [[ $# -lt 2 ]]; then
+  echo "Usage: rwtcreate <repo> <branch>" >&2
+  return 1
+fi
+
+local host="${RDEV_HOST:-dev}"
+local remote_home="${RDEV_HOME:-/home/psteinroe}"
+local repo="${1%.git}"
+local branch="$2"
+local repo_dir="${remote_home}/Developer/${repo}.git"
+
+local remote_cmd="cd ${(q)repo_dir} || exit 1; wtcreate ${(q)branch}"
+ssh -t "$host" "zsh -lic ${(q)remote_cmd}" || return
+
+rdev-host "$host" "$repo" "$branch"

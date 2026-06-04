@@ -1,4 +1,9 @@
-{ pkgs, inputs, username, ... }:
+{
+  inputs,
+  username,
+  system,
+  ...
+}:
 
 {
   imports = [
@@ -26,6 +31,5 @@
   # Apply overlays
   nixpkgs.overlays = [ inputs.rust-overlay.overlays.default ];
 
-  # Used for backwards compatibility
-  nixpkgs.hostPlatform = "aarch64-darwin";
+  nixpkgs.hostPlatform = system;
 }

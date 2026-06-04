@@ -1,25 +1,61 @@
 # Dotfiles
 
-nix-darwin + home-manager config for macOS.
+Cross-platform Nix + Home Manager dev environment.
 
-## Fresh Install
+- macOS: `nix-darwin` + Home Manager
+- Linux remotes: standalone Home Manager
+
+## Fresh Install: macOS
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/psteinroe/dotfiles/main/bootstrap.sh | bash
 ```
 
-## Manual Install
+## Fresh Install: Linux Remote
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/psteinroe/dotfiles/main/bootstrap-remote.sh | bash
+```
+
+The default Linux target is:
+
+```text
+homeConfigurations."psteinroe@linux-x86_64"
+```
+
+## Manual Install: macOS
 
 1. Install Xcode CLI: `xcode-select --install`
-2. Install Nix: `curl -sSf -L https://install.determinate.systems/nix | sh`
+2. Install Determinate Nix: `curl -sSf -L https://install.determinate.systems/nix | sh -s -- install`
 3. Clone: `git clone https://github.com/psteinroe/dotfiles.git ~/Developer/dotfiles`
-4. Build: `nix run nix-darwin -- switch --flake ~/Developer/dotfiles`
+4. Build: `nix run nix-darwin -- switch --flake ~/Developer/dotfiles#psteinroe`
+
+## Manual Install: Linux Remote
+
+1. Install Determinate Nix:
+   `curl -sSf -L https://install.determinate.systems/nix | sh -s -- install linux --no-confirm`
+2. Clone: `git clone https://github.com/psteinroe/dotfiles.git ~/Developer/dotfiles`
+3. Build: `nix run nixpkgs#home-manager -- switch --flake ~/Developer/dotfiles#psteinroe@linux-x86_64`
 
 ## Update
 
 ```bash
 rebuild
 ```
+
+## Remote Dev Workflow
+
+Set a local SSH alias named `dev` for the generic remote VM, or override per command with `RDEV_HOST`.
+
+```bash
+rwtclone https://github.com/org/app.git app
+rwtcreate app feature-x
+rwtcheckout app 123
+rwtlist app
+rdev app feature-x
+```
+
+Each `rdev`/`rwt*` attach opens a remote tmux session inside the selected worktree. Closing the local Ghostty tab detaches SSH but leaves remote zsh/Neovim running.
 
 ## Tailscale (macOS)
 
