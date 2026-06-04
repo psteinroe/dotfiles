@@ -40,6 +40,12 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    # Tuicr CLI
+    tuicr = {
+      url = "github:agavra/tuicr";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     # Remote skill sources
     agent-browser-skills = {
       url = "github:vercel-labs/agent-browser";

@@ -3,6 +3,7 @@
 .codex-session-id
 .DS_Store
 .opencode-session-id
+node_modules
 # AI agent session files (runtime, not config)
 # macOS
 # Neovim

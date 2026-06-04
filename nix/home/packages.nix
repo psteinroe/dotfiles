@@ -10,7 +10,20 @@ let
   claude-code = inputs.claude-code.packages.${system};
   codex-cli = inputs.codex-cli.packages.${system};
   llm-agents = inputs.llm-agents.packages.${system};
-  plannotator = pkgs.callPackage ../packages/plannotator.nix { };
+  tuicr = inputs.tuicr.defaultPackage.${system};
+  piWebToolsNodeModules = pkgs.buildNpmPackage {
+    pname = "pi-web-tools-extension-deps";
+    version = "0.1.0";
+    src = ../../agents/pi/extensions/web-tools;
+    npmDepsHash = "sha256-U280AVJ/2b2gXgFv1vPAVGXOcynJkJ+vwfAU1NZ4c/Y=";
+    dontNpmBuild = true;
+    installPhase = ''
+      runHook preInstall
+      mkdir -p $out
+      cp -R node_modules $out/node_modules
+      runHook postInstall
+    '';
+  };
 in
 {
   home.packages = with pkgs; [
@@ -27,13 +40,17 @@ in
     fd
 
     # Languages
-    nodejs_22
+    nodejs_24
     go
     lua
     elixir
     # ruby  # conflicts with gotools (both have bin/bundle)
     (rust-bin.stable.latest.default.override {
-      extensions = [ "rust-src" "rust-analyzer" "clippy" ];
+      extensions = [
+        "rust-src"
+        "rust-analyzer"
+        "clippy"
+      ];
     })
 
     # Python
@@ -93,14 +110,15 @@ in
     llvmPackages.lld # fast linker for Rust
 
     # Version control
+    diffnav # GitHub-like diff pager for git/gh PR diffs
     git-town # stacked PR workflow for git
+    tuicr # terminal UI for code review
 
     # AI coding assistants
     claude-code.default # pre-built binary via sadjow/claude-code-nix
-    codex-cli.default   # pre-built binary via sadjow/codex-cli-nix
-    opencode            # from nixpkgs
-    llm-agents.pi       # from numtide/llm-agents.nix
-    plannotator         # custom: prebuilt binary from GitHub releases
+    codex-cli.default # pre-built binary via sadjow/codex-cli-nix
+    opencode # from nixpkgs
+    llm-agents.pi # from numtide/llm-agents.nix
 
     # GUI Apps - moved to Homebrew casks for reliability
     # nix-casks can be unreliable, using homebrew.nix instead
@@ -111,7 +129,12 @@ in
   # imports like `diff` or `@sinclair/typebox`.
   home.activation.piExtensionDeps = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     $DRY_RUN_CMD mkdir -p $HOME/.pi/agent
-    $DRY_RUN_CMD ln -sfn ${llm-agents.pi}/lib/node_modules/@mariozechner/pi-coding-agent/node_modules \
+    $DRY_RUN_CMD ln -sfn ${llm-agents.pi}/lib/node_modules/@earendil-works/pi-coding-agent/node_modules \
       $HOME/.pi/agent/node_modules
+
+    if [ -d "$HOME/.pi/agent/extensions/web-tools" ]; then
+      $DRY_RUN_CMD ln -sfn ${piWebToolsNodeModules}/node_modules \
+        "$HOME/.pi/agent/extensions/web-tools/node_modules"
+    fi
   '';
 }

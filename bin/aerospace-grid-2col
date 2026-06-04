@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Arrange an AeroSpace workspace so the first two windows stay side-by-side and
+# additional windows start below them. AeroSpace doesn't expose a native
+# wrap-after-N layout, so this is a small best-effort helper.
+#
+# Usage:
+#   aerospace-grid-2col [--delay] [workspace|focused]
+
+if [[ "${1:-}" == "--delay" ]]; then
+  sleep 0.25
+  shift
+fi
+
+workspace="${1:-focused}"
+focused_workspace="$(aerospace list-workspaces --focused 2>/dev/null || true)"
+restore_workspace=""
+
+if [[ "$workspace" == "focused" || -z "$workspace" ]]; then
+  workspace="$focused_workspace"
+fi
+
+# Workspace 7 is the non-persistent overflow workspace. It intentionally keeps
+# fallback windows floating so crowded one-off apps do not get squeezed into the
+# tiled grid.
+if [[ "$workspace" == "7" ]]; then
+  exit 0
+fi
+
+if [[ -n "$focused_workspace" && "$workspace" != "$focused_workspace" ]]; then
+  # Directional move/layout commands are most reliable on the visible workspace.
+  # Briefly focus the requested workspace, then restore the previous one.
+  restore_workspace="$focused_workspace"
+  aerospace workspace "$workspace" >/dev/null
+fi
+
+cleanup() {
+  if [[ -n "${restore_workspace:-}" ]]; then
+    aerospace workspace "$restore_workspace" >/dev/null 2>&1 || true
+  fi
+}
+trap cleanup EXIT
+
+# Only arrange tiled windows. Floating windows are intentionally user-sized
+# (for example Safari on workspace 2) and should not be pulled back into the grid.
+mapfile -t windows < <(
+  aerospace list-windows --workspace "$workspace" --format '%{window-id} %{window-layout}' |
+    awk '$2 != "floating" { print $1 }'
+)
+count="${#windows[@]}"
+
+if (( count <= 1 )); then
+  exit 0
+fi
+
+# Keep simple two-window workspaces side-by-side.
+aerospace flatten-workspace-tree --workspace "$workspace" >/dev/null
+if (( count == 2 )); then
+  aerospace layout --window-id "${windows[0]}" tiles horizontal >/dev/null
+  aerospace balance-sizes >/dev/null 2>&1 || true
+  exit 0
+fi
+
+# Best-effort wrap: start from a horizontal row, then push windows after the
+# second one down. This yields the desired first row and avoids ultra-thin
+# columns when a workspace gets busy.
+aerospace layout --window-id "${windows[0]}" tiles horizontal >/dev/null
+for ((i = 2; i < count; i++)); do
+  aerospace move --window-id "${windows[$i]}" down >/dev/null 2>&1 || true
+done
+
+aerospace balance-sizes >/dev/null 2>&1 || true

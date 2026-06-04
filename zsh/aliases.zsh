@@ -18,6 +18,7 @@ alias hellomateo="cd $HOME/Developer/hellomateo.git"
 alias sbch="cd $HOME/Developer/supabase-cache-helpers.git"
 alias pglsp="cd $HOME/Developer/postgres-language-server.git"
 alias pgconductor="cd $HOME/Developer/postgres-conductor.git"
+alias toolshed="cd $HOME/Developer/toolshed.git"
 
 # Nix
 alias ndc='nix develop -c'
@@ -51,6 +52,8 @@ gca() { git add -A && git commit -m "${1:-progress}"; }
 alias gp='git push'
 alias gl='git pull'
 alias gs='git status'
+gpd() { gh pr diff "$@" --color=never | diffnav; }
+alias review='tuicr'
 
 # git-town (stacked PRs)
 alias gt='git town'

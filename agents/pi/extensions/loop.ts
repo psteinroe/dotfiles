@@ -1,324 +1,301 @@
 /**
- * Loop Extension
+ * Project Loop Extension
  *
- * Provides a /loop command that starts a follow-up loop with a breakout condition.
- * The loop keeps sending a prompt on turn end until the agent calls the
- * signal_loop_success tool.
+ * Adds a /loop command that repeatedly queues a follow-up prompt until the
+ * agent calls signal_loop_success, or the user stops it with /loop stop.
+ *
+ * Usage:
+ *   /loop                     Interactive preset picker
+ *   /loop tests               Loop until the test suite passes
+ *   /loop self                Loop until the agent decides the task is done
+ *   /loop custom <condition>  Loop until a custom condition is satisfied
+ *   /loop until <condition>   Alias for custom
+ *   /loop status              Show current loop state
+ *   /loop stop                Stop the loop
  */
 
-import { Type } from "@sinclair/typebox";
-import { complete, type Api, type Model, type UserMessage } from "@mariozechner/pi-ai";
-import type { ExtensionAPI, ExtensionContext, SessionSwitchEvent } from "@mariozechner/pi-coding-agent";
-import { compact } from "@mariozechner/pi-coding-agent";
-import { Container, type SelectItem, SelectList, Text } from "@mariozechner/pi-tui";
-import { DynamicBorder } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { Type } from "typebox";
 
 type LoopMode = "tests" | "custom" | "self";
 
-type LoopStateData = {
-	active: boolean;
-	mode?: LoopMode;
-	condition?: string;
-	prompt?: string;
-	summary?: string;
-	loopCount?: number;
-};
+type LoopState =
+	| {
+			active: true;
+			mode: LoopMode;
+			condition?: string;
+			prompt: string;
+			iteration: number;
+			startedAt: number;
+			lastTriggeredAt?: number;
+	  }
+	| {
+			active: false;
+			stoppedAt?: number;
+			reason?: string;
+	  };
 
-const LOOP_PRESETS = [
-	{ value: "tests", label: "Until tests pass", description: "" },
-	{ value: "custom", label: "Until custom condition", description: "" },
-	{ value: "self", label: "Self driven (agent decides)", description: "" },
-] as const;
+type ParsedCommand =
+	| { kind: "start"; state: LoopState & { active: true } }
+	| { kind: "stop" }
+	| { kind: "status" }
+	| null;
 
-const LOOP_STATE_ENTRY = "loop-state";
+const LOOP_STATE_ENTRY = "project-loop-state-v1";
+const LEGACY_LOOP_STATE_ENTRY = "loop-state";
 
-const HAIKU_MODEL_ID = "claude-haiku-4-5";
-
-const SUMMARY_SYSTEM_PROMPT = `You summarize loop breakout conditions for a status widget.
-Return a concise phrase (max 6 words) that says when the loop should stop.
-Use plain text only, no quotes, no punctuation, no prefix.
-
-Form should be "breaks when ...", "loops until ...", "stops on ...", "runs until ...", or similar.
-Use the best form that makes sense for the loop condition.
-`;
-
-function buildPrompt(mode: LoopMode, condition?: string): string {
-	switch (mode) {
-		case "tests":
-			return (
-				"Run all tests. If they are passing, call the signal_loop_success tool. " +
-				"Otherwise continue until the tests pass."
-			);
-		case "custom": {
-			const customCondition = condition?.trim() || "the custom condition is satisfied";
-			return (
-				`Continue until the following condition is satisfied: ${customCondition}. ` +
-				"When it is satisfied, call the signal_loop_success tool."
-			);
-		}
-		case "self":
-			return "Continue until you are done. When finished, call the signal_loop_success tool.";
-	}
-}
-
-function summarizeCondition(mode: LoopMode, condition?: string): string {
-	switch (mode) {
-		case "tests":
-			return "tests pass";
-		case "custom": {
-			const summary = condition?.trim() || "custom condition";
-			return summary.length > 48 ? `${summary.slice(0, 45)}...` : summary;
-		}
-		case "self":
-			return "done";
-	}
-}
-
-function getConditionText(mode: LoopMode, condition?: string): string {
+function conditionLabel(mode: LoopMode, condition?: string): string {
 	switch (mode) {
 		case "tests":
 			return "tests pass";
 		case "custom":
-			return condition?.trim() || "custom condition";
+			return condition?.trim() || "custom condition is met";
 		case "self":
-			return "you are done";
+			return "task is done";
 	}
 }
 
-async function selectSummaryModel(
-	ctx: ExtensionContext,
-): Promise<{ model: Model<Api>; apiKey?: string; headers?: Record<string, string> } | null> {
-	if (!ctx.model) return null;
+function buildPrompt(mode: LoopMode, condition?: string): string {
+	const label = conditionLabel(mode, condition);
 
-	if (ctx.model.provider === "anthropic") {
-		const haikuModel = ctx.modelRegistry.find("anthropic", HAIKU_MODEL_ID);
-		if (haikuModel) {
-			const auth = await ctx.modelRegistry.getApiKeyAndHeaders(haikuModel);
-			if (auth.ok) {
-				return { model: haikuModel, apiKey: auth.apiKey, headers: auth.headers };
-			}
-		}
+	switch (mode) {
+		case "tests":
+			return [
+				"Automatic loop iteration.",
+				"Run the relevant test suite. If all tests pass, call signal_loop_success.",
+				"If tests fail, fix the failure and keep working toward passing tests.",
+				"Do not call signal_loop_success until tests pass.",
+			].join(" ");
+		case "custom":
+			return [
+				"Automatic loop iteration.",
+				`Continue until this condition is satisfied: ${label}.`,
+				"If the condition is now satisfied, call signal_loop_success.",
+				"Otherwise take the next concrete step toward satisfying it.",
+			].join(" ");
+		case "self":
+			return [
+				"Automatic loop iteration.",
+				"Continue working autonomously on the current task.",
+				"When the task is complete, call signal_loop_success.",
+				"Otherwise take the next concrete step.",
+			].join(" ");
 	}
-
-	const auth = await ctx.modelRegistry.getApiKeyAndHeaders(ctx.model);
-	if (!auth.ok) return null;
-	return { model: ctx.model, apiKey: auth.apiKey, headers: auth.headers };
 }
 
-async function summarizeBreakoutCondition(
-	ctx: ExtensionContext,
-	mode: LoopMode,
-	condition?: string,
-): Promise<string> {
-	const fallback = summarizeCondition(mode, condition);
-	const selection = await selectSummaryModel(ctx);
-	if (!selection) return fallback;
-
-	const conditionText = getConditionText(mode, condition);
-	const userMessage: UserMessage = {
-		role: "user",
-		content: [{ type: "text", text: conditionText }],
-		timestamp: Date.now(),
-	};
-
-	const response = await complete(
-		selection.model,
-		{ systemPrompt: SUMMARY_SYSTEM_PROMPT, messages: [userMessage] },
-		{ apiKey: selection.apiKey, headers: selection.headers },
-	);
-
-	if (response.stopReason === "aborted" || response.stopReason === "error") {
-		return fallback;
-	}
-
-	const summary = response.content
-		.filter((c): c is { type: "text"; text: string } => c.type === "text")
-		.map((c) => c.text)
-		.join(" ")
-		.replace(/\s+/g, " ")
-		.trim();
-
-	if (!summary) return fallback;
-	return summary.length > 60 ? `${summary.slice(0, 57)}...` : summary;
+function summarizeState(state: LoopState): string {
+	if (!state.active) return state.reason ? `Loop inactive (${state.reason}).` : "Loop inactive.";
+	return `Loop active: ${conditionLabel(state.mode, state.condition)}; iteration ${state.iteration}.`;
 }
 
-function getCompactionInstructions(mode: LoopMode, condition?: string): string {
-	const conditionText = getConditionText(mode, condition);
-	return `Loop active. Breakout condition: ${conditionText}. Preserve this loop state and breakout condition in the summary.`;
-}
-
-function updateStatus(ctx: ExtensionContext, state: LoopStateData): void {
+function updateWidget(ctx: ExtensionContext, state: LoopState): void {
 	if (!ctx.hasUI) return;
-	if (!state.active || !state.mode) {
-		ctx.ui.setWidget("loop", undefined);
+
+	if (!state.active) {
+		ctx.ui.setWidget("project-loop", undefined);
 		return;
 	}
-	const loopCount = state.loopCount ?? 0;
-	const turnText = `(turn ${loopCount})`;
-	const summary = state.summary?.trim();
-	const text = summary
-		? `Loop active: ${summary} ${turnText}`
-		: `Loop active ${turnText}`;
-	ctx.ui.setWidget("loop", [ctx.ui.theme.fg("accent", text)]);
+
+	const label = conditionLabel(state.mode, state.condition);
+	const summary = label.length > 72 ? `${label.slice(0, 69)}...` : label;
+	ctx.ui.setWidget("project-loop", [
+		ctx.ui.theme.fg("accent", `↻ Loop active`),
+		ctx.ui.theme.fg("dim", `until ${summary} · iteration ${state.iteration}`),
+	]);
 }
 
-async function loadState(ctx: ExtensionContext): Promise<LoopStateData> {
-	const entries = ctx.sessionManager.getEntries();
+function coercePersistedState(data: unknown): LoopState | null {
+	const state = data as Partial<LoopState & { loopCount?: number }> | undefined;
+	if (!state || typeof state !== "object") return null;
+	if (!state.active) return { active: false };
+	if (!state.mode || !state.prompt) return null;
+
+	return {
+		active: true,
+		mode: state.mode,
+		condition: state.condition,
+		prompt: state.prompt,
+		iteration: typeof state.iteration === "number" ? state.iteration : state.loopCount ?? 0,
+		startedAt: typeof state.startedAt === "number" ? state.startedAt : Date.now(),
+		lastTriggeredAt: state.lastTriggeredAt,
+	};
+}
+
+function latestPersistedState(ctx: ExtensionContext): LoopState {
+	const entries = ctx.sessionManager.getBranch();
 	for (let i = entries.length - 1; i >= 0; i--) {
-		const entry = entries[i] as { type: string; customType?: string; data?: LoopStateData };
-		if (entry.type === "custom" && entry.customType === LOOP_STATE_ENTRY && entry.data) {
-			return entry.data;
+		const entry = entries[i] as { type?: string; customType?: string; data?: unknown };
+		if (
+			entry.type === "custom" &&
+			(entry.customType === LOOP_STATE_ENTRY || entry.customType === LEGACY_LOOP_STATE_ENTRY)
+		) {
+			const state = coercePersistedState(entry.data);
+			if (state) return state;
 		}
 	}
 	return { active: false };
 }
 
-export default function loopExtension(pi: ExtensionAPI): void {
-	let loopState: LoopStateData = { active: false };
+function wasLastAssistantAborted(messages: Array<{ role?: string; stopReason?: string }>): boolean {
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const message = messages[i];
+		if (message?.role === "assistant") return message.stopReason === "aborted";
+	}
+	return false;
+}
 
-	function persistState(state: LoopStateData): void {
+function parseCommand(args: string | undefined): ParsedCommand {
+	const text = args?.trim();
+	if (!text) return null;
+
+	const [rawMode = "", ...rest] = text.split(/\s+/);
+	const mode = rawMode.toLowerCase();
+	const condition = rest.join(" ").trim();
+
+	if (["stop", "end", "off", "cancel"].includes(mode)) return { kind: "stop" };
+	if (["status", "state"].includes(mode)) return { kind: "status" };
+
+	if (mode === "tests" || mode === "test") {
+		return {
+			kind: "start",
+			state: {
+				active: true,
+				mode: "tests",
+				prompt: buildPrompt("tests"),
+				iteration: 0,
+				startedAt: Date.now(),
+			},
+		};
+	}
+
+	if (mode === "self" || mode === "auto") {
+		return {
+			kind: "start",
+			state: {
+				active: true,
+				mode: "self",
+				prompt: buildPrompt("self"),
+				iteration: 0,
+				startedAt: Date.now(),
+			},
+		};
+	}
+
+	if (mode === "custom" || mode === "until") {
+		if (!condition) return null;
+		return {
+			kind: "start",
+			state: {
+				active: true,
+				mode: "custom",
+				condition,
+				prompt: buildPrompt("custom", condition),
+				iteration: 0,
+				startedAt: Date.now(),
+			},
+		};
+	}
+
+	return null;
+}
+
+async function promptForLoopState(ctx: ExtensionContext): Promise<(LoopState & { active: true }) | null> {
+	if (!ctx.hasUI) return null;
+
+	const preset = await ctx.ui.select("Start loop", [
+		"tests — until tests pass",
+		"custom — until a condition is met",
+		"self — until the agent decides it is done",
+	]);
+
+	if (!preset) return null;
+
+	if (preset.startsWith("tests")) {
+		return {
+			active: true,
+			mode: "tests",
+			prompt: buildPrompt("tests"),
+			iteration: 0,
+			startedAt: Date.now(),
+		};
+	}
+
+	if (preset.startsWith("self")) {
+		return {
+			active: true,
+			mode: "self",
+			prompt: buildPrompt("self"),
+			iteration: 0,
+			startedAt: Date.now(),
+		};
+	}
+
+	const condition = (await ctx.ui.editor("Loop until this condition is satisfied:", ""))?.trim();
+	if (!condition) return null;
+
+	return {
+		active: true,
+		mode: "custom",
+		condition,
+		prompt: buildPrompt("custom", condition),
+		iteration: 0,
+		startedAt: Date.now(),
+	};
+}
+
+export default function projectLoopExtension(pi: ExtensionAPI): void {
+	let loopState: LoopState = { active: false };
+
+	function persist(state: LoopState): void {
 		pi.appendEntry(LOOP_STATE_ENTRY, state);
 	}
 
-	function setLoopState(state: LoopStateData, ctx: ExtensionContext): void {
+	function setState(ctx: ExtensionContext, state: LoopState): void {
 		loopState = state;
-		persistState(state);
-		updateStatus(ctx, state);
+		persist(state);
+		updateWidget(ctx, state);
 	}
 
-	function clearLoopState(ctx: ExtensionContext): void {
-		const cleared: LoopStateData = { active: false };
-		loopState = cleared;
-		persistState(cleared);
-		updateStatus(ctx, cleared);
+	function stop(ctx: ExtensionContext, reason = "stopped"): void {
+		setState(ctx, { active: false, stoppedAt: Date.now(), reason });
+		ctx.ui.notify("Loop stopped", "info");
 	}
 
-	function breakLoop(ctx: ExtensionContext): void {
-		clearLoopState(ctx);
-		ctx.ui.notify("Loop ended", "info");
-	}
-
-	function wasLastAssistantAborted(messages: Array<{ role?: string; stopReason?: string }>): boolean {
-		for (let i = messages.length - 1; i >= 0; i--) {
-			const message = messages[i];
-			if (message?.role === "assistant") {
-				return message.stopReason === "aborted";
-			}
-		}
-		return false;
-	}
-
-	function triggerLoopPrompt(ctx: ExtensionContext): void {
-		if (!loopState.active || !loopState.mode || !loopState.prompt) return;
+	function triggerNextIteration(ctx: ExtensionContext): void {
+		if (!loopState.active) return;
 		if (ctx.hasPendingMessages()) return;
 
-		const loopCount = (loopState.loopCount ?? 0) + 1;
-		loopState = { ...loopState, loopCount };
-		persistState(loopState);
-		updateStatus(ctx, loopState);
+		const nextState: LoopState = {
+			...loopState,
+			iteration: loopState.iteration + 1,
+			lastTriggeredAt: Date.now(),
+		};
+		setState(ctx, nextState);
 
-		pi.sendMessage({
-			customType: "loop",
-			content: loopState.prompt,
-			display: true
-		}, {
-			deliverAs: "followUp",
-			triggerTurn: true
-		});
-	}
-
-	async function showLoopSelector(ctx: ExtensionContext): Promise<LoopStateData | null> {
-		const items: SelectItem[] = LOOP_PRESETS.map((preset) => ({
-			value: preset.value,
-			label: preset.label,
-			description: preset.description,
-		}));
-
-		const selection = await ctx.ui.custom<string | null>((tui, theme, _kb, done) => {
-			const container = new Container();
-			container.addChild(new DynamicBorder((str) => theme.fg("accent", str)));
-			container.addChild(new Text(theme.fg("accent", theme.bold("Select a loop preset"))));
-
-			const selectList = new SelectList(items, Math.min(items.length, 10), {
-				selectedPrefix: (text) => theme.fg("accent", text),
-				selectedText: (text) => theme.fg("accent", text),
-				description: (text) => theme.fg("muted", text),
-				scrollInfo: (text) => theme.fg("dim", text),
-				noMatch: (text) => theme.fg("warning", text),
-			});
-
-			selectList.onSelect = (item) => done(item.value);
-			selectList.onCancel = () => done(null);
-
-			container.addChild(selectList);
-			container.addChild(new Text(theme.fg("dim", "Press enter to confirm or esc to cancel")));
-			container.addChild(new DynamicBorder((str) => theme.fg("accent", str)));
-
-			return {
-				render(width: number) {
-					return container.render(width);
+		pi.sendMessage(
+			{
+				customType: "loop",
+				content: nextState.prompt,
+				display: true,
+				details: {
+					mode: nextState.mode,
+					condition: nextState.condition,
+					iteration: nextState.iteration,
 				},
-				invalidate() {
-					container.invalidate();
-				},
-				handleInput(data: string) {
-					selectList.handleInput(data);
-					tui.requestRender();
-				},
-			};
-		});
-
-		if (!selection) return null;
-
-		switch (selection) {
-			case "tests":
-				return { active: true, mode: "tests", prompt: buildPrompt("tests") };
-			case "self":
-				return { active: true, mode: "self", prompt: buildPrompt("self") };
-			case "custom": {
-				const condition = await ctx.ui.editor("Enter loop breakout condition:", "");
-				if (!condition?.trim()) return null;
-				return {
-					active: true,
-					mode: "custom",
-					condition: condition.trim(),
-					prompt: buildPrompt("custom", condition.trim()),
-				};
-			}
-			default:
-				return null;
-		}
-	}
-
-	function parseArgs(args: string | undefined): LoopStateData | null {
-		if (!args?.trim()) return null;
-		const parts = args.trim().split(/\s+/);
-		const mode = parts[0]?.toLowerCase();
-
-		switch (mode) {
-			case "tests":
-				return { active: true, mode: "tests", prompt: buildPrompt("tests") };
-			case "self":
-				return { active: true, mode: "self", prompt: buildPrompt("self") };
-			case "custom": {
-				const condition = parts.slice(1).join(" ").trim();
-				if (!condition) return null;
-				return {
-					active: true,
-					mode: "custom",
-					condition,
-					prompt: buildPrompt("custom", condition),
-				};
-			}
-			default:
-				return null;
-		}
+			},
+			{ deliverAs: "followUp", triggerTurn: true },
+		);
 	}
 
 	pi.registerTool({
 		name: "signal_loop_success",
 		label: "Signal Loop Success",
-		description: "Stop the active loop when the breakout condition is satisfied. Only call this tool when explicitly instructed to do so by the user, tool or system prompt.",
+		description:
+			"Stop the active /loop automation when its breakout condition is satisfied. Only call this after the loop condition is actually satisfied.",
+		promptSnippet: "Stop an active /loop automation after the breakout condition has been met",
+		promptGuidelines: [
+			"Use signal_loop_success only when an active /loop prompt tells you to stop and the loop breakout condition is satisfied.",
+		],
 		parameters: Type.Object({}),
 		async execute(_toolCallId, _params, _signal, _onUpdate, ctx) {
 			if (!loopState.active) {
@@ -328,56 +305,49 @@ export default function loopExtension(pi: ExtensionAPI): void {
 				};
 			}
 
-			clearLoopState(ctx);
+			setState(ctx, { active: false, stoppedAt: Date.now(), reason: "success" });
+			ctx.ui.notify("Loop completed", "info");
 
 			return {
-				content: [{ type: "text", text: "Loop ended." }],
-				details: { active: false },
+				content: [{ type: "text", text: "Loop stopped successfully." }],
+				details: { active: false, reason: "success" },
 			};
 		},
 	});
 
 	pi.registerCommand("loop", {
-		description: "Start a follow-up loop until a breakout condition is met",
+		description: "Repeat follow-up turns until tests pass, a condition is met, or the agent is done",
 		handler: async (args, ctx) => {
-			let nextState = parseArgs(args);
-			if (!nextState) {
-				if (!ctx.hasUI) {
-					ctx.ui.notify("Usage: /loop tests | /loop custom <condition> | /loop self", "warning");
-					return;
-				}
-				nextState = await showLoopSelector(ctx);
+			const parsed = parseCommand(args);
+
+			if (parsed?.kind === "stop") {
+				stop(ctx, "stopped by user");
+				return;
 			}
 
+			if (parsed?.kind === "status") {
+				ctx.ui.notify(summarizeState(loopState), loopState.active ? "info" : "warning");
+				return;
+			}
+
+			let nextState = parsed?.kind === "start" ? parsed.state : null;
+			if (!nextState) nextState = await promptForLoopState(ctx);
+
 			if (!nextState) {
-				ctx.ui.notify("Loop cancelled", "info");
+				ctx.ui.notify("Usage: /loop tests | /loop self | /loop custom <condition> | /loop stop", "warning");
 				return;
 			}
 
 			if (loopState.active) {
-				const confirm = ctx.hasUI
-					? await ctx.ui.confirm("Replace active loop?", "A loop is already active. Replace it?")
+				const replace = ctx.hasUI
+					? await ctx.ui.confirm("Replace active loop?", summarizeState(loopState))
 					: true;
-				if (!confirm) {
-					ctx.ui.notify("Loop unchanged", "info");
-					return;
-				}
+				if (!replace) return;
 			}
 
-			const summarizedState: LoopStateData = { ...nextState, summary: undefined, loopCount: 0 };
-			setLoopState(summarizedState, ctx);
-			ctx.ui.notify("Loop active", "info");
-			triggerLoopPrompt(ctx);
-
-			const mode = nextState.mode!;
-			const condition = nextState.condition;
-			void (async () => {
-				const summary = await summarizeBreakoutCondition(ctx, mode, condition);
-				if (!loopState.active || loopState.mode !== mode || loopState.condition !== condition) return;
-				loopState = { ...loopState, summary };
-				persistState(loopState);
-				updateStatus(ctx, loopState);
-			})();
+			setState(ctx, nextState);
+			ctx.ui.notify(summarizeState(nextState), "info");
+			triggerNextIteration(ctx);
 		},
 	});
 
@@ -385,69 +355,25 @@ export default function loopExtension(pi: ExtensionAPI): void {
 		if (!loopState.active) return;
 
 		if (ctx.hasUI && wasLastAssistantAborted(event.messages)) {
-			const confirm = await ctx.ui.confirm(
-				"Break active loop?",
-				"Operation aborted. Break out of the loop?",
+			const shouldStop = await ctx.ui.confirm(
+				"Stop active loop?",
+				"The last assistant turn was aborted. Stop the loop instead of continuing?",
 			);
-			if (confirm) {
-				breakLoop(ctx);
+			if (shouldStop) {
+				stop(ctx, "aborted by user");
 				return;
 			}
 		}
 
-		triggerLoopPrompt(ctx);
+		triggerNextIteration(ctx);
 	});
-
-	pi.on("session_before_compact", async (event, ctx) => {
-		if (!loopState.active || !loopState.mode || !ctx.model) return;
-		const auth = await ctx.modelRegistry.getApiKeyAndHeaders(ctx.model);
-		if (!auth.ok) return;
-
-		const instructionParts = [event.customInstructions, getCompactionInstructions(loopState.mode, loopState.condition)]
-			.filter(Boolean)
-			.join("\n\n");
-
-		try {
-			const compaction = await compact(
-				event.preparation,
-				ctx.model,
-				auth.apiKey ?? "",
-				auth.headers,
-				instructionParts,
-				event.signal,
-			);
-			return { compaction };
-		} catch (error) {
-			if (ctx.hasUI) {
-				const message = error instanceof Error ? error.message : String(error);
-				ctx.ui.notify(`Loop compaction failed: ${message}`, "warning");
-			}
-			return;
-		}
-	});
-
-	async function restoreLoopState(ctx: ExtensionContext): Promise<void> {
-		loopState = await loadState(ctx);
-		updateStatus(ctx, loopState);
-
-		if (loopState.active && loopState.mode && !loopState.summary) {
-			const mode = loopState.mode;
-			const condition = loopState.condition;
-			void (async () => {
-				const summary = await summarizeBreakoutCondition(ctx, mode, condition);
-				if (!loopState.active || loopState.mode !== mode || loopState.condition !== condition) return;
-				loopState = { ...loopState, summary };
-				persistState(loopState);
-				updateStatus(ctx, loopState);
-			})();
-		}
-	}
 
 	pi.on("session_start", async (_event, ctx) => {
-		await restoreLoopState(ctx);
+		loopState = latestPersistedState(ctx);
+		updateWidget(ctx, loopState);
 	});
 
-	pi.on("session_switch", async (_event: SessionSwitchEvent, ctx) => {
-		await restoreLoopState(ctx);
+	pi.on("session_shutdown", async (_event, ctx) => {
+		updateWidget(ctx, { active: false });
 	});
 }

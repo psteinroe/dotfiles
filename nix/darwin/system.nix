@@ -10,8 +10,14 @@
 
   # Dock settings
   system.defaults.dock = {
-    autohide = false;
+    autohide = true;
     show-recents = false;
+    # Reduce Dock, Mission Control, and Spaces-related animations
+    expose-animation-duration = 0.0;
+    launchanim = false;
+    autohide-delay = 0.0;
+    autohide-time-modifier = 0.0;
+    mru-spaces = false;
     persistent-apps = [
       "/Applications/Safari.app"
       "/System/Applications/Mail.app"
@@ -41,10 +47,19 @@
     ApplePressAndHoldEnabled = false; # Enable key repeat
     NSAutomaticCapitalizationEnabled = false;
     NSAutomaticSpellingCorrectionEnabled = false;
+    NSAutomaticWindowAnimationsEnabled = false;
+    NSUseAnimatedFocusRing = false;
+    NSWindowResizeTime = 0.001;
     # Scroll direction: false = traditional (not natural)
     "com.apple.swipescrolldirection" = false;
     AppleEnableSwipeNavigateWithScrolls = false;
   };
+
+  # Accessibility
+  # `com.apple.universalaccess` is TCC-protected on recent macOS releases and
+  # can make `darwin-rebuild` fail with "Could not write domain" when the
+  # launching terminal is not allowed to modify it. Keep this best-effort in
+  # postActivation below instead of nix-darwin's fatal defaults writer.
 
   # Trackpad settings
   system.defaults.trackpad = {
@@ -85,6 +100,10 @@
 
   # Set wallpaper
   system.activationScripts.postActivation.text = ''
+    # Disable animation when switching screens/spaces or opening apps. This can
+    # fail without Full Disk Access for the terminal app, so don't fail rebuilds.
+    /usr/bin/defaults write com.apple.universalaccess reduceMotion -bool true 2>/dev/null || true
+
     osascript -e 'tell application "System Events" to tell every desktop to set picture to "/Users/psteinroe/Developer/dotfiles/media/wallpaper.jpg" as POSIX file' 2>/dev/null || true
   '';
 }

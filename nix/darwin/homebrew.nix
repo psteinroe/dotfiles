@@ -1,17 +1,22 @@
 { ... }:
 
 {
+  # Work around Homebrew 5.1.7 API cask loader crashes on casks whose
+  # API JSON has an empty `depends_on.macos` object.
+  environment.etc."homebrew/brew.env".text = ''
+    HOMEBREW_NO_INSTALL_FROM_API=1
+  '';
+
   homebrew = {
     enable = true;
     onActivation = {
       cleanup = "zap";
-      autoUpdate = true;
-      upgrade = true;
+      autoUpdate = false;
+      upgrade = false;
     };
 
     taps = [
       "smudge/smudge"
-      "manaflow-ai/cmux"
       "nikitabobko/tap"
     ];
 
@@ -32,9 +37,9 @@
       "bitwarden"
       "stats"
       "timing"
-      "linear-linear"
+      "linear"
+      "notion"
       "bruno"
-      "cmux"
       "orbstack"
       "spotify"
       "steam"

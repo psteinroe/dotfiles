@@ -5,8 +5,9 @@ end
 -- Check if we need to reload the file when it changed
 vim.api.nvim_create_autocmd({ "FocusGained", "TermClose", "TermLeave" }, {
   group = augroup "checktime",
-  callback = function()
-    if vim.o.buftype ~= "nofile" then
+  callback = function(event)
+    local buf = event.buf or vim.api.nvim_get_current_buf()
+    if vim.bo[buf].buftype == "" then
       vim.cmd "checktime"
     end
   end,

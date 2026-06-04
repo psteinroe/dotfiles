@@ -5,11 +5,19 @@ config-version = 2
 
 start-at-login = true
 
-# Keep behavior explicit (vector-like keys don't always inherit defaults)
-on-focused-monitor-changed = ['move-mouse monitor-lazy-center']
+# Keep tiled layouts predictable and enforce the two-column helper whenever a
+# workspace becomes active.
+enable-normalization-flatten-containers = true
+enable-normalization-opposite-orientation-for-nested-containers = true
+default-root-container-layout = 'tiles'
+default-root-container-orientation = 'horizontal'
+exec-on-workspace-change = ['/bin/bash', '-lc', '/Users/psteinroe/Developer/dotfiles/bin/aerospace-pinned-app-guard; /Users/psteinroe/Developer/dotfiles/bin/aerospace-grid-2col focused']
 
-# Keep workspaces stable and predictable
-persistent-workspaces = ['1', '2', '3', '4', '5', '6', '7', '8', '9']
+# Single-monitor setup: no monitor-follow mouse behavior needed
+on-focused-monitor-changed = []
+
+# Keep the six daily workspaces stable and predictable
+persistent-workspaces = ['1', '2', '3', '4', '5', '6']
 
 # Optional niceties
 automatically-unhide-macos-hidden-apps = true
@@ -28,13 +36,19 @@ outer.right = 8
 
 [mode.main.binding]
 # Launcher
-alt-enter = 'exec-and-forget open -a Ghostty'
+alt-enter = ['workspace 1', 'exec-and-forget open -a Ghostty']
+
+# Disable macOS app hiding shortcuts. Hidden/revealed windows can bypass
+# on-window-detected and reappear on the current workspace.
+cmd-h = []
+cmd-alt-h = []
 
 # Layouts
 alt-slash = 'layout tiles horizontal vertical'
 alt-comma = 'layout accordion horizontal vertical'
-alt-f = 'fullscreen'
+alt-f = 'fullscreen --no-outer-gaps'
 alt-shift-f = 'layout floating tiling'
+alt-g = 'exec-and-forget /Users/psteinroe/Developer/dotfiles/bin/aerospace-grid-2col focused'
 
 # Focus
 alt-h = 'focus left'
@@ -61,8 +75,6 @@ alt-4 = 'workspace 4'
 alt-5 = 'workspace 5'
 alt-6 = 'workspace 6'
 alt-7 = 'workspace 7'
-alt-8 = 'workspace 8'
-alt-9 = 'workspace 9'
 
 alt-shift-1 = 'move-node-to-workspace 1'
 alt-shift-2 = 'move-node-to-workspace 2'
@@ -70,12 +82,8 @@ alt-shift-3 = 'move-node-to-workspace 3'
 alt-shift-4 = 'move-node-to-workspace 4'
 alt-shift-5 = 'move-node-to-workspace 5'
 alt-shift-6 = 'move-node-to-workspace 6'
-alt-shift-7 = 'move-node-to-workspace 7'
-alt-shift-8 = 'move-node-to-workspace 8'
-alt-shift-9 = 'move-node-to-workspace 9'
-
+alt-shift-7 = ['move-node-to-workspace 7', 'layout floating']
 alt-tab = 'workspace-back-and-forth'
-alt-shift-tab = 'move-workspace-to-monitor --wrap-around next'
 
 # Utility mode
 alt-semicolon = 'mode service'
@@ -98,31 +106,38 @@ j = ['join-with down', 'mode main']
 k = ['join-with up', 'mode main']
 l = ['join-with right', 'mode main']
 
-# Auto-assign common apps
+# Auto-assign daily apps for a single-monitor workflow
+# Keep Ghostty on workspace 1 and floating. Native Ghostty tabs are kept; their
+# macOS tab surfaces should stay anchored here instead of being retiled/moved.
 [[on-window-detected]]
 if.app-id = 'com.mitchellh.ghostty'
-run = 'move-node-to-workspace 1'
+run = ['move-node-to-workspace 1', 'layout floating']
 
 [[on-window-detected]]
 if.app-id = 'com.google.Chrome'
 run = 'move-node-to-workspace 2'
 
 [[on-window-detected]]
+if.app-id = 'com.apple.Safari'
+run = 'move-node-to-workspace 2'
+
+[[on-window-detected]]
+if.app-id = 'com.apple.Notes'
+run = 'move-node-to-workspace 3'
+
+[[on-window-detected]]
 if.app-id = 'com.tinyspeck.slackmacgap'
-run = 'move-node-to-workspace 3'
-
-[[on-window-detected]]
-if.app-id = 'com.hnc.Discord'
-run = 'move-node-to-workspace 3'
-
-[[on-window-detected]]
-if.app-id = 'com.linear'
 run = 'move-node-to-workspace 4'
 
 [[on-window-detected]]
-if.app-id = 'com.usebruno.app'
+if.app-id = 'com.linear'
 run = 'move-node-to-workspace 5'
 
 [[on-window-detected]]
 if.app-id = 'com.spotify.client'
-run = 'move-node-to-workspace 9'
+run = 'move-node-to-workspace 6'
+
+# Fallback: all unpinned apps go to a temporary/non-persistent overflow workspace.
+# Keep them floating so many one-off windows do not get squeezed together.
+[[on-window-detected]]
+run = ['move-node-to-workspace 7', 'layout floating']

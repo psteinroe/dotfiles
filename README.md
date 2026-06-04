@@ -136,7 +136,8 @@ git add -A
 git commit -m "Add feature"
 
 # 4. Create PR
-gtp                              # opens PR in browser
+gtp                              # git-town stacked PR flow; opens PR in browser
+# or: gpr                        # quick commit/push/create flow
 
 # 5. After merge, sync and cleanup
 gts                              # sync all branches
@@ -152,54 +153,74 @@ wtcheckout feat-other            # checkout branch
 
 ---
 
-## Ghostty Keybindings
+## Terminal GitHub Workflow
 
-Custom nvim-like keybindings.
+`tuicr` is the terminal code-review UI for reviewing local changes like a PR.
 
-### Split Navigation
+| Command | Purpose |
+|---------|---------|
+| `review` | Open `tuicr` for the current repository |
+| `gpd [pr]` | `gh pr diff [pr] --color=never \| diffnav`; pipe a PR diff into diffnav |
+| `lazygit` | Open the terminal Git UI |
+| `wtcheckout <branch\|pr#>` | Checkout a branch/PR into a worktree |
+| `gpr [-a] [-n] [-e] [-d] [-f issue]` | Commit/push/create a PR with generated copy, or open the GitHub editor with `-e` |
+| `/pr [--all|-a] [--draft] [--fixes issue] [--refs issue]` | In Pi, create or refresh a PR for the current branch using the `pr-writer` skill; `--all`/`-a` stages and commits first |
+
+`diffnav` is configured as the pager for `git diff`; other git commands continue to use `delta` through `core.pager`.
+
+---
+
+## Ghostty
+
+Config: `ghostty.conf` → `~/.config/ghostty/config`.
+
+Ghostty uses native macOS tabs, is routed by AeroSpace to workspace `1`, and stays floating.
+
+### Keybindings
+
+| Area | Action | Key |
+|------|--------|-----|
+| Splits | Focus left/down/up/right | `Ctrl+H/J/K/L` |
+| Splits | Resize left/down/up/right | `Cmd+Ctrl+H/J/K/L` |
+| Splits | New split right / down | `Cmd+D` / `Cmd+Shift+D` |
+| Splits | Toggle zoom / equalize / close | `Cmd+Shift+Enter` / `Alt+Shift+=` / `Cmd+W` |
+| Tabs | New tab / window | `Cmd+T` / `Cmd+N` |
+| Tabs | Switch tab | `Cmd+1` … `Cmd+9` |
+| Tabs | Previous / next tab | `Cmd+Shift+[` / `Cmd+Shift+]` |
+| Windows | Previous / next window | `Cmd+Shift+H/L` |
+| Ghostty | Command palette | `Cmd+Shift+P` |
+| Scrollback | Half page up/down | `Cmd+Alt+U/D` |
+| Scrollback | Page up/down | `Cmd+Alt+B/F` |
+| Scrollback | Line up/down | `Cmd+Alt+Y/E` |
+| Scrollback | Top / bottom | `Cmd+Alt+G` / `Cmd+Alt+Shift+G` |
+| Selection | Select all | `Cmd+A` |
+| Selection | Extend existing selection | `Cmd+Alt+Shift+H/J/K/L` or `Cmd+Alt+Shift+B/F` |
+
+`Cmd+Alt` is used for scrollback instead of raw `Ctrl` so shells, Neovim, and Ghostty defaults still work. Selection keybindings only adjust an existing selection; Ghostty does not provide a full Vim visual mode.
+
+---
+
+## Neovim Pi
+
+Pi opens inside a floating Neovim terminal via ToggleTerm and uses `cpi`, which first tries `pi --continue` and falls back to a new session.
 
 | Action | Key |
 |--------|-----|
-| Go left | `Ctrl+H` |
-| Go down | `Ctrl+J` |
-| Go up | `Ctrl+K` |
-| Go right | `Ctrl+L` |
+| Toggle Pi | `Ctrl+A` |
+| Toggle Pi alternative | `<leader>ap` |
 
-### Split Management
-
-| Action | Key |
-|--------|-----|
-| New split right | `Cmd+D` |
-| New split down | `Cmd+Shift+D` |
-| Toggle zoom | `Cmd+Shift+Enter` |
-| Equalize | `Alt+Shift+=` |
-| Close | `Cmd+W` |
-
-### Split Resize
-
-| Action | Key |
-|--------|-----|
-| Resize left | `Cmd+Ctrl+H` |
-| Resize down | `Cmd+Ctrl+J` |
-| Resize up | `Cmd+Ctrl+K` |
-| Resize right | `Cmd+Ctrl+L` |
-
-### Tabs
-
-| Action | Key |
-|--------|-----|
-| New tab | `Cmd+T` |
-| Prev tab | `Cmd+Shift+[` |
-| Next tab | `Cmd+Shift+]` |
-| Go to tab 1-9 | `Cmd+1-9` |
+Other Neovim agent integrations are disabled/removed; `Ctrl+A` opens Pi directly instead of showing an agent picker.
 
 ---
 
 ## AeroSpace
 
+The Dock is configured to auto-hide via nix-darwin so AeroSpace fullscreen can use the bottom of the screen.
+
 - Installed via Homebrew cask: `nikitabobko/tap/aerospace`
 - Config is tracked in repo at `aerospace.toml`
 - Nix symlinks it to `~/.config/aerospace/aerospace.toml`
+- Setup is optimized for one monitor with six persistent daily workspaces plus a non-persistent overflow workspace.
 
 Apply changes:
 
@@ -215,14 +236,50 @@ aerospace list-workspaces --all
 aerospace list-windows --all
 ```
 
-Current app-to-workspace defaults:
+### Daily workspace layout
 
-- `1`: Ghostty
-- `2`: Chrome
-- `3`: Slack + Discord
-- `4`: Linear
-- `5`: Bruno
-- `9`: Spotify
+| Workspace | Shortcut | App / purpose |
+|-----------|----------|---------------|
+| `1` | `Alt+1` | Ghostty / terminal |
+| `2` | `Alt+2` | Browser: Chrome or Safari |
+| `3` | `Alt+3` | Apple Notes |
+| `4` | `Alt+4` | Slack |
+| `5` | `Alt+5` | Linear |
+| `6` | `Alt+6` | Spotify |
+| `7` | `Alt+7` | Overflow for unpinned apps; non-persistent and floating |
+
+AeroSpace auto-moves pinned apps to their assigned workspace when their windows are detected. `bin/aerospace-pinned-app-guard` also re-applies those pinned workspace assignments on focus/workspace changes, covering macOS restore/hide cases where `on-window-detected` does not fire. Any other app opens on workspace `7`, which is not persistent, floats its windows, and disappears when empty.
+
+Workspaces `1`–`6` are auto-normalized with `bin/aerospace-grid-2col` when focused: the first two windows stay side-by-side and extra windows start below them, avoiding ultra-thin columns. Workspace `7` is skipped so crowded overflow windows are not squeezed into the tiled grid.
+
+Ghostty is special-cased: AeroSpace always routes Ghostty to workspace `1` and keeps it floating. Native tabs remain enabled; use Ghostty's command palette (`Cmd+Shift+P`) to search/switch tabs. macOS hide shortcuts (`Cmd+H`, `Cmd+Alt+H`) are disabled because hidden/revealed windows can bypass detection.
+
+### Core usage
+
+| Action | Shortcut |
+|--------|----------|
+| Open Ghostty | `Alt+Enter` |
+| Switch workspace | `Alt+1` … `Alt+7` |
+| Move focused window to workspace | `Alt+Shift+1` … `Alt+Shift+7` |
+| Jump back to previous workspace | `Alt+Tab` |
+| Focus adjacent window | `Alt+H/J/K/L` |
+| Move focused window | `Alt+Shift+H/J/K/L` |
+| Resize smartly | `Alt+-` / `Alt+=` |
+| Enter resize mode | `Alt+R`, then `H/J/K/L`, `Esc` to leave |
+| Toggle AeroSpace fullscreen without outer gaps | `Alt+F` |
+| Toggle floating/tiling | `Alt+Shift+F` |
+| Re-apply two-column workspace layout | `Alt+G` |
+| Enter service mode | `Alt+;` |
+
+Service mode shortcuts after `Alt+;`:
+
+| Action | Key |
+|--------|-----|
+| Reload config | `Esc` |
+| Flatten/reset workspace layout | `R` |
+| Toggle floating/tiling | `F` |
+| Close all windows except current | `Backspace` |
+| Join with adjacent window | `H/J/K/L` |
 
 Important: AeroSpace fails if both `~/.aerospace.toml` and `~/.config/aerospace/aerospace.toml` exist. Keep only the XDG one.
 

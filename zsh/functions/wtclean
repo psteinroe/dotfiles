@@ -12,6 +12,25 @@ local temp_file=$(mktemp)
 local wt_file=$(mktemp)
 local status_dir=$(mktemp -d)
 
+local default_branch=$(gh repo view --json defaultBranchRef -q '.defaultBranchRef.name' 2>/dev/null)
+if [ -z "$default_branch" ]; then
+  default_branch=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')
+fi
+[ -n "$default_branch" ] || default_branch="main"
+
+local protected_branches=("$default_branch" main master trunk)
+
+is_protected_branch() {
+  local branch="$1"
+  local protected
+  for protected in "${protected_branches[@]}"; do
+    if [ "$branch" = "$protected" ]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 # Collect worktrees (avoid piped while-read subshell)
 git worktree list --porcelain | grep '^worktree' | cut -d' ' -f2- > "$wt_file"
 
@@ -20,6 +39,10 @@ while read worktree_path; do
   if [ "$worktree_path" != "$repo_root" ] && [ "$worktree_path" != "$(dirname "$repo_root")/$(basename "$repo_root")" ]; then
     local branch=$(git -C "$worktree_path" branch --show-current 2>/dev/null)
     if [ -n "$branch" ]; then
+      if is_protected_branch "$branch"; then
+        echo "Protected: $branch"
+        continue
+      fi
       worktrees+=("$worktree_path:$branch")
     fi
   fi
@@ -65,10 +88,15 @@ done < "$temp_file"
 echo -n "\nRemove these? (y/N): "
 read response
 if [[ "$response" =~ ^[Yy]$ ]]; then
-  # rm directories in parallel, then prune metadata once
+  # Remove worktrees in parallel, then prune metadata once. Guard protected
+  # branches again here so a stale temp file can never remove main/default.
   while IFS=: read -r worktree_path branch; do
+    if is_protected_branch "$branch"; then
+      echo "Skipping protected branch: $branch"
+      continue
+    fi
     echo "Removing $branch..."
-    rm -rf "$worktree_path" &
+    git worktree remove --force "$worktree_path" &
   done < "$temp_file"
   wait
   git worktree prune

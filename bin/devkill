@@ -1,0 +1,327 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage: devkill [--repo] [--list] [--force]
+
+Interactively list plausible local dev-server processes, let you multi-select,
+then kill only the selected processes plus their child processes.
+
+Options:
+  --repo    Only show processes whose cwd is inside the current git repo/worktree.
+  --list    Print candidates and exit without selecting/killing.
+  --force   After TERM, send KILL to selected processes that are still alive.
+  -h,--help Show this help.
+
+Safety model:
+  - Dry allowlist of dev commands: vite/next/nuxt/astro/storybook/wrangler/etc.
+  - Also shows node/bun/deno listeners on common local dev ports under ~/Developer.
+  - Excludes pi/Ghostty/editor/agent-looking processes.
+  - Kills only PIDs you select, and their descendants. It does not do pkill node.
+EOF
+}
+
+repo_only=0
+list_only=0
+force=0
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --repo) repo_only=1 ;;
+    --list) list_only=1 ;;
+    --force) force=1 ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "Unknown option: $1" >&2; usage >&2; exit 2 ;;
+  esac
+  shift
+done
+
+current_repo="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+home_dev="$HOME/Developer"
+
+trim() {
+  local s="$*"
+  s="${s#${s%%[![:space:]]*}}"
+  s="${s%${s##*[![:space:]]}}"
+  printf '%s' "$s"
+}
+
+cwd_for_pid() {
+  { lsof -a -p "$1" -d cwd -Fn 2>/dev/null || true; } \
+    | sed -n 's/^n//p' \
+    | head -n 1
+}
+
+ports_for_pid() {
+  { lsof -nP -a -p "$1" -iTCP -sTCP:LISTEN 2>/dev/null || true; } \
+    | awk 'NR > 1 { name=$9; sub(/.*:/, "", name); if (name ~ /^[0-9]+$/) print name }' \
+    | sort -nu \
+    | paste -sd, -
+}
+
+inside_dir() {
+  local path="$1" dir="$2"
+  [[ -n "$path" && -n "$dir" && ( "$path" == "$dir" || "$path" == "$dir"/* ) ]]
+}
+
+is_protected() {
+  local pid="$1" comm="$2" args="$3"
+
+  [[ "$pid" == "$$" || "$pid" == "$PPID" ]] && return 0
+
+  case "$comm" in
+    pi|ghostty|Ghostty|nvim|vim|code|Cursor|Claude|codex) return 0 ;;
+  esac
+
+  [[ "$args" == *pi-coding-agent* ]] && return 0
+  [[ "$args" =~ (^|[[:space:]/])pi([[:space:]]|$) ]] && return 0
+  [[ "$args" == *Ghostty.app* ]] && return 0
+  [[ "$args" == *Visual\ Studio\ Code.app* ]] && return 0
+  [[ "$args" == *Cursor.app* ]] && return 0
+  [[ "$args" == *Claude.app* ]] && return 0
+
+  return 1
+}
+
+is_direct_dev_command() {
+  local text="$1"
+
+  [[ "$text" =~ (^|[[:space:]/])(pnpm|npm|yarn|bun)([[:space:]]+run)?[[:space:]]+dev([[:space:]]|$) ]] && return 0
+  [[ "$text" =~ (^|[[:space:]/])vite([^[:alnum:]_-]|$) ]] && return 0
+  [[ "$text" =~ (^|[[:space:]/])next[[:space:]]+dev([[:space:]]|$) ]] && return 0
+  [[ "$text" =~ (^|[[:space:]/])nuxt[[:space:]]+dev([[:space:]]|$) ]] && return 0
+  [[ "$text" =~ (^|[[:space:]/])astro[[:space:]]+dev([[:space:]]|$) ]] && return 0
+  [[ "$text" =~ (^|[[:space:]/])remix[[:space:]]+dev([[:space:]]|$) ]] && return 0
+  [[ "$text" =~ (^|[[:space:]/])storybook([[:space:]]+dev|-dev-server|[[:space:]]|$) ]] && return 0
+  [[ "$text" =~ (^|[[:space:]/])webpack-dev-server([^[:alnum:]_-]|$) ]] && return 0
+  [[ "$text" =~ (^|[[:space:]/])rspack([^[:alnum:]_-].*serve|[[:space:]]+serve) ]] && return 0
+  [[ "$text" =~ (^|[[:space:]/])wrangler[[:space:]]+dev([[:space:]]|$) ]] && return 0
+  [[ "$text" =~ (^|[[:space:]/])expo[[:space:]]+start([[:space:]]|$) ]] && return 0
+  [[ "$text" =~ (^|[[:space:]/])turbo[[:space:]]+dev([[:space:]]|$) ]] && return 0
+  [[ "$text" =~ (^|[[:space:]/])tsx[[:space:]]+watch([[:space:]]|$) ]] && return 0
+  [[ "$text" =~ (^|[[:space:]/])nodemon([^[:alnum:]_-]|$) ]] && return 0
+  [[ "$text" =~ (^|[[:space:]/])rollup([^[:alnum:]_-].*--watch|[[:space:]]+--watch) ]] && return 0
+  [[ "$text" =~ (^|[[:space:]/])tsup([^[:alnum:]_-].*--watch|[[:space:]]+--watch) ]] && return 0
+
+  return 1
+}
+
+is_helper_process() {
+  local comm="$1" args="$2" cwd="$3"
+
+  # esbuild/Rollup helper processes are commonly leaked by Vite. Only show them
+  # when they are working under ~/Developer, so global build daemons are ignored.
+  if inside_dir "$cwd" "$home_dev"; then
+    [[ "$comm" == esbuild || "$args" == *'/esbuild --service='* || "$args" == *'/bin/esbuild --service='* ]] && return 0
+  fi
+
+  return 1
+}
+
+has_common_dev_port() {
+  local ports=","$1","
+  [[ "$ports" =~ ,(3000|3001|3002|3003|3004|3005|3333|4000|4173|4321|5000|5001|5173|5174|6006|7000|8000|8080|8787|9000|9292), ]]
+}
+
+is_runtime_listener() {
+  local comm="$1" args="$2" cwd="$3" ports="$4"
+
+  [[ -n "$ports" ]] || return 1
+  has_common_dev_port "$ports" || return 1
+  inside_dir "$cwd" "$home_dev" || return 1
+
+  case "$comm" in
+    node|bun|deno|python|python3|ruby|go|java) return 0 ;;
+  esac
+  [[ "$args" =~ (^|[[:space:]/])(node|bun|deno|python3?|ruby|go|java)([[:space:]]|$) ]] && return 0
+
+  return 1
+}
+
+shorten() {
+  local s="$1" max="$2"
+  if (( ${#s} > max )); then
+    printf '…%s' "${s: -$((max - 1))}"
+  else
+    printf '%s' "$s"
+  fi
+}
+
+lines=()
+
+while IFS= read -r row; do
+  pid="$(awk '{print $1}' <<<"$row")"
+  ppid="$(awk '{print $2}' <<<"$row")"
+  pgid="$(awk '{print $3}' <<<"$row")"
+  comm="$(awk '{print $4}' <<<"$row")"
+  args="$(cut -d' ' -f5- <<<"$row")"
+  args="$(trim "$args")"
+
+  [[ -n "$pid" && "$pid" =~ ^[0-9]+$ ]] || continue
+  is_protected "$pid" "$comm" "$args" && continue
+
+  # Avoid lsof for every process. First do cheap ps/argv tests, then query cwd
+  # and ports only for processes that could plausibly be dev-server related.
+  direct=0
+  helperish=0
+  listenerish=0
+
+  is_direct_dev_command "$args" && direct=1
+  [[ "$comm" == esbuild || "$args" == *'/esbuild --service='* || "$args" == *'/bin/esbuild --service='* ]] && helperish=1
+  case "$comm" in
+    node|bun|deno|python|python3|ruby|go|java) listenerish=1 ;;
+  esac
+  [[ "$args" =~ (^|[[:space:]/])(node|bun|deno|python3?|ruby|go|java)([[:space:]]|$) ]] && listenerish=1
+
+  (( direct || helperish || listenerish )) || continue
+
+  cwd="$(cwd_for_pid "$pid")"
+  if (( repo_only )); then
+    inside_dir "$cwd" "$current_repo" || continue
+  fi
+
+  ports=""
+  reason=""
+
+  if (( direct )); then
+    ports="$(ports_for_pid "$pid")"
+    reason="dev-cmd"
+  elif (( helperish )) && is_helper_process "$comm" "$args" "$cwd"; then
+    ports="$(ports_for_pid "$pid")"
+    reason="helper"
+  else
+    ports="$(ports_for_pid "$pid")"
+    if is_runtime_listener "$comm" "$args" "$cwd" "$ports"; then
+      reason="listener"
+    else
+      continue
+    fi
+  fi
+
+  cwd_short="$(shorten "${cwd:-?}" 54)"
+  args_short="$(shorten "$args" 110)"
+  lines+=("$(printf '%-7s\t%-7s\t%-7s\t%-15s\t%-9s\t%-54s\t%s' "$pid" "$ppid" "$pgid" "${ports:-"-"}" "$reason" "$cwd_short" "$args_short")")
+done < <(ps -axo pid=,ppid=,pgid=,comm=,args=)
+
+if (( ${#lines[@]} == 0 )); then
+  if (( repo_only )); then
+    echo "No plausible dev-server processes found in current repo."
+  else
+    echo "No plausible dev-server processes found."
+  fi
+  exit 0
+fi
+
+header=$'PID    \tPPID   \tPGID   \tPORTS          \tREASON   \tCWD                                                   \tCOMMAND'
+
+if (( list_only )); then
+  printf '%s\n' "$header"
+  printf '%s\n' "${lines[@]}"
+  exit 0
+fi
+
+selected=""
+if command -v fzf >/dev/null 2>&1; then
+  selected="$(printf '%s\n' "${lines[@]}" \
+    | fzf --multi --no-sort --delimiter='\t' \
+      --header="$header"$'\nTab/Shift-Tab: mark many • Ctrl-A: select all • Ctrl-D: clear • Ctrl-T: toggle all • Enter: continue' \
+      --bind='ctrl-a:select-all,ctrl-d:deselect-all,ctrl-t:toggle-all' \
+      --prompt='devkill> ' \
+      --preview='pid=$(awk -F"\t" "{gsub(/^[ ]+|[ ]+$/, \"\", \\$1); print \\$1}" <<< {}); ps -p "$pid" -o pid,ppid,pgid,rss,stat,comm,args; echo; lsof -nP -a -p "$pid" -iTCP -sTCP:LISTEN 2>/dev/null || true' \
+      --preview-window=down,8,wrap || true)"
+else
+  printf '%s\n' "$header"
+  nl -w2 -s': ' <(printf '%s\n' "${lines[@]}")
+  echo
+  read -r -p "Select numbers to kill, separated by spaces: " picks
+  for pick in $picks; do
+    [[ "$pick" =~ ^[0-9]+$ ]] || continue
+    idx=$((pick - 1))
+    (( idx >= 0 && idx < ${#lines[@]} )) && selected+="${lines[$idx]}"$'\n'
+  done
+fi
+
+if [[ -z "$(trim "$selected")" ]]; then
+  echo "Nothing selected."
+  exit 0
+fi
+
+selected_pids=()
+while IFS= read -r line; do
+  pid="$(awk -F'\t' '{gsub(/^[ ]+|[ ]+$/, "", $1); print $1}' <<<"$line")"
+  [[ "$pid" =~ ^[0-9]+$ ]] && selected_pids+=("$pid")
+done <<<"$selected"
+
+children_of() {
+  pgrep -P "$1" 2>/dev/null || true
+}
+
+descendants_depth_first() {
+  local root="$1" child
+  for child in $(children_of "$root"); do
+    descendants_depth_first "$child"
+    echo "$child"
+  done
+}
+
+targets_tmp="$(mktemp)"
+trap 'rm -f "$targets_tmp"' EXIT
+
+for pid in "${selected_pids[@]}"; do
+  descendants_depth_first "$pid" >>"$targets_tmp"
+  echo "$pid" >>"$targets_tmp"
+done
+
+targets=()
+while IFS= read -r pid; do
+  [[ "$pid" =~ ^[0-9]+$ ]] || continue
+  ps -p "$pid" >/dev/null 2>&1 || continue
+  comm="$(ps -p "$pid" -o comm= 2>/dev/null | xargs || true)"
+  args="$(ps -p "$pid" -o args= 2>/dev/null || true)"
+  if is_protected "$pid" "$comm" "$args"; then
+    echo "Skipping protected process: $pid $comm $args" >&2
+    continue
+  fi
+  targets+=("$pid")
+done < <(awk '!seen[$0]++' "$targets_tmp")
+
+if (( ${#targets[@]} == 0 )); then
+  echo "No live unprotected targets remain."
+  exit 0
+fi
+
+echo
+echo "Selected process tree targets:"
+ps -o pid=,ppid=,pgid=,rss=,stat=,comm=,args= -p "$(IFS=,; echo "${targets[*]}")" 2>/dev/null || true
+
+echo
+read -r -p "Send TERM to these ${#targets[@]} process(es)? [y/N] " answer
+case "$answer" in
+  y|Y|yes|YES) ;;
+  *) echo "Aborted."; exit 0 ;;
+esac
+
+for pid in "${targets[@]}"; do
+  kill -TERM "$pid" 2>/dev/null || true
+done
+
+sleep 1
+alive=()
+for pid in "${targets[@]}"; do
+  kill -0 "$pid" 2>/dev/null && alive+=("$pid") || true
+done
+
+if (( ${#alive[@]} > 0 )); then
+  if (( force )); then
+    echo "Still alive after TERM; sending KILL: ${alive[*]}"
+    for pid in "${alive[@]}"; do
+      kill -KILL "$pid" 2>/dev/null || true
+    done
+  else
+    echo "Still alive after TERM: ${alive[*]}"
+    echo "Re-run with --force if you want to send KILL."
+  fi
+else
+  echo "Done."
+fi

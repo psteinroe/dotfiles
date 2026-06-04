@@ -1,0 +1,12 @@
+{
+    "providers": {
+        "openai-codex": {
+            "modelOverrides": {
+                "gpt-5.5": {
+                    "contextWindow": 200000,
+                    "maxTokens": 128000
+                }
+            }
+        }
+    }
+}

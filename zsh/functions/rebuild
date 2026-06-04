@@ -3,5 +3,17 @@
 if [[ "$1" == "-u" || "$1" == "--update" ]]; then
   echo "Updating flake inputs..."
   nix flake update --flake "$HOME/Developer/dotfiles"
+
+  if command -v brew >/dev/null 2>&1; then
+    echo "Updating Homebrew metadata..."
+    brew update
+  fi
 fi
-sudo HOME="$HOME" darwin-rebuild switch --flake "$HOME/Developer/dotfiles#psteinroe"
+# `sudo` can start the root-side Nix client with macOS launchd's low
+# maxfiles limit (often 256). Flake evaluation then fails in root's
+# tarball cache with "Too many open files". Raise the limit inside the
+# privileged shell before invoking darwin-rebuild.
+sudo HOME="$HOME" /bin/sh -c '
+  ulimit -n 1048575 2>/dev/null || ulimit -n 65536 2>/dev/null || true
+  exec darwin-rebuild switch --flake "$HOME/Developer/dotfiles#psteinroe"
+'

@@ -1,0 +1,25 @@
+# tuicr reads this from ~/.config/tuicr/config.toml.
+# Defining comment_types replaces the built-ins, so keep the defaults here
+# and add any custom review categories below.
+
+[[comment_types]]
+id = "note"
+definition = "observations"
+
+[[comment_types]]
+id = "issue"
+definition = "problems to fix"
+
+[[comment_types]]
+id = "suggestion"
+definition = "improvements"
+
+[[comment_types]]
+id = "question"
+color = "yellow"
+definition = "questions that should be answered"
+
+[[comment_types]]
+id = "praise"
+definition = "positive feedback"
+

@@ -1,25 +1,31 @@
 # Quick PR: commits "initial", pushes, creates PR with AI-generated title/body
-# Usage: gpr [-a] [-n] [-e] [-f <issue>]
-#   gpr             = commit (if changes) + push + create PR
-#   gpr -a          = git add -A first
-#   gpr -n          = new random branch first
-#   gpr -e          = edit title/body in $EDITOR before creating PR
-#   gpr -f <issue>  = add "Fixes <issue>" to PR body
+# Usage: gpr [-a] [-n] [-e] [-d] [-f <issue>]
+#   gpr            = commit (if changes) + push + create PR with Pi-generated title/body
+#   gpr -a         = git add -A first
+#   gpr -n         = new random branch first
+#   gpr -e         = open GitHub CLI editor directly (no AI title/body)
+#   gpr -d         = create a draft PR
+#   gpr -f <issue> = add "Fixes <issue>" to PR body
 # Env:
 #   GPR_PI_MODEL              = Pi model (default: openai-codex/gpt-5.4)
 #   GPR_PI_THINKING           = Pi thinking level (default: low)
 #   GPR_AI_TIMEOUT_SECONDS    = generation timeout (default: 60)
+# AI env vars only apply when -e/--edit is not used.
 local ai_timeout="${GPR_AI_TIMEOUT_SECONDS:-60}"
 local pi_model="${GPR_PI_MODEL:-openai-codex/gpt-5.4}"
 local pi_thinking="${GPR_PI_THINKING:-low}"
-local add_all=false new_branch=false edit=false fixes=""
+local add_all=false new_branch=false edit=false draft=false fixes=""
+local title="" body=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -a) add_all=true; shift ;;
     -n) new_branch=true; shift ;;
     -e|--edit) edit=true; shift ;;
-    -f|--fixes) fixes="$2"; shift 2 ;;
-    *) shift ;;
+    -d|--draft) draft=true; shift ;;
+    -f|--fixes)
+      [[ $# -ge 2 ]] || { echo "Missing value for $1"; return 1; }
+      fixes="$2"; shift 2 ;;
+    *) echo "Unknown argument: $1"; return 1 ;;
   esac
 done
 
@@ -51,19 +57,27 @@ fi
 local branch=$(git branch --show-current)
 git push -u origin "$branch" || return 1
 
+local gh_args=()
+$draft && gh_args+=(--draft)
+
+if $edit; then
+  echo "Opening PR editor..."
+  gh pr create "${gh_args[@]}" -e
+  return
+fi
+
 echo "Collecting changes..."
 git fetch origin "$main" --quiet
 local log=$(git log "origin/$main"..HEAD --oneline 2>/dev/null)
 local diff=$(git diff "origin/$main"...HEAD 2>/dev/null | head -2000)
 
 local prompt='Generate a GitHub PR title and body from these changes.
-Title: use conventional commits (feat:, fix:, chore:, docs:, refactor:), under 70 chars.
-Body: 2-4 concise bullet points summarizing the changes.
+Title: use conventional-commit style (<type>(<scope>): <subject> or <type>: <subject>), under 70 chars. Prefer feat, fix, refactor, perf, docs, test, build, ci, chore, style, revert. No bot/AI attribution and no trailing period.
+Body: reviewer-facing prose, not a narrated diff. Start with 1-3 short sentences explaining what changed and why it matters. Add 0-3 optional bold markdown blocks only for important reviewer-relevant behavior, implementation, risk, or contract changes. Do not include headings like Summary, Changes, or Test plan. Do not include checkbox lists or file-by-file narration.
 Output EXACTLY this format, no fences, no extra text:
 TITLE: <title here>
 BODY:
-- <bullet>
-- <bullet>'
+<markdown body here>'
 
 echo "Generating title and description with Pi (${pi_model}, thinking=${pi_thinking})..."
 local ai_prompt_file
@@ -75,10 +89,8 @@ ai_output=$(perl -e 'alarm shift; exec @ARGV' "$ai_timeout" pi --no-session --no
 local ai_exit=$?
 rm -f "$ai_prompt_file"
 
-local title=$(echo "$ai_output" | sed -n 's/^TITLE: //p' | head -1)
-local body=$(echo "$ai_output" | sed -n '/^BODY:/,$ { /^BODY:/d; p; }')
-
-[[ -n "$fixes" ]] && body="${body}"$'\n\n'"Fixes ${fixes}"
+title=$(echo "$ai_output" | sed -n 's/^TITLE: //p' | head -1)
+body=$(echo "$ai_output" | sed -n '/^BODY:/,$ { /^BODY:/d; p; }')
 
 if [[ -z "$title" ]]; then
   if [[ $ai_exit -eq 142 ]]; then
@@ -87,22 +99,13 @@ if [[ -z "$title" ]]; then
     echo "Pi generation failed (exit ${ai_exit})."
   fi
   echo "Falling back to editor."
-  gh pr create -e
+  gh pr create "${gh_args[@]}" -e
   return
 fi
 
+[[ -n "$fixes" ]] && body="${body}"$'\n\n'"Fixes ${fixes}"
+
 echo "\n  \033[1m$title\033[0m\n$body\n"
 
-if $edit; then
-  local tmpfile=$(mktemp)
-  printf '%s\n\n%s' "$title" "$body" > "$tmpfile"
-  ${EDITOR:-vim} "$tmpfile"
-  title=$(head -1 "$tmpfile")
-  body=$(tail -n +3 "$tmpfile")
-  rm -f "$tmpfile"
-  echo "Creating PR..."
-  gh pr create --title "$title" --body "$body"
-else
-  echo "Creating PR..."
-  gh pr create --title "$title" --body "$body"
-fi
+echo "Creating PR..."
+gh pr create "${gh_args[@]}" --title "$title" --body "$body"

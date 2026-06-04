@@ -1,0 +1,56 @@
+#!/bin/bash
+set -euo pipefail
+
+# AeroSpace's on-window-detected callback only runs for newly detected windows.
+# Apps restored by macOS, revealed after hiding, or already running during config
+# reload can therefore show up on the current workspace. Keep the daily pinned
+# apps anchored to their configured workspaces.
+
+aerospace_bin="${AEROSPACE_BIN:-/opt/homebrew/bin/aerospace}"
+if [[ ! -x "$aerospace_bin" ]]; then
+  aerospace_bin="$(command -v aerospace)"
+fi
+
+focused_id="$({ "$aerospace_bin" list-windows --focused --format '%{window-id}' 2>/dev/null || true; } | head -n 1)"
+
+guard_app() {
+  local app_id="$1"
+  local target_workspace="$2"
+  local layout="${3:-}"
+
+  "$aerospace_bin" list-windows \
+    --monitor all \
+    --app-bundle-id "$app_id" \
+    --format '%{window-id} %{workspace}' |
+  while read -r window_id workspace; do
+    [[ -n "${window_id:-}" ]] || continue
+
+    if [[ -n "$layout" ]]; then
+      "$aerospace_bin" layout --window-id "$window_id" "$layout" >/dev/null 2>&1 || true
+    fi
+
+    if [[ "$workspace" != "$target_workspace" ]]; then
+      if [[ "$window_id" == "$focused_id" ]]; then
+        "$aerospace_bin" move-node-to-workspace \
+          --window-id "$window_id" \
+          --focus-follows-window \
+          "$target_workspace" >/dev/null 2>&1 || true
+      else
+        "$aerospace_bin" move-node-to-workspace \
+          --window-id "$window_id" \
+          "$target_workspace" >/dev/null 2>&1 || true
+      fi
+    fi
+  done
+}
+
+# Workspace 1: Ghostty floats so native macOS tabs do not get retiled.
+guard_app 'com.mitchellh.ghostty' '1' 'floating'
+
+# Daily pinned apps. These mirror the on-window-detected rules in aerospace.toml.
+guard_app 'com.google.Chrome' '2'
+guard_app 'com.apple.Safari' '2'
+guard_app 'com.apple.Notes' '3'
+guard_app 'com.tinyspeck.slackmacgap' '4'
+guard_app 'com.linear' '5'
+guard_app 'com.spotify.client' '6'

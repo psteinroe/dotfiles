@@ -1,0 +1,40 @@
+#!/bin/bash
+set -euo pipefail
+
+# Ghostty keeps native macOS tabs. AeroSpace can see those tabs as separate
+# windows, and macOS may focus a tab/window on the workspace where it was last
+# seen. Keep every Ghostty surface anchored to workspace 1.
+target_workspace="1"
+ghostty_app_id="com.mitchellh.ghostty"
+
+aerospace_bin="${AEROSPACE_BIN:-/opt/homebrew/bin/aerospace}"
+if [[ ! -x "$aerospace_bin" ]]; then
+  aerospace_bin="$(command -v aerospace)"
+fi
+
+focused_id="$({ "$aerospace_bin" list-windows --focused --format '%{window-id}' 2>/dev/null || true; } | head -n 1)"
+
+"$aerospace_bin" list-windows \
+  --monitor all \
+  --app-bundle-id "$ghostty_app_id" \
+  --format '%{window-id} %{workspace}' |
+while read -r window_id workspace; do
+  [[ -n "${window_id:-}" ]] || continue
+
+  # Mirror the on-window-detected rule and protect tabs/windows restored before
+  # AeroSpace applied startup rules.
+  "$aerospace_bin" layout --window-id "$window_id" floating >/dev/null 2>&1 || true
+
+  if [[ "$workspace" != "$target_workspace" ]]; then
+    if [[ "$window_id" == "$focused_id" ]]; then
+      "$aerospace_bin" move-node-to-workspace \
+        --window-id "$window_id" \
+        --focus-follows-window \
+        "$target_workspace" >/dev/null 2>&1 || true
+    else
+      "$aerospace_bin" move-node-to-workspace \
+        --window-id "$window_id" \
+        "$target_workspace" >/dev/null 2>&1 || true
+    fi
+  fi
+done

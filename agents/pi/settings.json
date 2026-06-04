@@ -2,6 +2,10 @@
     "compaction": {
         "enabled": true
     },
+    "retry": {
+        "enabled": true,
+        "maxRetries": 50
+    },
     "hideThinkingBlock": false,
     "shellPath": "/bin/zsh",
     "shellCommandPrefix": "fpath=($HOME/Developer/dotfiles/zsh/functions $fpath); autoload -Uz gpr coffee",
@@ -11,10 +15,12 @@
         "git:github.com/default-anton/pi-handoff",
         "git:github.com/ogulcancelik/pi-ghostty-theme-sync",
         "git:github.com/HazAT/pi-ghostty",
-        "git:github.com/nicobailon/pi-mcp-adapter",
-        "npm:@plannotator/pi-extension",
-        "npm:pi-codex-web-search",
-        "npm:pi-slopchop",
+        "git:github.com/nicobailon/pi-mcp-adapter@v2.8.0",
         "git:github.com/davebcn87/pi-autoresearch"
-    ]
+    ],
+    "lastChangelogVersion": "0.75.3",
+    "theme": "ghostty-sync-f4e5674f",
+    "defaultProvider": "openai-codex",
+    "defaultModel": "gpt-5.5",
+    "defaultThinkingLevel": "high"
 }

@@ -53,6 +53,7 @@ in
       config.lib.file.mkOutOfStoreSymlink "${dotfiles}/aerospace.toml";
     "starship.toml".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/starship.toml";
     "atuin/config.toml".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/atuin.toml";
+    "tuicr/config.toml".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/tuicr/config.toml";
   };
 
   # Home directory files (symlinked for fast iteration)

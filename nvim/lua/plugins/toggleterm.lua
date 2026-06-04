@@ -4,8 +4,9 @@ return {
   lazy = false,
   config = function()
     require("toggleterm").setup {
-      open_mapping = [[<c-ö>]],
-      -- open_mapping = [[<c-\>]],
+      -- Keep <C-ö> as an alternate keyboard-layout-friendly toggle, but make
+      -- <C-\> the primary ToggleTerm mapping in normal/insert/terminal mode.
+      open_mapping = { [[<c-\>]], [[<c-ö>]] },
       shade_terminals = false,
       -- Add --login so ~/.zprofile is loaded. Use Neovim's resolved shell
       -- path instead of bare "zsh"; in Neovim, bare "zsh" resolves to the
@@ -31,15 +32,11 @@ return {
       },
     }
 
-    -- explicitly set the keymap as backup
-    vim.keymap.set("n", "<C-\\>", "<Cmd>ToggleTerm<CR>", { noremap = true, silent = true, desc = "Toggle Terminal" })
-    vim.keymap.set("t", "<C-\\>", "<Cmd>ToggleTerm<CR>", { noremap = true, silent = true, desc = "Toggle Terminal" })
-
     vim.api.nvim_create_autocmd("TermOpen", {
       pattern = "*",
-      callback = function()
-        vim.keymap.set("t", "<C-v>", "<C-\\><C-n>v", { noremap = true, silent = true })
-        vim.keymap.set("t", "<C-q>", "<C-\\><C-n><C-v>", { noremap = true, silent = true }) -- Alternative for block mode
+      callback = function(event)
+        vim.keymap.set("t", "<C-v>", "<C-\\><C-n>v", { buffer = event.buf, noremap = true, silent = true })
+        vim.keymap.set("t", "<C-q>", "<C-\\><C-n><C-v>", { buffer = event.buf, noremap = true, silent = true }) -- Alternative for block mode
       end,
     })
   end,

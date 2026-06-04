@@ -27,8 +27,8 @@
  * Note: PR review requires a clean working tree (no uncommitted changes to tracked files).
  */
 
-import type { ExtensionAPI, ExtensionContext, ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
-import { DynamicBorder, BorderedLoader } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import { DynamicBorder, BorderedLoader } from "@earendil-works/pi-coding-agent";
 import {
 	Container,
 	fuzzyFilter,
@@ -37,7 +37,7 @@ import {
 	SelectList,
 	Spacer,
 	Text,
-} from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-tui";
 import path from "node:path";
 import { promises as fs } from "node:fs";
 

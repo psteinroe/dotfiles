@@ -9,10 +9,12 @@
     # so opt out of Home Manager's legacy default to silence the warning.
     signing.format = null;
   };
-  programs.delta.enable = true;  # No enableGitIntegration - gitconfig has it
+  programs.delta.enable = true; # No enableGitIntegration - gitconfig has it
   programs.gh = {
     enable = true;
-    extensions = [ pkgs.gh-poi ];
+    extensions = [
+      pkgs.gh-poi
+    ];
   };
   programs.lazygit.enable = true;
 }
