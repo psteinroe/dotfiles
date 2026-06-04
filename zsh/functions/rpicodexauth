@@ -10,6 +10,8 @@ fi
 
 local host="${1:-${RDEV_HOST:-rdev}}"
 local remote_user="${RDEV_REMOTE_USER:-psteinroe}"
+local remote_home="${RDEV_HOME:-/home/${remote_user}}"
+local remote_path="${remote_home}/.local/bin:${remote_home}/.nix-profile/bin:/nix/var/nix/profiles/default/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 local local_auth="${PI_AUTH_FILE:-$HOME/.pi/agent/auth.json}"
 local provider="${PI_CODEX_PROVIDER:-openai-codex}"
 
@@ -51,6 +53,10 @@ fi
 mv "$auth.tmp" "$auth"
 chmod 600 "$auth"'
 
-printf '%s\n' "$payload" | ssh "$host" "sudo -iu ${(q)remote_user} zsh -lc ${(q)remote_cmd}" || return
+local encoded
+encoded=$(printf '%s' "$remote_cmd" | base64 | tr -d '\n') || return
+local runner="encoded=${(q)encoded}; cmd=\$(printf %s \"\$encoded\" | base64 -d); sudo -u ${(q)remote_user} HOME=${(q)remote_home} USER=${(q)remote_user} LOGNAME=${(q)remote_user} PATH=${(q)remote_path} ${(q)remote_home}/.nix-profile/bin/zsh -lc \"\$cmd\""
+
+printf '%s\n' "$payload" | ssh "$host" "$runner" || return
 
 echo "Copied $provider Pi auth to $host:${remote_user}:~/.pi/agent/auth.json"
