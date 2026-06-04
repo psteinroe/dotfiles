@@ -50,6 +50,7 @@
       autoload -Uz wtlist
       autoload -Uz wtclean
       autoload -Uz wtsetup
+      autoload -Uz wtdev
       autoload -Uz cpi
       autoload -Uz gpr
       autoload -Uz gclean

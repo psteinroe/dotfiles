@@ -1,0 +1,55 @@
+# Upsert a worktree in the current repo and attach/create a tmux session for it.
+# Usage: wtdev <worktree|branch|pr-number>
+if [[ $# -lt 1 ]]; then
+  echo "Usage: wtdev <worktree|branch|pr-number>" >&2
+  return 1
+fi
+
+local input="$1"
+local worktree_name="$input"
+
+if [[ "$input" =~ ^[0-9]+$ ]]; then
+  worktree_name="pr-$input"
+else
+  worktree_name="${input//\//-}"
+fi
+
+local repo_root
+repo_root=$(git worktree list --porcelain 2>/dev/null | awk '/^worktree / { print substr($0, 10); exit }')
+if [[ -z "$repo_root" ]]; then
+  echo "Not in a git worktree repository" >&2
+  return 1
+fi
+
+local repo_base="$(basename "$repo_root")"
+local repo_parent="$(dirname "$repo_root")"
+local repo_name="$repo_base"
+local worktree_path
+
+if [[ "$repo_base" == *.git ]]; then
+  repo_name="${repo_base%.git}"
+  worktree_path="$repo_parent/$repo_base/$worktree_name"
+else
+  worktree_path="$repo_parent/$repo_base.git/$worktree_name"
+fi
+
+if [[ ! -d "$worktree_path" ]]; then
+  wtcheckout "$input" || return
+else
+  cd "$worktree_path" || return
+fi
+
+local session="${repo_name}-${worktree_name}"
+session="${session//\//-}"
+session="${session//[^A-Za-z0-9_.-]/-}"
+
+if ! infocmp "${TERM:-}" >/dev/null 2>&1; then
+  export TERM=xterm-256color
+fi
+
+if [[ -n "$TMUX" ]]; then
+  tmux has-session -t "$session" 2>/dev/null || tmux new-session -d -s "$session" -c "$PWD"
+  tmux switch-client -t "$session"
+else
+  exec tmux new-session -A -s "$session" -c "$PWD"
+fi
