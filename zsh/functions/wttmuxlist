@@ -40,13 +40,13 @@ selected=$(git worktree list --porcelain | awk '
   /^detached$/ { printf "%s\t%s\n", "detached", path }
 ' | fzf --prompt="Worktree tmux> " --height=40% --reverse --with-nth=1,2) || return 0
 
-local path="${selected#*$'\t'}"
-if [[ -z "$path" || ! -d "$path" ]]; then
-  echo "Cannot attach to selected worktree: $path" >&2
+local selected_path="${selected#*$'\t'}"
+if [[ -z "$selected_path" || ! -d "$selected_path" ]]; then
+  echo "Cannot attach to selected worktree: $selected_path" >&2
   return 1
 fi
 
-local worktree_name="$(basename "$path")"
+local worktree_name="$(basename "$selected_path")"
 local session="${repo_name}-${worktree_name}"
 session="${session//\//-}"
 session="${session//[^A-Za-z0-9_.-]/-}"
@@ -56,8 +56,8 @@ if ! infocmp "${TERM:-}" >/dev/null 2>&1; then
 fi
 
 if [[ -n "$TMUX" ]]; then
-  tmux has-session -t "$session" 2>/dev/null || tmux new-session -d -s "$session" -c "$path"
+  tmux has-session -t "$session" 2>/dev/null || tmux new-session -d -s "$session" -c "$selected_path"
   tmux switch-client -t "$session"
 else
-  exec tmux new-session -A -s "$session" -c "$path"
+  exec tmux new-session -A -s "$session" -c "$selected_path"
 fi
