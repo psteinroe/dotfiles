@@ -14,6 +14,8 @@ die() {
 github_ssh_works() {
   local output
 
+  # GitHub can return a non-zero exit code even on successful auth because it
+  # does not provide shell access, so we must inspect the output instead.
   output="$(ssh -o BatchMode=yes -T git@github.com 2>&1 || true)"
   echo "$output"
 
@@ -85,15 +87,12 @@ if ! command -v nix &>/dev/null; then
   . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
 fi
 
-# Ensure gh auth exists
+# Ensure gh auth exists.
+# We only need gh if SSH does not work yet and we need to upload the key.
 if ! run_gh auth status &>/dev/null 2>&1; then
   echo "Authenticating with GitHub via gh..."
   run_gh auth login -h github.com -p ssh -w
 fi
-
-# Ensure gh token has scopes needed to manage SSH auth + signing keys
-echo "Refreshing GitHub CLI auth scopes..."
-run_gh auth refresh -h github.com -s admin:public_key -s admin:ssh_signing_key
 
 # Start agent and load key
 echo "Loading SSH key into ssh-agent..."
@@ -109,14 +108,17 @@ echo "Testing GitHub SSH authentication..."
 if ! github_ssh_works; then
   echo ""
   echo "GitHub SSH is not ready yet."
-  echo "Adding this machine's SSH public key to GitHub..."
 
+  echo "Refreshing GitHub CLI auth scopes..."
+  run_gh auth refresh -h github.com -s admin:public_key -s admin:ssh_signing_key
+
+  echo "Adding this machine's SSH public key to GitHub..."
   run_gh ssh-key add "$HOME/.ssh/id_ed25519.pub" \
     --type authentication \
-    --title "$(hostname)"
+    --title "$(hostname)" || true
 
   # Optional: also register same key for commit signing.
-  # GitHub requires the key to be uploaded separately for auth and signing.
+  # This is not required for cloning, so it is best-effort.
   run_gh ssh-key add "$HOME/.ssh/id_ed25519.pub" \
     --type signing \
     --title "$(hostname) signing" || true
