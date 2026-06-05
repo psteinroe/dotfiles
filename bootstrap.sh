@@ -14,12 +14,10 @@ die() {
 github_ssh_works() {
   local output
 
-  # GitHub can return a non-zero exit code even on successful auth because it
-  # does not provide shell access, so we must inspect the output instead.
   output="$(ssh -o BatchMode=yes -T git@github.com 2>&1 || true)"
   echo "$output"
 
-  echo "$output" | grep -q "successfully authenticated"
+  [[ "$output" == *"successfully authenticated"* ]]
 }
 
 run_gh() {
