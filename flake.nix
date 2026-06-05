@@ -145,6 +145,7 @@
             home-manager = {
               useGlobalPkgs = true;
               useUserPackages = true;
+              backupFileExtension = "hm-backup";
               extraSpecialArgs = darwinSpecialArgs;
               users.${username} = import ./nix/home;
             };
