@@ -37,18 +37,31 @@ else
   worktree_path="$repo_parent/$repo_base.git/$worktree_name"
 fi
 
-if [[ ! -d "$worktree_path" ]]; then
-  local dotfiles="${RDEV_DOTFILES:-$HOME/Developer/dotfiles}"
-  wtsetup() { source "$dotfiles/zsh/functions/wtsetup" "$@"; }
+local dotfiles="${RDEV_DOTFILES:-$HOME/Developer/dotfiles}"
+wtsetup() { source "$dotfiles/zsh/functions/wtsetup" "$@"; }
 
-  if [[ "$input" =~ ^[0-9]+$ ]] || git show-ref --verify --quiet "refs/remotes/origin/$input"; then
+# Always fetch first so a just-pushed local branch is visible before deciding
+# whether this is an existing remote branch or a new branch to create.
+git fetch origin --prune || return
+
+if [[ ! -d "$worktree_path" ]]; then
+  if [[ "$input" =~ ^[0-9]+$ ]]; then
     wtcheckout "$input" || return
+  elif git show-ref --verify --quiet "refs/remotes/origin/$input"; then
+    if git show-ref --verify --quiet "refs/heads/$input"; then
+      git branch --set-upstream-to="origin/$input" "$input" 2>/dev/null || true
+      git worktree add "$worktree_path" "$input" || return
+    else
+      git worktree add --track -b "$input" "$worktree_path" "origin/$input" || return
+    fi
+    cd "$worktree_path" || return
+    git merge --ff-only "origin/$input" || return
+    wtsetup
   elif git show-ref --verify --quiet "refs/heads/$input"; then
     git worktree add "$worktree_path" "$input" || return
     cd "$worktree_path" || return
     wtsetup
   else
-    git fetch origin --prune
     local base
     base=$(source "$dotfiles/zsh/functions/gh-default-branch") || return
     git worktree add "$worktree_path" -b "$input" --no-track "origin/$base" || return
@@ -57,6 +70,11 @@ if [[ ! -d "$worktree_path" ]]; then
   fi
 else
   cd "$worktree_path" || return
+fi
+
+if [[ ! "$input" =~ ^[0-9]+$ ]] && git show-ref --verify --quiet "refs/remotes/origin/$input" && [[ "$(git branch --show-current 2>/dev/null)" == "$input" ]]; then
+  git branch --set-upstream-to="origin/$input" "$input" 2>/dev/null || true
+  git merge --ff-only "origin/$input" || return
 fi
 
 local session="${repo_name}-${worktree_name}"

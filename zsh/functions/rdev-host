@@ -15,20 +15,8 @@ local remote_path="${remote_home}/.local/bin:${remote_home}/.nix-profile/bin:/ni
 local remote_term="${RDEV_TERM:-xterm-256color}"
 local repo_dir="${remote_home}/Developer/${repo}.git"
 local dotfiles="${RDEV_DOTFILES:-${remote_home}/Developer/dotfiles}"
-local worktree_name="$requested"
 
-if [[ "$requested" =~ ^[0-9]+$ ]]; then
-  worktree_name="pr-$requested"
-else
-  worktree_name="${requested//\//-}"
-fi
-
-local dir="${repo_dir}/${worktree_name}"
-local session="${repo}-${worktree_name}"
-session="${session//\//-}"
-session="${session//[^A-Za-z0-9_.-]/-}"
-
-local inner_cmd="export PATH=${(q)remote_path}; repo_dir=${(q)repo_dir}; dotfiles=${(q)dotfiles}; dir=${(q)dir}; requested=${(q)requested}; session=${(q)session}; if [ ! -d \"\$dir\" ]; then cd \"\$repo_dir\" || { echo \"Remote repo not found: \$repo_dir\" >&2; exit 1; }; wtsetup() { source \"\$dotfiles/zsh/functions/wtsetup\" \"\$@\"; }; if [[ \"\$requested\" =~ ^[0-9]+$ ]] || git show-ref --verify --quiet \"refs/remotes/origin/\$requested\"; then source \"\$dotfiles/zsh/functions/wtcheckout\" \"\$requested\" || exit 1; elif git show-ref --verify --quiet \"refs/heads/\$requested\"; then git worktree add \"\$dir\" \"\$requested\" || exit 1; cd \"\$dir\" || exit 1; wtsetup; else git fetch origin --prune; base=\$(source \"\$dotfiles/zsh/functions/gh-default-branch\") || exit 1; git worktree add \"\$dir\" -b \"\$requested\" --no-track \"origin/\$base\" || exit 1; cd \"\$dir\" || exit 1; wtsetup; fi; fi; cd \"\$dir\" || { echo \"Remote worktree not found after upsert: \$dir\" >&2; exit 1; }; exec tmux new-session -A -s \"\$session\" -c \"\$dir\""
+local inner_cmd="export PATH=${(q)remote_path}; cd ${(q)repo_dir} || { echo Remote repo not found: ${(q)repo_dir} >&2; exit 1; }; source ${(q)dotfiles}/zsh/functions/wttmux ${(q)requested}"
 local encoded
 encoded=$(printf '%s' "$inner_cmd" | base64 | tr -d '\n') || return
 local remote_cmd="encoded=${(q)encoded}; cmd=\$(printf %s \"\$encoded\" | base64 -d); sudo -u ${(q)remote_user} HOME=${(q)remote_home} USER=${(q)remote_user} LOGNAME=${(q)remote_user} PATH=${(q)remote_path} TERM=${(q)remote_term} ${(q)remote_home}/.nix-profile/bin/zsh -lc \"\$cmd\""
