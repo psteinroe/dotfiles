@@ -13,14 +13,11 @@ die() {
 
 github_ssh_works() {
   local output
+
   output="$(ssh -o BatchMode=yes -T git@github.com 2>&1 || true)"
   echo "$output"
 
-  if echo "$output" | grep -q "successfully authenticated"; then
-    return 0
-  fi
-
-  return 1
+  echo "$output" | grep -q "successfully authenticated"
 }
 
 run_gh() {
