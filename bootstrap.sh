@@ -23,6 +23,10 @@ github_ssh_works() {
   return 1
 }
 
+run_gh() {
+  nix run nixpkgs#gh -- "$@"
+}
+
 # Install Xcode CLI tools, needed for git
 if ! xcode-select -p &>/dev/null; then
   echo "Installing Xcode Command Line Tools..."
@@ -45,6 +49,8 @@ if [[ ! -f "$HOME/.ssh/id_ed25519" ]]; then
     -N "" \
     -f "$HOME/.ssh/id_ed25519"
 fi
+
+[[ -f "$HOME/.ssh/id_ed25519.pub" ]] || die "Missing SSH public key: $HOME/.ssh/id_ed25519.pub"
 
 chmod 600 "$HOME/.ssh/id_ed25519"
 chmod 644 "$HOME/.ssh/id_ed25519.pub"
@@ -83,10 +89,14 @@ if ! command -v nix &>/dev/null; then
 fi
 
 # Ensure gh auth exists
-if ! nix run nixpkgs#gh -- auth status &>/dev/null 2>&1; then
+if ! run_gh auth status &>/dev/null 2>&1; then
   echo "Authenticating with GitHub via gh..."
-  nix run nixpkgs#gh -- auth login -p ssh -w
+  run_gh auth login -h github.com -p ssh -w
 fi
+
+# Ensure gh token has scopes needed to manage SSH auth + signing keys
+echo "Refreshing GitHub CLI auth scopes..."
+run_gh auth refresh -h github.com -s admin:public_key -s admin:ssh_signing_key
 
 # Start agent and load key
 echo "Loading SSH key into ssh-agent..."
@@ -104,12 +114,13 @@ if ! github_ssh_works; then
   echo "GitHub SSH is not ready yet."
   echo "Adding this machine's SSH public key to GitHub..."
 
-  nix run nixpkgs#gh -- ssh-key add "$HOME/.ssh/id_ed25519.pub" \
+  run_gh ssh-key add "$HOME/.ssh/id_ed25519.pub" \
     --type authentication \
-    --title "$(hostname)" || true
+    --title "$(hostname)"
 
-  # Optional: also register for commit signing
-  nix run nixpkgs#gh -- ssh-key add "$HOME/.ssh/id_ed25519.pub" \
+  # Optional: also register same key for commit signing.
+  # GitHub requires the key to be uploaded separately for auth and signing.
+  run_gh ssh-key add "$HOME/.ssh/id_ed25519.pub" \
     --type signing \
     --title "$(hostname) signing" || true
 
