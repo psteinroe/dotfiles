@@ -12,9 +12,11 @@ local remote_path="${remote_home}/.local/bin:${remote_home}/.nix-profile/bin:/ni
 local dotfiles="${RDEV_DOTFILES:-${remote_home}/Developer/dotfiles}"
 local repo="${1%.git}"
 local branch="$2"
+local worktree="${branch//\//-}"
 local repo_dir="${remote_home}/Developer/${repo}.git"
+local worktree_path="${repo_dir}/${worktree}"
 
-local remote_cmd="cd ${(q)repo_dir} || exit 1; wtsetup() { source ${(q)dotfiles}/zsh/functions/wtsetup \"\$@\"; }; source ${(q)dotfiles}/zsh/functions/wtcreate ${(q)branch}"
+local remote_cmd="cd ${(q)repo_dir} || exit 1; export PATH=${(q)remote_path}; git fetch origin --prune; base=\$(git config --get git-town.main-branch 2>/dev/null || true); if [ -z \"\$base\" ]; then base=\$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##' || true); fi; [ -n \"\$base\" ] || base=main; if [ -d ${(q)worktree_path} ]; then cd ${(q)worktree_path} || exit 1; elif git show-ref --verify --quiet refs/heads/${(q)branch}; then git worktree add ${(q)worktree_path} ${(q)branch} || exit 1; cd ${(q)worktree_path} || exit 1; wtsetup() { source ${(q)dotfiles}/zsh/functions/wtsetup \"\$@\"; }; wtsetup; else git worktree add ${(q)worktree_path} -b ${(q)branch} --no-track \"origin/\$base\" || exit 1; cd ${(q)worktree_path} || exit 1; wtsetup() { source ${(q)dotfiles}/zsh/functions/wtsetup \"\$@\"; }; wtsetup; fi"
 local encoded
 encoded=$(printf '%s' "$remote_cmd" | base64 | tr -d '\n') || return
 local runner="encoded=${(q)encoded}; cmd=\$(printf %s \"\$encoded\" | base64 -d); sudo -u ${(q)remote_user} HOME=${(q)remote_home} USER=${(q)remote_user} LOGNAME=${(q)remote_user} PATH=${(q)remote_path} ${(q)remote_home}/.nix-profile/bin/zsh -lc \"\$cmd\""
