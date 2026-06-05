@@ -1,14 +1,13 @@
 { ... }:
 
 {
-  # Work around Homebrew 5.1.7 API cask loader crashes on casks whose
+  # Work around Homebrew API cask loader crashes on casks whose
   # API JSON has an empty `depends_on.macos` object.
-  environment.etc."homebrew/brew.env".text = ''
-    HOMEBREW_NO_INSTALL_FROM_API=1
-  '';
+  environment.variables.HOMEBREW_NO_INSTALL_FROM_API = "1";
 
   homebrew = {
     enable = true;
+
     onActivation = {
       cleanup = "zap";
       autoUpdate = false;
@@ -20,9 +19,8 @@
       "nikitabobko/tap"
     ];
 
-    # macOS-specific CLIs (not in nixpkgs or need macOS integration)
     brews = [
-      "mole" # macOS cleanup & optimization
+      "mole"
       "smudge/smudge/nightlight"
     ];
 
@@ -46,8 +44,8 @@
       "google-chrome"
       "font-fira-code-nerd-font"
       {
-        name = "tailscale-app"; # GUI app + Network Extension (CLI comes from nixpkgs)
-        greedy = true; # keep auto-updating cask on rebuild
+        name = "tailscale-app";
+        greedy = true;
       }
     ];
   };
