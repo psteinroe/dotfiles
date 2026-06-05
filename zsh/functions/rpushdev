@@ -1,0 +1,82 @@
+# From Mac: commit/push current local branch, then attach that branch on the remote VM.
+# Usage: rpushdev [repo] [commit-message...]
+#
+# This is the "move this local work to remote" helper:
+#   1. detect current local branch
+#   2. commit dirty changes after confirmation
+#   3. push the branch to origin
+#   4. run `rdev <repo> <branch>` to checkout/attach remote tmux
+local repo="${1:-}"
+if [[ $# -gt 0 ]]; then
+  shift
+fi
+local message="$*"
+
+if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  echo "rpushdev must be run inside a git worktree" >&2
+  return 1
+fi
+
+local branch
+branch=$(git branch --show-current 2>/dev/null)
+if [[ -z "$branch" ]]; then
+  echo "Cannot rpushdev from a detached HEAD" >&2
+  return 1
+fi
+
+case "$branch" in
+  main|master|dev|trunk|production)
+    if [[ "${RPUSHDEV_ALLOW_PROTECTED:-0}" != 1 ]]; then
+      echo "Refusing to rpushdev protected branch: $branch" >&2
+      echo "Set RPUSHDEV_ALLOW_PROTECTED=1 to override." >&2
+      return 1
+    fi
+    ;;
+esac
+
+if [[ -z "$repo" ]]; then
+  local remote_url remote_tail
+  remote_url=$(git remote get-url origin 2>/dev/null) || {
+    echo "Could not read origin remote; pass repo explicitly: rpushdev <repo>" >&2
+    return 1
+  }
+  remote_tail="${remote_url##*/}"
+  remote_tail="${remote_tail##*:}"
+  repo="${remote_tail%.git}"
+fi
+
+if [[ -z "$message" ]]; then
+  message="wip: move $branch to remote"
+fi
+
+local status
+status=$(git status --porcelain)
+if [[ -n "$status" ]]; then
+  echo "Local changes to commit before moving to remote:"
+  git status --short
+  echo
+
+  local reply
+  if [[ "${RPUSHDEV_YES:-0}" == 1 ]]; then
+    reply=y
+  else
+    read -r "reply?Commit all changes with message '$message'? [y/N] "
+  fi
+
+  case "$reply" in
+    y|Y|yes|YES)
+      git add -A || return
+      git commit -m "$message" || return
+      ;;
+    *)
+      echo "Cancelled. Commit or stash changes, then retry." >&2
+      return 1
+      ;;
+  esac
+else
+  echo "Working tree clean; no local commit needed."
+fi
+
+git push -u origin "$branch" || return
+
+rdev "$repo" "$branch"

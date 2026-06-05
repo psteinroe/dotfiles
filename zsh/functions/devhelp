@@ -32,6 +32,7 @@ if [[ "$topic" == all || "$topic" == remote ]]; then
   _case_row "rwtcheckout <repo> <branch|pr>" "checkout existing remote branch/PR worktree, attach remote tmux"
   _case_row "rwtlist <repo>" "pick a remote worktree with local fzf, then attach remote tmux"
   _case_row "rwtclean <repo>" "run wtclean on the remote repo"
+  _case_row "rpushdev [repo] [msg]" "commit/push current local branch, then attach it on remote tmux"
   _case_row "rrebuild [host]" "pull dotfiles and rebuild Home Manager on the remote VM"
   _case_row "rdev-host <host> <repo> <branch|pr>" "internal explicit-host variant used by wrappers"
   [[ "$topic" == all ]] && print

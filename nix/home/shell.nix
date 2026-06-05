@@ -65,6 +65,7 @@
       autoload -Uz rwtcheckout
       autoload -Uz rwtlist
       autoload -Uz rwtclean
+      autoload -Uz rpushdev
       autoload -Uz rrebuild
       autoload -Uz rpicodexauth
     '';
