@@ -49,9 +49,9 @@ if [[ -z "$message" ]]; then
   message="wip: move $branch to remote"
 fi
 
-local status
-status=$(git status --porcelain)
-if [[ -n "$status" ]]; then
+local git_status
+git_status=$(git status --porcelain)
+if [[ -n "$git_status" ]]; then
   echo "Local changes to commit before moving to remote:"
   git status --short
   echo
