@@ -9,10 +9,12 @@
 
     ".tmux.conf".text = ''
       set -g status off
-      set -g mouse off
+      set -g mouse on
+      set -g history-limit 50000
       set -g escape-time 10
       set -g focus-events on
       set -g extended-keys on
+      set -g extended-keys-format csi-u
       set -g default-terminal "tmux-256color"
       set -as terminal-overrides ',xterm-256color:RGB,screen-256color:RGB,tmux-256color:RGB'
     '';
