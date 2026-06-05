@@ -7,7 +7,7 @@
         "maxRetries": 50
     },
     "hideThinkingBlock": false,
-    "shellPath": "/bin/zsh",
+    "shellPath": "/home/psteinroe/.nix-profile/bin/zsh",
     "shellCommandPrefix": "fpath=($HOME/Developer/dotfiles/zsh/functions $fpath); autoload -Uz gpr",
     "packages": [
         "git:github.com/default-anton/pi-librarian",
