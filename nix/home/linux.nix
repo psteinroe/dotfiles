@@ -12,6 +12,7 @@
       set -g mouse off
       set -g escape-time 10
       set -g focus-events on
+      set -g extended-keys on
       set -g default-terminal "tmux-256color"
       set -as terminal-overrides ',xterm-256color:RGB,screen-256color:RGB,tmux-256color:RGB'
     '';
