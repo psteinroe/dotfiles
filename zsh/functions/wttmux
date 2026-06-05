@@ -50,11 +50,7 @@ if [[ ! -d "$worktree_path" ]]; then
   else
     git fetch origin --prune
     local base
-    base=$(git config --get git-town.main-branch 2>/dev/null || true)
-    if [[ -z "$base" ]]; then
-      base=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##' || true)
-    fi
-    [[ -n "$base" ]] || base=main
+    base=$(source "$dotfiles/zsh/functions/gh-default-branch") || return
     git worktree add "$worktree_path" -b "$input" --no-track "origin/$base" || return
     cd "$worktree_path" || return
     wtsetup

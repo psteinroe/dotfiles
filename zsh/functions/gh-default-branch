@@ -1,0 +1,49 @@
+# Print the GitHub default branch for the current repo using gh.
+# Usage: gh-default-branch [owner/repo]
+#
+# If no repo is passed, derive owner/repo and GH_HOST from origin.
+# This supports exe.dev integration remotes like:
+#   https://hellomateo.int.exe.xyz/getmateo/hellomateo.git
+local repo="${1:-}"
+local host=""
+
+if [[ -z "$repo" ]]; then
+  local url rest
+  url=$(git remote get-url origin 2>/dev/null) || return
+
+  case "$url" in
+    https://*/*)
+      rest="${url#https://}"
+      host="${rest%%/*}"
+      repo="${rest#*/}"
+      ;;
+    http://*/*)
+      rest="${url#http://}"
+      host="${rest%%/*}"
+      repo="${rest#*/}"
+      ;;
+    git@*:*)
+      rest="${url#git@}"
+      host="${rest%%:*}"
+      repo="${rest#*:}"
+      ;;
+    ssh://git@*/*)
+      rest="${url#ssh://git@}"
+      host="${rest%%/*}"
+      repo="${rest#*/}"
+      ;;
+  esac
+
+  repo="${repo%.git}"
+fi
+
+if [[ -z "$repo" ]]; then
+  echo "Could not derive GitHub repo from origin" >&2
+  return 1
+fi
+
+if [[ -n "$host" && "$host" != "github.com" ]]; then
+  GH_HOST="$host" gh repo view "$repo" --json defaultBranchRef -q '.defaultBranchRef.name'
+else
+  gh repo view "$repo" --json defaultBranchRef -q '.defaultBranchRef.name'
+fi

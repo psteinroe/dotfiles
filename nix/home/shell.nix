@@ -51,6 +51,7 @@
       autoload -Uz wtlist
       autoload -Uz wtclean
       autoload -Uz wtsetup
+      autoload -Uz gh-default-branch
       autoload -Uz wttmux
       autoload -Uz wttmuxlist
       autoload -Uz cpi
