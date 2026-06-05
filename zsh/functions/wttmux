@@ -38,7 +38,27 @@ else
 fi
 
 if [[ ! -d "$worktree_path" ]]; then
-  wtcheckout "$input" || return
+  local dotfiles="${RDEV_DOTFILES:-$HOME/Developer/dotfiles}"
+  wtsetup() { source "$dotfiles/zsh/functions/wtsetup" "$@"; }
+
+  if [[ "$input" =~ ^[0-9]+$ ]] || git show-ref --verify --quiet "refs/remotes/origin/$input"; then
+    wtcheckout "$input" || return
+  elif git show-ref --verify --quiet "refs/heads/$input"; then
+    git worktree add "$worktree_path" "$input" || return
+    cd "$worktree_path" || return
+    wtsetup
+  else
+    git fetch origin --prune
+    local base
+    base=$(git config --get git-town.main-branch 2>/dev/null || true)
+    if [[ -z "$base" ]]; then
+      base=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##' || true)
+    fi
+    [[ -n "$base" ]] || base=main
+    git worktree add "$worktree_path" -b "$input" --no-track "origin/$base" || return
+    cd "$worktree_path" || return
+    wtsetup
+  fi
 else
   cd "$worktree_path" || return
 fi
