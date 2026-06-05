@@ -1,61 +1,146 @@
 #!/bin/bash
-set -e
+
+set -euo pipefail
 
 echo "=== psteinroe dotfiles bootstrap ==="
 
-# Install Xcode CLI tools (needed for git)
+die() {
+  echo ""
+  echo "ERROR: $1"
+  echo ""
+  exit 1
+}
+
+github_ssh_works() {
+  local output
+  output="$(ssh -o BatchMode=yes -T git@github.com 2>&1 || true)"
+  echo "$output"
+
+  if echo "$output" | grep -q "successfully authenticated"; then
+    return 0
+  fi
+
+  return 1
+}
+
+# Install Xcode CLI tools, needed for git
 if ! xcode-select -p &>/dev/null; then
-	echo "Installing Xcode Command Line Tools..."
-	xcode-select --install
-	echo "Press enter after Xcode tools are installed..."
-	read
+  echo "Installing Xcode Command Line Tools..."
+  xcode-select --install
+
+  echo ""
+  echo "Press enter after Xcode tools are installed..."
+  read -r
 fi
+
+# Ensure ~/.ssh exists
+mkdir -p "$HOME/.ssh"
+chmod 700 "$HOME/.ssh"
 
 # Generate SSH key if missing
-if [[ ! -f ~/.ssh/id_ed25519 ]]; then
-	echo "Generating SSH key..."
-	mkdir -p ~/.ssh
-	ssh-keygen -t ed25519 -C "philipp@steinroetter.com" -N "" -f ~/.ssh/id_ed25519
+if [[ ! -f "$HOME/.ssh/id_ed25519" ]]; then
+  echo "Generating SSH key..."
+  ssh-keygen -t ed25519 \
+    -C "philipp@steinroetter.com" \
+    -N "" \
+    -f "$HOME/.ssh/id_ed25519"
 fi
 
-# Install Nix
+chmod 600 "$HOME/.ssh/id_ed25519"
+chmod 644 "$HOME/.ssh/id_ed25519.pub"
+
+# Ensure GitHub host key is known
+if ! ssh-keygen -F github.com &>/dev/null; then
+  echo "Adding github.com to known_hosts..."
+  ssh-keyscan github.com >> "$HOME/.ssh/known_hosts" 2>/dev/null
+fi
+chmod 644 "$HOME/.ssh/known_hosts"
+
+# Ensure SSH config helps macOS remember/use the key
+if [[ ! -f "$HOME/.ssh/config" ]] || ! grep -q "Host github.com" "$HOME/.ssh/config"; then
+  echo "Configuring SSH for github.com..."
+  cat >> "$HOME/.ssh/config" <<'EOF'
+
+Host github.com
+  HostName github.com
+  User git
+  IdentityFile ~/.ssh/id_ed25519
+  IdentitiesOnly yes
+  AddKeysToAgent yes
+  UseKeychain yes
+EOF
+fi
+chmod 600 "$HOME/.ssh/config"
+
+# Install Nix if missing
 if ! command -v nix &>/dev/null; then
-	echo "Installing Nix..."
-	curl --proto '=https' --tlsv1.2 -sSf -L \
-		https://install.determinate.systems/nix | sh -s -- install
+  echo "Installing Nix..."
+  curl --proto '=https' --tlsv1.2 -sSf -L \
+    https://install.determinate.systems/nix | sh -s -- install
 
-	# Source nix in current shell
-	. /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
+  # shellcheck disable=SC1091
+  . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
 fi
 
-# Setup GitHub auth and SSH keys (use nix run since gh not installed yet)
-mkdir -p ~/.config/gh
+# Ensure gh auth exists
 if ! nix run nixpkgs#gh -- auth status &>/dev/null 2>&1; then
-	echo "Authenticating with GitHub..."
-	nix run nixpkgs#gh -- auth login -p ssh -w
-
-	echo "Adding SSH key to GitHub..."
-	nix run nixpkgs#gh -- ssh-key add ~/.ssh/id_ed25519.pub --type authentication --title "$(hostname)"
-	nix run nixpkgs#gh -- ssh-key add ~/.ssh/id_ed25519.pub --type signing --title "$(hostname) signing"
+  echo "Authenticating with GitHub via gh..."
+  nix run nixpkgs#gh -- auth login -p ssh -w
 fi
 
-# Clone or update dotfiles
-DOTFILES="$HOME/Developer/dotfiles"
-if [ ! -d "$DOTFILES" ]; then
-	echo "Cloning dotfiles..."
-	mkdir -p "$HOME/Developer"
-	git clone git@github.com:psteinroe/dotfiles.git "$DOTFILES"
+# Start agent and load key
+echo "Loading SSH key into ssh-agent..."
+eval "$(ssh-agent -s)" >/dev/null
+
+if ssh-add --apple-use-keychain "$HOME/.ssh/id_ed25519" 2>/dev/null; then
+  :
 else
-	echo "Updating dotfiles..."
-	git -C "$DOTFILES" pull
+  ssh-add "$HOME/.ssh/id_ed25519" 2>/dev/null || true
 fi
 
-# First run of nix-darwin (bootstraps itself)
+echo "Testing GitHub SSH authentication..."
+if ! github_ssh_works; then
+  echo ""
+  echo "GitHub SSH is not ready yet."
+  echo "Adding this machine's SSH public key to GitHub..."
+
+  nix run nixpkgs#gh -- ssh-key add "$HOME/.ssh/id_ed25519.pub" \
+    --type authentication \
+    --title "$(hostname)" || true
+
+  # Optional: also register for commit signing
+  nix run nixpkgs#gh -- ssh-key add "$HOME/.ssh/id_ed25519.pub" \
+    --type signing \
+    --title "$(hostname) signing" || true
+
+  echo ""
+  echo "Re-testing GitHub SSH authentication..."
+  if ! github_ssh_works; then
+    die "GitHub SSH authentication still failed. Fix SSH before continuing."
+  fi
+fi
+
+echo ""
+echo "GitHub SSH is working."
+
+# Clone or update dotfiles using SSH
+DOTFILES="$HOME/Developer/dotfiles"
+mkdir -p "$HOME/Developer"
+
+if [[ ! -d "$DOTFILES/.git" ]]; then
+  echo "Cloning dotfiles via SSH..."
+  git clone git@github.com:psteinroe/dotfiles.git "$DOTFILES"
+else
+  echo "Updating dotfiles..."
+  git -C "$DOTFILES" remote set-url origin git@github.com:psteinroe/dotfiles.git
+  git -C "$DOTFILES" pull
+fi
+
+# First run of nix-darwin
 echo "Building system configuration..."
 sudo HOME="$HOME" nix run nix-darwin -- switch --flake "$DOTFILES#psteinroe"
 
 echo ""
 echo "=== Done! ==="
-echo "Your system is configured. Restart your terminal."
-echo ""
+echo "Your system is configured."
 echo "Future updates: rebuild"
