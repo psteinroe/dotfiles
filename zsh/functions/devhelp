@@ -27,6 +27,7 @@ esac
 if [[ "$topic" == all || "$topic" == remote ]]; then
   _case_header "Remote-from-Mac helpers"
   _case_row "rdev <repo> <branch|pr>" "upsert remote worktree and attach/create its remote tmux session"
+  _case_row "rpi <repo> <branch|pr> [-- args]" "upsert remote worktree, run local Pi with remote SSH tools"
   _case_row "rwtclone <url> [repo]" "clone repo on remote VM, set up default worktree, attach remote tmux"
   _case_row "rwtcreate <repo> <branch>" "create new remote branch worktree, attach remote tmux"
   _case_row "rwtcheckout <repo> <branch|pr>" "checkout existing remote branch/PR worktree, attach remote tmux"
@@ -46,12 +47,13 @@ if [[ "$topic" == all || "$topic" == worktree ]]; then
   _case_row "wtcheckout <branch|pr>" "checkout an existing branch or PR into a worktree"
   _case_row "wtlist" "list/select existing worktrees without tmux behavior"
   _case_row "wtclean" "clean merged/closed worktrees"
+  _case_row "wtensure <branch|pr>" "upsert worktree and cd into it without tmux"
   [[ "$topic" == all ]] && print
 fi
 
 if [[ "$topic" == all || "$topic" == tmux ]]; then
   _case_header "Explicit tmux helpers, mainly for the remote VM"
-  _case_row "wttmux <branch|pr>" "upsert worktree in current repo and attach/create its tmux session"
+  _case_row "wttmux <branch|pr>" "wtensure plus attach/create tmux session"
   _case_row "wttmuxlist" "pick existing worktree in current repo and attach/create its tmux session"
   [[ "$topic" == all ]] && print
 fi

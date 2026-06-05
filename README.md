@@ -54,11 +54,14 @@ rwtclone https://github.com/org/app.git app
 rwtcreate app feature-x
 rwtcheckout app 123
 rwtlist app
-rdev app feature-x
-rpicodexauth   # copy local Pi Codex subscription auth to the remote
+rdev app feature-x       # remote tmux shell/nvim
+rpi app feature-x        # local Pi UI, remote SSH-backed tools
+rpicodexauth             # copy local Pi Codex subscription auth to the remote
 ```
 
-`rdev` upserts the requested remote worktree: if `~/Developer/<repo>.git/<branch>` does not exist, it runs remote `wtcheckout <branch>` first, then attaches tmux. Closing the local Ghostty tab detaches SSH but leaves remote zsh/Neovim running.
+`rdev` upserts the requested remote worktree: if `~/Developer/<repo>.git/<branch>` does not exist, it creates/checks out the worktree first, then attaches tmux. Closing the local Ghostty tab detaches SSH but leaves remote zsh/Neovim running.
+
+`rpi` performs the same remote worktree upsert but does **not** attach tmux. It starts Pi locally from a shadow cwd under `~/.cache/pi-remote/...` and passes `--remote-ssh/--remote-cwd` to the Pi `remote-ssh` extension, so Pi input stays local while `read`, `write`, `edit`, `bash`, `ls`, `find`, `grep`, and `!` commands execute on the remote VM. Use `rdev` only when you need a real remote terminal, tmux, or Neovim.
 
 ## Tailscale (macOS)
 
@@ -149,6 +152,7 @@ wtclone git@github.com:user/repo.git    # creates repo.git/ with main/ worktree
 | `wtcheckout <branch\|pr#>` | Checkout branch/PR into worktree |
 | `wtlist` | List worktrees |
 | `wtclean` | Remove merged/closed PR worktrees |
+| `wtensure <branch\|pr#>` | Upsert a worktree and cd into it without tmux (used by `rpi`/`wttmux`) |
 
 ### git-town Commands (Stacked PRs)
 

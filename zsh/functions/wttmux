@@ -5,89 +5,17 @@ if [[ $# -lt 1 ]]; then
   return 1
 fi
 
-# Be robust when launched from mobile SSH/sudo shells that do not source the
-# normal Home Manager PATH. `tmux` may live in /usr/bin or the Nix profile.
-export PATH="$HOME/.local/bin:$HOME/.nix-profile/bin:/nix/var/nix/profiles/default/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}"
-
-local input="$1"
-local worktree_name="$input"
-
-if [[ "$input" =~ ^[0-9]+$ ]]; then
-  worktree_name="pr-$input"
-else
-  worktree_name="${input//\//-}"
-fi
-
-local repo_root
-repo_root=$(git worktree list --porcelain 2>/dev/null | awk '/^worktree / { print substr($0, 10); exit }')
-if [[ -z "$repo_root" ]]; then
-  echo "Not in a git worktree repository" >&2
-  return 1
-fi
-
-local repo_base="$(basename "$repo_root")"
-local repo_parent="$(dirname "$repo_root")"
-local repo_name="$repo_base"
-local worktree_path
-
-if [[ "$repo_base" == *.git ]]; then
-  repo_name="${repo_base%.git}"
-  worktree_path="$repo_parent/$repo_base/$worktree_name"
-else
-  worktree_path="$repo_parent/$repo_base.git/$worktree_name"
-fi
-
 local dotfiles="${RDEV_DOTFILES:-$HOME/Developer/dotfiles}"
-wtsetup() { source "$dotfiles/zsh/functions/wtsetup" "$@"; }
-
-# Always fetch first so a just-pushed local branch is visible before deciding
-# whether this is an existing remote branch or a new branch to create.
-git fetch origin --prune || return
-
-if [[ ! -d "$worktree_path" ]]; then
-  if [[ "$input" =~ ^[0-9]+$ ]]; then
-    wtcheckout "$input" || return
-  elif git show-ref --verify --quiet "refs/remotes/origin/$input"; then
-    if git show-ref --verify --quiet "refs/heads/$input"; then
-      git branch --set-upstream-to="origin/$input" "$input" 2>/dev/null || true
-      git worktree add "$worktree_path" "$input" || return
-    else
-      git worktree add --track -b "$input" "$worktree_path" "origin/$input" || return
-    fi
-    cd "$worktree_path" || return
-    git merge --ff-only "origin/$input" || return
-    wtsetup
-  elif git show-ref --verify --quiet "refs/heads/$input"; then
-    git worktree add "$worktree_path" "$input" || return
-    cd "$worktree_path" || return
-    wtsetup
-  else
-    local base
-    base=$(source "$dotfiles/zsh/functions/gh-default-branch") || return
-    git worktree add "$worktree_path" -b "$input" --no-track "origin/$base" || return
-    cd "$worktree_path" || return
-    wtsetup
-  fi
-else
-  cd "$worktree_path" || return
-fi
-
-if [[ ! "$input" =~ ^[0-9]+$ ]] && git show-ref --verify --quiet "refs/remotes/origin/$input" && [[ "$(git branch --show-current 2>/dev/null)" == "$input" ]]; then
-  git branch --set-upstream-to="origin/$input" "$input" 2>/dev/null || true
-  git merge --ff-only "origin/$input" || return
-fi
-
-local session="${repo_name}-${worktree_name}"
-session="${session//\//-}"
-session="${session//[^A-Za-z0-9_.-]/-}"
+unset WTENSURE_PRINT_PATH
+source "$dotfiles/zsh/functions/wtensure" "$1" || return
 
 if ! infocmp "${TERM:-}" >/dev/null 2>&1; then
   export TERM=xterm-256color
 fi
 
 if [[ -n "$TMUX" ]]; then
-  tmux has-session -t "$session" 2>/dev/null || tmux new-session -d -s "$session" -c "$PWD"
-  tmux switch-client -t "$session"
+  tmux has-session -t "$WTENSURE_SESSION" 2>/dev/null || tmux new-session -d -s "$WTENSURE_SESSION" -c "$WTENSURE_WORKTREE_PATH"
+  tmux switch-client -t "$WTENSURE_SESSION"
 else
-  tmux new-session -A -s "$session" -c "$PWD"
+  tmux new-session -A -s "$WTENSURE_SESSION" -c "$WTENSURE_WORKTREE_PATH"
 fi

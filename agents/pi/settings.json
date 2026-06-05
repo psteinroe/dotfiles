@@ -17,7 +17,7 @@
         "git:github.com/HazAT/pi-ghostty",
         "git:github.com/nicobailon/pi-mcp-adapter@v2.8.0",
         "git:github.com/davebcn87/pi-autoresearch",
-        "npm:pi-dynamic-workflows"
+        "npm:pi-codex-goal"
     ],
     "lastChangelogVersion": "0.75.3",
     "theme": "ghostty-sync-f4e5674f",

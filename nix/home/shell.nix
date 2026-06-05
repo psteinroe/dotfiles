@@ -51,6 +51,7 @@
       autoload -Uz wtlist
       autoload -Uz wtclean
       autoload -Uz wtsetup
+      autoload -Uz wtensure
       autoload -Uz gh
       autoload -Uz gh-default-branch
       autoload -Uz wttmux
@@ -61,6 +62,7 @@
       autoload -Uz greset
       autoload -Uz rdev-host
       autoload -Uz rdev
+      autoload -Uz rpi
       autoload -Uz rwtclone
       autoload -Uz rwtcreate
       autoload -Uz rwtcheckout

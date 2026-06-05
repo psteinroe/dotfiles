@@ -3,9 +3,17 @@
 # This won't be added again if you remove it.
 Include ~/.orbstack/ssh/config
 
+Host exe.dev rdev *.exe.xyz
+  IdentitiesOnly yes
+  IdentityFile ~/.ssh/id_ed25519
+
 Host rdev
   HostName psteinroe-dev.exe.xyz
   User exedev
+  ControlMaster auto
+  ControlPath ~/.ssh/cm-%r@%h:%p
+  ControlPersist 10m
+  ServerAliveInterval 30
 
 Host github.com
   AddKeysToAgent yes

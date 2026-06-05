@@ -1,39 +1,32 @@
 return {
   "nvim-treesitter/nvim-treesitter",
+  branch = "main",
+  lazy = false,
   build = ":TSUpdate",
   config = function()
-    local parser_install_dir = vim.fn.stdpath "data" .. "/treesitter-parsers"
-
-    -- Keep nvim-treesitter's parsers ahead of Neovim's bundled parsers.
-    -- Mixing bundled parsers with plugin queries can break markdown injections.
-    vim.opt.runtimepath:prepend(parser_install_dir)
-
-    local config = require "nvim-treesitter.configs"
-    config.setup {
-      parser_install_dir = parser_install_dir,
-      ensure_installed = {
-        "nix",
-        "query",
-        "markdown",
-        "markdown_inline",
-        "html",
-        "yaml",
-        "latex",
-      },
-      sync_install = false,
-      auto_install = true,
-      highlight = {
-        enable = true,
-        -- Setting this to true will run `:h syntax` and tree-sitter at the same time.
-        -- Set this to `true` if you depend on 'syntax' being enabled (like for indentation).
-        -- Using this option may slow down your editor, and you may see some duplicate highlights.
-        -- Instead of true it can also be a list of languages
-        additional_vim_regex_highlighting = false,
-      },
-      indent = {
-        enable = true,
-      },
+    local install_dir = vim.fn.stdpath "data" .. "/treesitter-parsers"
+    local languages = {
+      "nix",
+      "query",
+      "markdown",
+      "markdown_inline",
+      "html",
+      "yaml",
+      "latex",
     }
+
+    require("nvim-treesitter").setup {
+      install_dir = install_dir,
+    }
+    require("nvim-treesitter").install(languages)
+
+    vim.api.nvim_create_autocmd("FileType", {
+      pattern = { "nix", "query", "markdown", "html", "yaml", "tex", "latex" },
+      callback = function(args)
+        pcall(vim.treesitter.start, args.buf)
+        vim.bo[args.buf].indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
+      end,
+    })
 
     -- Work around a Neovim 0.12 markdown injection crash triggered by
     -- nvim-treesitter's #set-lang-from-info-string! directive.
