@@ -51,6 +51,7 @@
       autoload -Uz wtlist
       autoload -Uz wtclean
       autoload -Uz wtsetup
+      autoload -Uz gh
       autoload -Uz gh-default-branch
       autoload -Uz wttmux
       autoload -Uz wttmuxlist
@@ -66,6 +67,7 @@
       autoload -Uz rwtlist
       autoload -Uz rwtclean
       autoload -Uz rpushdev
+      autoload -Uz rssh
       autoload -Uz rrebuild
       autoload -Uz rpicodexauth
     '';

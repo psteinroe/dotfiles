@@ -1,0 +1,24 @@
+# From Mac: open a plain interactive shell on the remote VM as psteinroe, without tmux.
+# Usage: rssh [remote-directory]
+#
+# Examples:
+#   rssh
+#   rssh /home/psteinroe/Developer/hellomateo.git/dev
+local host="${RDEV_HOST:-rdev}"
+local remote_user="${RDEV_REMOTE_USER:-psteinroe}"
+local remote_home="${RDEV_HOME:-/home/${remote_user}}"
+local remote_path="${remote_home}/.local/bin:${remote_home}/.nix-profile/bin:/nix/var/nix/profiles/default/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+local remote_dir="${1:-${remote_home}}"
+local remote_term="${RDEV_TERM:-xterm-256color}"
+
+if [[ "$1" == "-h" || "$1" == "--help" || $# -gt 1 ]]; then
+  echo "Usage: rssh [remote-directory]" >&2
+  return $([[ $# -gt 1 ]] && echo 1 || echo 0)
+fi
+
+local inner_cmd="cd ${(q)remote_dir} || exit 1; exec ${(q)remote_home}/.nix-profile/bin/zsh -l"
+local encoded
+encoded=$(printf '%s' "$inner_cmd" | base64 | tr -d '\n') || return
+local remote_cmd="encoded=${(q)encoded}; cmd=\$(printf %s \"\$encoded\" | base64 -d); sudo -u ${(q)remote_user} HOME=${(q)remote_home} USER=${(q)remote_user} LOGNAME=${(q)remote_user} PATH=${(q)remote_path} TERM=${(q)remote_term} ${(q)remote_home}/.nix-profile/bin/zsh -lc \"\$cmd\""
+
+ssh -t "$host" "$remote_cmd"

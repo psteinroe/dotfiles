@@ -1,0 +1,35 @@
+# GitHub CLI wrapper.
+#
+# On exe.dev integration remotes, automatically sets GH_HOST from origin so
+# plain `gh ...` works without a GitHub token on the VM.
+# Example origin: https://hellomateo.int.exe.xyz/getmateo/hellomateo.git
+if [[ -z "${GH_HOST:-}" ]]; then
+  local origin_url origin_rest origin_host
+  origin_url=$(git remote get-url origin 2>/dev/null || true)
+
+  case "$origin_url" in
+    https://*/*)
+      origin_rest="${origin_url#https://}"
+      origin_host="${origin_rest%%/*}"
+      ;;
+    http://*/*)
+      origin_rest="${origin_url#http://}"
+      origin_host="${origin_rest%%/*}"
+      ;;
+    git@*:*)
+      origin_rest="${origin_url#git@}"
+      origin_host="${origin_rest%%:*}"
+      ;;
+    ssh://git@*/*)
+      origin_rest="${origin_url#ssh://git@}"
+      origin_host="${origin_rest%%/*}"
+      ;;
+  esac
+
+  if [[ -n "$origin_host" && "$origin_host" != "github.com" ]]; then
+    GH_HOST="$origin_host" command gh "$@"
+    return
+  fi
+fi
+
+command gh "$@"
