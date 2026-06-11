@@ -256,6 +256,7 @@ in
         link_optional_path "${piSettings}" "$HOME/.pi/agent/settings.json"
         link_optional_path "${agentsDir}/pi/models.json" "$HOME/.pi/agent/models.json"
         link_optional_path "${agentsDir}/pi/mcp.json" "$HOME/.pi/agent/mcp.json"
+        link_optional_path "${agentsDir}/pi/themes" "$HOME/.pi/agent/themes"
         link_optional_path "${agentsDir}/pi/extensions" "$HOME/.pi/agent/extensions"
 
         # Deploy pinned upstream skills first, then local shared skills, then

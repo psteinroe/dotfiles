@@ -3,6 +3,9 @@
         "autoAuth": true
     },
     "mcpServers": {
+        "signoz": {
+            "url": "https://mcp.eu.signoz.cloud/mcp"
+        },
         "scryfall": {
             "command": "pnpx",
             "args": [
@@ -11,10 +14,6 @@
         },
         "linear": {
             "url": "https://mcp.linear.app/mcp",
-            "auth": "oauth"
-        },
-        "toolshed": {
-            "url": "https://toolshed-web.localhost:1355/mcp",
             "auth": "oauth"
         },
         "figma": {

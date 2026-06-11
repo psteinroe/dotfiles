@@ -1,25 +1,35 @@
 # tuicr reads this from ~/.config/tuicr/config.toml.
+# Use an explicit, non-transparent high-contrast theme so SSH/tmux sessions
+# remain readable even when terminal truecolor negotiation is imperfect.
+theme = "gruvbox-readable"
+appearance = "dark"
+transparent_background = false
+
 # Defining comment_types replaces the built-ins, so keep the defaults here
 # and add any custom review categories below.
 
 [[comment_types]]
 id = "note"
+color = "#83a598"
 definition = "observations"
 
 [[comment_types]]
 id = "issue"
+color = "#fb4934"
 definition = "problems to fix"
 
 [[comment_types]]
 id = "suggestion"
+color = "#8ec07c"
 definition = "improvements"
 
 [[comment_types]]
 id = "question"
-color = "yellow"
+color = "#fabd2f"
 definition = "questions that should be answered"
 
 [[comment_types]]
 id = "praise"
+color = "#b8bb26"
 definition = "positive feedback"
 

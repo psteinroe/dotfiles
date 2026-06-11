@@ -37,8 +37,34 @@ if [[ -z "$repo" ]]; then
   repo="${repo%.git}"
 fi
 
+# Prefer local/remote git metadata so this works on remote VMs without `gh auth login`.
+local branch
+branch=$(git config --get git-town.main-branch 2>/dev/null)
+if [[ -n "$branch" ]]; then
+  print -r -- "$branch"
+  return 0
+fi
+
+branch=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null)
+branch="${branch#origin/}"
+if [[ -n "$branch" ]]; then
+  print -r -- "$branch"
+  return 0
+fi
+
+branch=$(git ls-remote --symref origin HEAD 2>/dev/null | awk '/^ref:/ { sub("refs/heads/", "", $2); print $2; exit }')
+if [[ -n "$branch" ]]; then
+  print -r -- "$branch"
+  return 0
+fi
+
 if [[ -z "$repo" ]]; then
   echo "Could not derive GitHub repo from origin" >&2
+  return 1
+fi
+
+if ! command -v gh >/dev/null 2>&1; then
+  echo "Could not determine default branch from git metadata and gh is unavailable" >&2
   return 1
 fi
 

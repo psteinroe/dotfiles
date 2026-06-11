@@ -1,4 +1,4 @@
-# From Mac: upsert a remote worktree, then run local Pi with tools delegated to that remote cwd.
+# From Mac: upsert a remote worktree, then continue local Pi with tools delegated to that remote cwd.
 # Usage: rpi <repo> <worktree|branch|pr-number> [-- <pi-args...>]
 # Example: rpi hellomateo dev
 #
@@ -13,6 +13,7 @@ local host="${RDEV_HOST:-rdev}"
 local remote_user="${RDEV_REMOTE_USER:-psteinroe}"
 local remote_home="${RDEV_HOME:-/home/${remote_user}}"
 local remote_path="${remote_home}/.local/bin:${remote_home}/.nix-profile/bin:/nix/var/nix/profiles/default/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+local remote_colorterm="${RDEV_COLORTERM:-truecolor}"
 local dotfiles="${RDEV_DOTFILES:-${remote_home}/Developer/dotfiles}"
 local repo="${1%.git}"
 local requested="$2"
@@ -27,7 +28,7 @@ local wtensure_path="${dotfiles}/zsh/functions/wtensure"
 local inner_cmd="export PATH=${(q)remote_path}; cd ${(q)repo_dir} || { echo Remote repo not found: ${(q)repo_dir} >&2; exit 1; }; if [[ ! -r ${(q)wtensure_path} ]]; then echo Remote wtensure not found: ${(q)wtensure_path} >&2; echo Run 'rrebuild' or pull/rebuild dotfiles on ${(q)host}, then retry. >&2; exit 1; fi; WTENSURE_PRINT_PATH=1; source ${(q)wtensure_path} ${(q)requested}"
 local encoded
 encoded=$(printf '%s' "$inner_cmd" | base64 | tr -d '\n') || return
-local runner="encoded=${(q)encoded}; cmd=\$(printf %s \"\$encoded\" | base64 -d); sudo -u ${(q)remote_user} HOME=${(q)remote_home} USER=${(q)remote_user} LOGNAME=${(q)remote_user} PATH=${(q)remote_path} ${(q)remote_home}/.nix-profile/bin/zsh -lc \"\$cmd\""
+local runner="encoded=${(q)encoded}; cmd=\$(printf %s \"\$encoded\" | base64 -d); sudo -u ${(q)remote_user} HOME=${(q)remote_home} USER=${(q)remote_user} LOGNAME=${(q)remote_user} PATH=${(q)remote_path} COLORTERM=${(q)remote_colorterm} ${(q)remote_home}/.nix-profile/bin/zsh -lc \"\$cmd\""
 
 local remote_output remote_status remote_cwd
 remote_output=$(ssh -T "$host" "$runner" 2>&1)
@@ -64,7 +65,8 @@ EOF
 print -P "%F{cyan}Pi local UI → remote tools:%f $host:$remote_cwd"
 (
   cd "$local_cwd" || exit 1
-  "$HOME/Developer/dotfiles/bin/cpi" \
+  command pi \
+    -c \
     --remote-ssh "$host" \
     --remote-cwd "$remote_cwd" \
     --remote-user "$remote_user" \

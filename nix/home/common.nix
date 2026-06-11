@@ -54,6 +54,7 @@ in
     "atuin/config.toml".source = config.lib.file.mkOutOfStoreSymlink "${dotfilesPath}/atuin.toml";
     "tuicr/config.toml".source =
       config.lib.file.mkOutOfStoreSymlink "${dotfilesPath}/tuicr/config.toml";
+    "tuicr/themes".source = config.lib.file.mkOutOfStoreSymlink "${dotfilesPath}/tuicr/themes";
   };
 
   # Home directory files (symlinked for fast iteration)

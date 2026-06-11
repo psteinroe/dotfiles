@@ -1,0 +1,6 @@
+#!/usr/bin/env zsh
+# Executable wrapper for the zsh autoloaded rssh function.
+# Keeps rssh available from non-interactive shells/tools that do not source ~/.zshrc.
+fpath=("$HOME/Developer/dotfiles/zsh/functions" $fpath)
+autoload -Uz rssh
+rssh "$@"

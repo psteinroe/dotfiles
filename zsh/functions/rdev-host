@@ -13,12 +13,13 @@ local remote_user="${RDEV_REMOTE_USER:-psteinroe}"
 local remote_home="${RDEV_HOME:-/home/${remote_user}}"
 local remote_path="${remote_home}/.local/bin:${remote_home}/.nix-profile/bin:/nix/var/nix/profiles/default/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 local remote_term="${RDEV_TERM:-xterm-256color}"
+local remote_colorterm="${RDEV_COLORTERM:-truecolor}"
 local repo_dir="${remote_home}/Developer/${repo}.git"
 local dotfiles="${RDEV_DOTFILES:-${remote_home}/Developer/dotfiles}"
 
 local inner_cmd="export PATH=${(q)remote_path}; cd ${(q)repo_dir} || { echo Remote repo not found: ${(q)repo_dir} >&2; exit 1; }; source ${(q)dotfiles}/zsh/functions/wttmux ${(q)requested}"
 local encoded
 encoded=$(printf '%s' "$inner_cmd" | base64 | tr -d '\n') || return
-local remote_cmd="encoded=${(q)encoded}; cmd=\$(printf %s \"\$encoded\" | base64 -d); sudo -u ${(q)remote_user} HOME=${(q)remote_home} USER=${(q)remote_user} LOGNAME=${(q)remote_user} PATH=${(q)remote_path} TERM=${(q)remote_term} ${(q)remote_home}/.nix-profile/bin/zsh -lc \"\$cmd\""
+local remote_cmd="encoded=${(q)encoded}; cmd=\$(printf %s \"\$encoded\" | base64 -d); sudo -u ${(q)remote_user} HOME=${(q)remote_home} USER=${(q)remote_user} LOGNAME=${(q)remote_user} PATH=${(q)remote_path} TERM=${(q)remote_term} COLORTERM=${(q)remote_colorterm} ${(q)remote_home}/.nix-profile/bin/zsh -lc \"\$cmd\""
 
 ssh -t "$host" "$remote_cmd"

@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Prefer the Home Manager/Nix Neovim on remotes. Ubuntu's /usr/bin/nvim can be
+# older than the config supports, causing plugin startup errors.
+candidates=(
+  "$HOME/.nix-profile/bin/nvim"
+  "/etc/profiles/per-user/${USER:-}/bin/nvim"
+  "/run/current-system/sw/bin/nvim"
+  "/nix/var/nix/profiles/default/bin/nvim"
+  "/opt/homebrew/bin/nvim"
+  "/usr/local/bin/nvim"
+  "/usr/bin/nvim"
+)
+
+for candidate in "${candidates[@]}"; do
+  if [[ -x "$candidate" && "$candidate" != "$0" ]]; then
+    exec "$candidate" "$@"
+  fi
+done
+
+echo "nvim wrapper could not find nvim" >&2
+exit 127

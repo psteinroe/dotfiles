@@ -1,0 +1,51 @@
+# High-contrast Gruvbox theme for tuicr.
+# Keep this readable over SSH/tmux and do not rely on terminal transparency.
+panel_bg = "#1d2021"
+bg_highlight = "#3c3836"
+fg_primary = "#fbf1c7"
+fg_secondary = "#d5c4a1"
+fg_dim = "#bdae93"
+
+diff_add = "#b8bb26"
+diff_add_bg = "#32361f"
+diff_del = "#fb4934"
+diff_del_bg = "#3b2021"
+diff_context = "#fbf1c7"
+diff_hunk_header = "#83a598"
+expanded_context_fg = "#bdae93"
+
+syntax_add_bg = "#32361f"
+syntax_del_bg = "#3b2021"
+
+file_added = "#b8bb26"
+file_modified = "#fabd2f"
+file_deleted = "#fb4934"
+file_renamed = "#d3869b"
+
+reviewed = "#b8bb26"
+pending = "#fabd2f"
+
+comment_note = "#83a598"
+comment_suggestion = "#8ec07c"
+comment_issue = "#fb4934"
+comment_praise = "#b8bb26"
+
+border_focused = "#fabd2f"
+border_unfocused = "#665c54"
+status_bar_bg = "#282828"
+cursor_color = "#fabd2f"
+cursor_line_bg = "#32302f"
+branch_name = "#d3869b"
+help_indicator = "#d5c4a1"
+
+message_info_fg = "#1d2021"
+message_info_bg = "#83a598"
+message_warning_fg = "#1d2021"
+message_warning_bg = "#fabd2f"
+message_error_fg = "#1d2021"
+message_error_bg = "#fb4934"
+update_badge_fg = "#1d2021"
+update_badge_bg = "#fabd2f"
+
+mode_fg = "#1d2021"
+mode_bg = "#fabd2f"

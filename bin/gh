@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# GitHub CLI wrapper for exe.dev integration remotes.
+#
+# exe.dev GitHub integrations expose private repos through hosts like
+# https://<integration>.int.exe.xyz/<owner>/<repo>.git. The GitHub CLI works
+# against that integration host when GH_HOST is set, without storing a GitHub
+# token on the VM. Derive GH_HOST from the current git remote before invoking
+# the real gh binary.
+
+if [[ -z "${GH_HOST:-}" ]]; then
+  origin_url="$(git remote get-url origin 2>/dev/null || true)"
+  origin_host=""
+
+  case "$origin_url" in
+    https://*/*)
+      origin_rest="${origin_url#https://}"
+      origin_host="${origin_rest%%/*}"
+      ;;
+    http://*/*)
+      origin_rest="${origin_url#http://}"
+      origin_host="${origin_rest%%/*}"
+      ;;
+    git@*:*)
+      origin_rest="${origin_url#git@}"
+      origin_host="${origin_rest%%:*}"
+      ;;
+    ssh://git@*/*)
+      origin_rest="${origin_url#ssh://git@}"
+      origin_host="${origin_rest%%/*}"
+      ;;
+  esac
+
+  if [[ -n "$origin_host" && "$origin_host" != "github.com" ]]; then
+    export GH_HOST="$origin_host"
+  fi
+fi
+
+candidates=(
+  "/etc/profiles/per-user/${USER:-}/bin/gh"
+  "$HOME/.nix-profile/bin/gh"
+  "/run/current-system/sw/bin/gh"
+  "/nix/var/nix/profiles/default/bin/gh"
+  "/usr/local/bin/gh"
+  "/opt/homebrew/bin/gh"
+  "/usr/bin/gh"
+)
+
+for candidate in "${candidates[@]}"; do
+  if [[ -x "$candidate" && "$candidate" != "$0" ]]; then
+    exec "$candidate" "$@"
+  fi
+done
+
+echo "gh wrapper could not find the real gh binary" >&2
+exit 127

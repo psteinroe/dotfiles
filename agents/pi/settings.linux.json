@@ -15,9 +15,10 @@
         "git:github.com/default-anton/pi-handoff",
         "git:github.com/nicobailon/pi-mcp-adapter@v2.8.0",
         "git:github.com/davebcn87/pi-autoresearch",
-        "npm:pi-dynamic-workflows"
+        "npm:pi-codex-goal"
     ],
     "lastChangelogVersion": "0.75.3",
+    "theme": "gruvbox-high-contrast",
     "defaultProvider": "openai-codex",
     "defaultModel": "gpt-5.5",
     "defaultThinkingLevel": "high"
