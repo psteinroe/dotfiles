@@ -21,6 +21,4 @@ fi
 
 git worktree add "$default_branch" "$default_branch"
 cd "$default_branch"
-# Set git-town main branch
-git config git-town.main-branch "$default_branch"
 wtsetup

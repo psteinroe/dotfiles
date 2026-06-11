@@ -52,6 +52,7 @@ ssh rdev
 rrebuild
 rwtclone https://github.com/org/app.git app
 rwtcreate app feature-x
+rdevstack app feature-x feature-child  # stack child branch on existing parent, attach tmux
 rwtcheckout app 123
 rwtlist app
 rdev app feature-x       # remote tmux shell/nvim
@@ -59,7 +60,7 @@ rpi app feature-x        # local Pi UI, remote SSH-backed tools
 rpicodexauth             # copy local Pi Codex subscription auth to the remote
 ```
 
-`rdev` upserts the requested remote worktree: if `~/Developer/<repo>.git/<branch>` does not exist, it creates/checks out the worktree first, then attaches tmux. Closing the local Ghostty tab detaches SSH but leaves remote zsh/Neovim running.
+`rdev` upserts the requested remote worktree: if `~/Developer/<repo>.git/<branch>` does not exist, it creates/checks out the worktree first, then attaches tmux. Use `rdevstack <repo> <parent> <branch>` when the new branch should be created from an existing parent branch. Closing the local Ghostty tab detaches SSH but leaves remote zsh/Neovim running.
 
 `rpi` performs the same remote worktree upsert but does **not** attach tmux. It starts Pi locally from a shadow cwd under `~/.cache/pi-remote/...` and passes `--remote-ssh/--remote-cwd` to the Pi `remote-ssh` extension, so Pi input stays local while `read`, `write`, `edit`, `bash`, `ls`, `find`, `grep`, and `!` commands execute on the remote VM. Use `rdev` only when you need a real remote terminal, tmux, or Neovim.
 
@@ -135,7 +136,7 @@ ocweb restart
 
 ## Git Worktree Workflow
 
-Using bare git repos with worktrees for parallel development + git-town for stacked PRs.
+Using bare git repos with worktrees for parallel development.
 
 ### Setup a New Repo
 
@@ -154,15 +155,6 @@ wtclone git@github.com:user/repo.git    # creates repo.git/ with main/ worktree
 | `wtclean` | Remove merged/closed PR worktrees |
 | `wtensure <branch\|pr#>` | Upsert a worktree and cd into it without tmux (used by `rpi`/`wttmux`) |
 
-### git-town Commands (Stacked PRs)
-
-| Alias | Command | Purpose |
-|-------|---------|---------|
-| `gts` | `git town sync` | Sync all branches |
-| `gth` | `git town hack` | Create feature branch |
-| `gtp` | `git town propose` | Create PR |
-| `gtsh` | `git town ship` | Merge shipped PR |
-
 ### Full Workflow
 
 ```bash
@@ -179,11 +171,9 @@ git add -A
 git commit -m "Add feature"
 
 # 4. Create PR
-gtp                              # git-town stacked PR flow; opens PR in browser
-# or: gpr                        # quick commit/push/create flow
+gpr                              # quick commit/push/create flow
 
-# 5. After merge, sync and cleanup
-gts                              # sync all branches
+# 5. After merge, cleanup
 wtclean                          # remove merged worktrees
 ```
 

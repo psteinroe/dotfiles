@@ -54,6 +54,3 @@ alias gl='git pull'
 alias gs='git status'
 gpd() { gh pr diff "$@" --color=never | diffnav; }
 alias review='tuicr'
-
-# git-town (stacked PRs)
-alias gt='git town'

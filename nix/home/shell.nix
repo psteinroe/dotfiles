@@ -62,6 +62,7 @@
       autoload -Uz greset
       autoload -Uz rdev-host
       autoload -Uz rdev
+      autoload -Uz rdevstack
       autoload -Uz rpi
       autoload -Uz rwtclone
       autoload -Uz rwtcreate

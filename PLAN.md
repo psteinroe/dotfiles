@@ -313,7 +313,7 @@ Keep core packages portable:
 - jq, yq, postgresql, just, cmake, ffmpeg, imagemagick
 - pnpm, bun
 - formatters and LSPs
-- git-town, diffnav, gh tooling
+- diffnav, gh tooling
 - AI CLIs that build on Linux
 
 Add Linux remote package:

@@ -17,7 +17,7 @@ local repo_name="${bare%.git}"
 local dev_dir="${remote_home}/Developer"
 local repo_dir="${dev_dir}/${bare}"
 
-local remote_cmd="mkdir -p ${(q)dev_dir} && cd ${(q)dev_dir} || exit 1; git clone --bare ${(q)url} ${(q)bare} || exit 1; cd ${(q)bare} || exit 1; git config remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*' || exit 1; git fetch || exit 1; default_branch=\$(source ${(q)dotfiles}/zsh/functions/gh-default-branch) || exit 1; git worktree add \"\$default_branch\" \"\$default_branch\" || exit 1; cd \"\$default_branch\" || exit 1; git config git-town.main-branch \"\$default_branch\"; wtsetup() { source ${(q)dotfiles}/zsh/functions/wtsetup \"\$@\"; }; wtsetup"
+local remote_cmd="mkdir -p ${(q)dev_dir} && cd ${(q)dev_dir} || exit 1; git clone --bare ${(q)url} ${(q)bare} || exit 1; cd ${(q)bare} || exit 1; git config remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*' || exit 1; git fetch || exit 1; default_branch=\$(source ${(q)dotfiles}/zsh/functions/gh-default-branch) || exit 1; git worktree add \"\$default_branch\" \"\$default_branch\" || exit 1; cd \"\$default_branch\" || exit 1; wtsetup() { source ${(q)dotfiles}/zsh/functions/wtsetup \"\$@\"; }; wtsetup"
 local encoded
 encoded=$(printf '%s' "$remote_cmd" | base64 | tr -d '\n') || return
 local runner="encoded=${(q)encoded}; cmd=\$(printf %s \"\$encoded\" | base64 -d); sudo -u ${(q)remote_user} HOME=${(q)remote_home} USER=${(q)remote_user} LOGNAME=${(q)remote_user} PATH=${(q)remote_path} ${(q)remote_home}/.nix-profile/bin/zsh -lc \"\$cmd\""

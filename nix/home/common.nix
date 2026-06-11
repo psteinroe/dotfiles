@@ -33,7 +33,6 @@ in
     # Generate shell completions
     activation.completions = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       mkdir -p $HOME/.zsh/completions
-      ${pkgs.git-town}/bin/git-town completions zsh > $HOME/.zsh/completions/_git-town 2>/dev/null || true
       ${pkgs.just}/bin/just --completions zsh > $HOME/.zsh/completions/_just 2>/dev/null || true
       ${pkgs.gh}/bin/gh completion -s zsh > $HOME/.zsh/completions/_gh 2>/dev/null || true
       ${pkgs.rustup}/bin/rustup completions zsh > $HOME/.zsh/completions/_rustup 2>/dev/null || true

@@ -39,12 +39,6 @@ fi
 
 # Prefer local/remote git metadata so this works on remote VMs without `gh auth login`.
 local branch
-branch=$(git config --get git-town.main-branch 2>/dev/null)
-if [[ -n "$branch" ]]; then
-  print -r -- "$branch"
-  return 0
-fi
-
 branch=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null)
 branch="${branch#origin/}"
 if [[ -n "$branch" ]]; then

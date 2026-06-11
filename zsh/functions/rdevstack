@@ -1,0 +1,77 @@
+# From Mac: create/ensure a remote branch worktree stacked on an existing parent, then attach/create tmux.
+# Usage: rdevstack <repo> <parent-branch|pr-number> <new-branch>
+# Example: rdevstack hellomateo feature-base feature-child
+if [[ $# -lt 3 ]]; then
+  echo "Usage: rdevstack <repo> <parent-branch|pr-number> <new-branch>" >&2
+  return 1
+fi
+
+local host="${RDEV_HOST:-rdev}"
+local remote_user="${RDEV_REMOTE_USER:-psteinroe}"
+local remote_home="${RDEV_HOME:-/home/${remote_user}}"
+local remote_path="${remote_home}/.local/bin:${remote_home}/.nix-profile/bin:/nix/var/nix/profiles/default/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+local dotfiles="${RDEV_DOTFILES:-${remote_home}/Developer/dotfiles}"
+local repo="${1%.git}"
+local parent="$2"
+local branch="$3"
+local repo_dir="${remote_home}/Developer/${repo}.git"
+
+local -a remote_lines
+remote_lines=(
+  "export PATH=${(q)remote_path}"
+  "repo_dir=${(q)repo_dir}"
+  "parent=${(q)parent}"
+  "branch=${(q)branch}"
+  "dotfiles=${(q)dotfiles}"
+  'cd "$repo_dir" || { echo "Remote repo not found: $repo_dir" >&2; exit 1; }'
+  'worktree="${branch//\//-}"'
+  'worktree_path="$repo_dir/$worktree"'
+  'wtsetup() { source "$dotfiles/zsh/functions/wtsetup" "$@"; }'
+  'echo "Fetching latest changes..."'
+  'git fetch origin --prune || exit 1'
+  'if [[ ! "$parent" =~ ^[0-9]+$ ]] && ! git show-ref --verify --quiet "refs/heads/$parent" && ! git show-ref --verify --quiet "refs/remotes/origin/$parent"; then'
+  '  echo "Parent branch not found locally or on origin: $parent" >&2'
+  '  exit 1'
+  'fi'
+  'source "$dotfiles/zsh/functions/wtensure" "$parent" || exit 1'
+  'parent_path="$WTENSURE_WORKTREE_PATH"'
+  'parent_branch=$(git -C "$parent_path" branch --show-current) || exit 1'
+  'if [[ -z "$parent_branch" ]]; then'
+  '  echo "Parent worktree is not on a branch: $parent_path" >&2'
+  '  exit 1'
+  'fi'
+  'if [[ -d "$worktree_path" ]]; then'
+  '  cd "$worktree_path" || exit 1'
+  'elif git show-ref --verify --quiet "refs/heads/$branch"; then'
+  '  cd "$repo_dir" || exit 1'
+  '  git worktree add "$worktree_path" "$branch" || exit 1'
+  '  cd "$worktree_path" || exit 1'
+  '  wtsetup'
+  'elif git show-ref --verify --quiet "refs/remotes/origin/$branch"; then'
+  '  cd "$repo_dir" || exit 1'
+  '  git worktree add --track -b "$branch" "$worktree_path" "origin/$branch" || exit 1'
+  '  cd "$worktree_path" || exit 1'
+  '  wtsetup'
+  'else'
+  '  cd "$repo_dir" || exit 1'
+  '  git worktree add "$worktree_path" -b "$branch" --no-track "$parent_branch" || exit 1'
+  '  cd "$worktree_path" || exit 1'
+  '  wtsetup'
+  'fi'
+  'current_branch=$(git branch --show-current) || exit 1'
+  'if [[ "$current_branch" != "$branch" ]]; then'
+  '  echo "Worktree $worktree_path is on $current_branch, expected $branch" >&2'
+  '  exit 1'
+  'fi'
+  'if git show-ref --verify --quiet "refs/remotes/origin/$branch"; then'
+  '  git branch --set-upstream-to="origin/$branch" "$branch" 2>/dev/null || true'
+  '  git merge --ff-only "origin/$branch" || exit 1'
+  'fi'
+)
+local remote_cmd="${(F)remote_lines}"
+local encoded
+encoded=$(printf '%s' "$remote_cmd" | base64 | tr -d '\n') || return
+local runner="encoded=${(q)encoded}; cmd=\$(printf %s \"\$encoded\" | base64 -d); sudo -u ${(q)remote_user} HOME=${(q)remote_home} USER=${(q)remote_user} LOGNAME=${(q)remote_user} PATH=${(q)remote_path} ${(q)remote_home}/.nix-profile/bin/zsh -lc \"\$cmd\""
+ssh -t "$host" "$runner" || return
+
+rdev-host "$host" "$repo" "$branch"

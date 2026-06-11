@@ -47,9 +47,6 @@ local default_branch=$(gh repo view "$repo" --json defaultBranchRef -q '.default
 if [ -n "$default_branch" ]; then
   git worktree add "$default_branch" "$default_branch"
   cd "$default_branch"
-  # Set git-town for fork workflow
-  git config git-town.main-branch "$default_branch"
-  git config git-town.push-hook false
   wtsetup
   echo ""
   echo "Fork ready! Remotes:"

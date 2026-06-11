@@ -116,7 +116,6 @@ in
 
         # Version control
         diffnav # GitHub-like diff pager for git/gh PR diffs
-        git-town # stacked PR workflow for git
 
         # AI coding assistants from nixpkgs
         opencode
