@@ -11,7 +11,7 @@ let
   claudeCode = lib.attrByPath [ system "default" ] null inputs.claude-code.packages;
   codexCli = lib.attrByPath [ system "default" ] null inputs.codex-cli.packages;
   piAgent = lib.attrByPath [ system "pi" ] null inputs.llm-agents.packages;
-  tuicr = lib.attrByPath [ system ] null inputs.tuicr.defaultPackage;
+  tuicr = lib.attrByPath [ system "default" ] null inputs.tuicr.packages;
   optionalPackage = pkg: lib.optional (pkg != null) pkg;
   piWebToolsNodeModules = pkgs.buildNpmPackage {
     pname = "pi-web-tools-extension-deps";

@@ -6,6 +6,9 @@
         "signoz": {
             "url": "https://mcp.eu.signoz.cloud/mcp"
         },
+        "supabase": {
+            "url": "https://mcp.supabase.com/mcp?project_ref=uagvwyhbnlutltxparir&read_only=true"
+        },
         "scryfall": {
             "command": "pnpx",
             "args": [

@@ -11,7 +11,7 @@ if [[ $# -gt 1 ]]; then
   return 1
 fi
 
-local remote_cmd="cd ${(q)dotfiles} || exit 1; git pull --ff-only; source ${(q)dotfiles}/zsh/functions/rebuild"
+local remote_cmd="set -e; cd ${(q)dotfiles} || exit 1; git pull --ff-only; source ${(q)dotfiles}/zsh/functions/rebuild"
 local encoded
 encoded=$(printf '%s' "$remote_cmd" | base64 | tr -d '\n') || return
 local runner="encoded=${(q)encoded}; cmd=\$(printf %s \"\$encoded\" | base64 -d); sudo -u ${(q)remote_user} HOME=${(q)remote_home} USER=${(q)remote_user} LOGNAME=${(q)remote_user} PATH=${(q)remote_path} ${(q)remote_home}/.nix-profile/bin/zsh -lc \"\$cmd\""
