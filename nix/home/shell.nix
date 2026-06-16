@@ -72,7 +72,7 @@
       autoload -Uz rpushdev
       autoload -Uz rssh
       autoload -Uz rrebuild
-      autoload -Uz rpicodexauth
+      autoload -Uz ragentauth
     '';
   };
 

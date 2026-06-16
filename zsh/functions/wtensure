@@ -49,6 +49,19 @@ local dotfiles="${RDEV_DOTFILES:-$HOME/Developer/dotfiles}"
 wtsetup() { source "$dotfiles/zsh/functions/wtsetup" "$@"; }
 wtcheckout() { source "$dotfiles/zsh/functions/wtcheckout" "$@"; }
 
+wtensure_pull_origin_if_clean() {
+  local branch="$1"
+  local git_status
+
+  git_status=$(git status --porcelain) || return
+  if [[ -n "$git_status" ]]; then
+    echo "Local changes present in $PWD; skipping pull from origin/$branch." >&2
+    return 0
+  fi
+
+  git merge --ff-only "origin/$branch"
+}
+
 # Always fetch first so a just-pushed local branch is visible before deciding
 # whether this is an existing remote branch or a new branch to create.
 git fetch origin --prune || return
@@ -64,7 +77,7 @@ if [[ ! -d "$worktree_path" ]]; then
       git worktree add --track -b "$input" "$worktree_path" "origin/$input" || return
     fi
     cd "$worktree_path" || return
-    git merge --ff-only "origin/$input" || return
+    wtensure_pull_origin_if_clean "$input" || return
     wtsetup
   elif git show-ref --verify --quiet "refs/heads/$input"; then
     git worktree add "$worktree_path" "$input" || return
@@ -83,7 +96,7 @@ fi
 
 if [[ ! "$input" =~ ^[0-9]+$ ]] && git show-ref --verify --quiet "refs/remotes/origin/$input" && [[ "$(git branch --show-current 2>/dev/null)" == "$input" ]]; then
   git branch --set-upstream-to="origin/$input" "$input" 2>/dev/null || true
-  git merge --ff-only "origin/$input" || return
+  wtensure_pull_origin_if_clean "$input" || return
 fi
 
 typeset -g WTENSURE_REPO_NAME="$repo_name"

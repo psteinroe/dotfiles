@@ -1,0 +1,191 @@
+# From Mac: copy local agent subscription auth to the remote psteinroe user.
+# Usage: ragentauth [host] [all|pi[:provider[,provider...]]|claude ...]
+#
+# Defaults to copying the Pi OpenAI Codex provider plus Claude Code OAuth
+# subscription credentials when available. Pi providers can be overridden with
+# RAGENTAUTH_PI_PROVIDERS, PI_AUTH_PROVIDERS, or the legacy PI_CODEX_PROVIDER.
+if [[ $# -gt 8 ]]; then
+  echo "Usage: ragentauth [host] [all|pi[:provider[,provider...]]|claude ...]" >&2
+  return 1
+fi
+
+local host="${RDEV_HOST:-rdev}"
+local remote_user="${RDEV_REMOTE_USER:-psteinroe}"
+local remote_home="${RDEV_HOME:-/home/${remote_user}}"
+local remote_path="${remote_home}/.local/bin:${remote_home}/.nix-profile/bin:/nix/var/nix/profiles/default/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+local local_pi_auth="${PI_AUTH_FILE:-$HOME/.pi/agent/auth.json}"
+local local_claude_config="${CLAUDE_CONFIG_FILE:-$HOME/.claude.json}"
+local default_pi_providers="${RAGENTAUTH_PI_PROVIDERS:-${PI_AUTH_PROVIDERS:-${PI_CODEX_PROVIDER:-openai-codex}}}"
+
+local -a specs
+if [[ $# -gt 0 ]]; then
+  case "$1" in
+    all|pi|pi:*|codex|openai-codex|claude|claude-code)
+      specs=("$@")
+      ;;
+    *)
+      host="$1"
+      shift
+      specs=("$@")
+      ;;
+  esac
+fi
+[[ ${#specs[@]} -eq 0 ]] && specs=(all)
+
+local copy_pi_all=0 copy_claude=0
+local -a pi_providers
+for spec in "${specs[@]}"; do
+  case "$spec" in
+    all)
+      pi_providers+=("${(@s:,:)default_pi_providers}")
+      copy_claude=1
+      ;;
+    pi)
+      pi_providers+=("${(@s:,:)default_pi_providers}")
+      ;;
+    pi:all|pi:*)
+      local providers="${spec#pi:}"
+      if [[ "$providers" == "all" || "$providers" == "*" ]]; then
+        copy_pi_all=1
+      else
+        pi_providers+=("${(@s:,:)providers}")
+      fi
+      ;;
+    codex|openai-codex)
+      pi_providers+=("${PI_CODEX_PROVIDER:-openai-codex}")
+      ;;
+    claude|claude-code)
+      copy_claude=1
+      ;;
+    *)
+      echo "Unknown auth spec: $spec" >&2
+      echo "Usage: ragentauth [host] [all|pi[:provider[,provider...]]|claude ...]" >&2
+      return 1
+      ;;
+  esac
+done
+typeset -U pi_providers
+
+if ! command -v jq >/dev/null 2>&1; then
+  echo "ragentauth requires jq locally" >&2
+  return 1
+fi
+
+local pi_payload='{}'
+if [[ "$copy_pi_all" -eq 1 || ${#pi_providers[@]} -gt 0 ]]; then
+  if [[ ! -f "$local_pi_auth" ]]; then
+    echo "No local Pi auth file found: $local_pi_auth" >&2
+    return 1
+  fi
+
+  if [[ "$copy_pi_all" -eq 1 ]]; then
+    pi_payload=$(jq -c '.' "$local_pi_auth") || return
+  else
+    local providers_json missing
+    providers_json=$(printf '%s\n' "${pi_providers[@]}" | jq -R . | jq -s .) || return
+    missing=$(jq -r --argjson providers "$providers_json" '$providers[] as $p | select(has($p) | not) | $p' "$local_pi_auth") || return
+    if [[ -n "$missing" ]]; then
+      echo "Missing Pi auth provider(s) in $local_pi_auth:" >&2
+      printf '  %s\n' ${(f)missing} >&2
+      echo "Run pi locally, then /login for the missing provider(s)." >&2
+      return 1
+    fi
+    pi_payload=$(jq -c --argjson providers "$providers_json" 'with_entries(select(.key as $k | $providers | index($k)))' "$local_pi_auth") || return
+  fi
+fi
+
+local claude_credentials='null'
+local claude_config='null'
+if [[ "$copy_claude" -eq 1 ]]; then
+  local keychain_service="${CLAUDE_CODE_KEYCHAIN_SERVICE:-Claude Code-credentials}"
+  local keychain_account="${CLAUDE_CODE_KEYCHAIN_ACCOUNT:-$USER}"
+  local credentials_file="${CLAUDE_CODE_CREDENTIALS_FILE:-$HOME/.claude/.credentials.json}"
+
+  if command -v security >/dev/null 2>&1; then
+    claude_credentials=$(security find-generic-password -a "$keychain_account" -s "$keychain_service" -w 2>/dev/null || true)
+  fi
+  if [[ -z "$claude_credentials" && -f "$credentials_file" ]]; then
+    claude_credentials=$(<"$credentials_file") || return
+  fi
+  if [[ -z "$claude_credentials" ]]; then
+    echo "No Claude Code OAuth credentials found in keychain service '$keychain_service' or $credentials_file" >&2
+    echo "Run 'claude auth login' locally first." >&2
+    return 1
+  fi
+  if ! jq -e '.claudeAiOauth.accessToken and .claudeAiOauth.refreshToken' <<<"$claude_credentials" >/dev/null; then
+    echo "Claude Code credentials are not in the expected claudeAiOauth format" >&2
+    return 1
+  fi
+  claude_credentials=$(jq -c '.' <<<"$claude_credentials") || return
+
+  if [[ -f "$local_claude_config" ]]; then
+    claude_config=$(jq -c '{oauthAccount, hasCompletedOnboarding, claudeCodeFirstTokenDate} | with_entries(select(.value != null))' "$local_claude_config") || return
+  else
+    claude_config='{}'
+  fi
+fi
+
+local payload
+payload=$(jq -n \
+  --argjson piAuth "$pi_payload" \
+  --argjson claudeCredentials "$claude_credentials" \
+  --argjson claudeConfig "$claude_config" \
+  '{piAuth: $piAuth, claudeCredentials: $claudeCredentials, claudeConfig: $claudeConfig}') || return
+
+local remote_cmd='set -e
+if ! command -v jq >/dev/null 2>&1; then
+  echo "ragentauth requires jq on the remote; run rebuild/bootstrap first" >&2
+  exit 1
+fi
+umask 077
+payload=$(mktemp)
+trap '\''rm -f "$payload" "$HOME/.pi/agent/auth.json.tmp" "$HOME/.claude.json.tmp" "$HOME/.claude/.credentials.json.tmp"'\'' EXIT
+cat > "$payload"
+
+if jq -e '\''.piAuth? and (.piAuth | length > 0)'\'' "$payload" >/dev/null; then
+  mkdir -p "$HOME/.pi/agent"
+  auth="$HOME/.pi/agent/auth.json"
+  jq -c '\''.piAuth'\'' "$payload" > "$payload.pi"
+  if [ -f "$auth" ]; then
+    jq -s '\''.[0] * .[1]'\'' "$auth" "$payload.pi" > "$auth.tmp"
+  else
+    cp "$payload.pi" "$auth.tmp"
+  fi
+  mv "$auth.tmp" "$auth"
+  chmod 600 "$auth"
+  rm -f "$payload.pi"
+fi
+
+if jq -e '\''.claudeCredentials?'\'' "$payload" >/dev/null; then
+  mkdir -p "$HOME/.claude"
+  jq -c '\''.claudeCredentials'\'' "$payload" > "$HOME/.claude/.credentials.json.tmp"
+  mv "$HOME/.claude/.credentials.json.tmp" "$HOME/.claude/.credentials.json"
+  chmod 600 "$HOME/.claude/.credentials.json"
+fi
+
+if jq -e '\''.claudeConfig? and (.claudeConfig | length > 0)'\'' "$payload" >/dev/null; then
+  jq -c '\''.claudeConfig'\'' "$payload" > "$HOME/.claude.json.tmp.in"
+  if [ -f "$HOME/.claude.json" ]; then
+    jq -s '\''.[0] * .[1]'\'' "$HOME/.claude.json" "$HOME/.claude.json.tmp.in" > "$HOME/.claude.json.tmp"
+  else
+    cp "$HOME/.claude.json.tmp.in" "$HOME/.claude.json.tmp"
+  fi
+  mv "$HOME/.claude.json.tmp" "$HOME/.claude.json"
+  chmod 600 "$HOME/.claude.json"
+  rm -f "$HOME/.claude.json.tmp.in"
+fi'
+
+local encoded
+encoded=$(printf '%s' "$remote_cmd" | base64 | tr -d '\n') || return
+local runner="encoded=${(q)encoded}; cmd=\$(printf %s \"\$encoded\" | base64 -d); sudo -u ${(q)remote_user} HOME=${(q)remote_home} USER=${(q)remote_user} LOGNAME=${(q)remote_user} PATH=${(q)remote_path} ${(q)remote_home}/.nix-profile/bin/zsh -lc \"\$cmd\""
+
+printf '%s\n' "$payload" | ssh "$host" "$runner" || return
+
+local -a copied
+if [[ "$copy_pi_all" -eq 1 ]]; then
+  copied+=("Pi auth providers: all")
+elif [[ ${#pi_providers[@]} -gt 0 ]]; then
+  copied+=("Pi auth providers: ${(j:, :)pi_providers}")
+fi
+[[ "$copy_claude" -eq 1 ]] && copied+=("Claude Code subscription auth")
+printf 'Copied %s to %s:%s:%s\n' "${(j:; :)copied}" "$host" "$remote_user" "$remote_home"

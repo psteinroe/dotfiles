@@ -62,6 +62,6 @@ fi
 if [[ "$topic" == all || "$topic" == auth ]]; then
   _case_header "Auth/helper utilities"
   _case_row "gh" "wrap gh to auto-use exe.dev integration hosts from origin"
-  _case_row "rpicodexauth [host]" "copy local Pi openai-codex auth to the remote psteinroe user"
+  _case_row "ragentauth [host] [spec]" "copy Pi provider auth and/or Claude Code subscription auth to remote"
   _case_row "devhelp [topic]" "show this command reference"
 fi
