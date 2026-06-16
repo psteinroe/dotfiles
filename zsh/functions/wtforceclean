@@ -1,0 +1,125 @@
+# Git worktree helper - explicitly select worktrees and force-remove them.
+# Usage: wtforceclean
+if [[ $# -gt 0 ]]; then
+  echo "Usage: wtforceclean" >&2
+  return 1
+fi
+
+if ! git rev-parse --git-dir >/dev/null 2>&1; then
+  echo "wtforceclean must be run inside a git repository/worktree" >&2
+  return 1
+fi
+
+if ! command -v fzf >/dev/null 2>&1; then
+  echo "fzf required for worktree selection" >&2
+  return 1
+fi
+
+local current_worktree
+current_worktree=$(git rev-parse --show-toplevel 2>/dev/null || true)
+
+local default_branch
+default_branch=$(gh repo view --json defaultBranchRef -q '.defaultBranchRef.name' 2>/dev/null)
+if [[ -z "$default_branch" ]]; then
+  default_branch=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')
+fi
+[[ -n "$default_branch" ]] || default_branch="main"
+
+local protected_branches=("$default_branch" main master trunk)
+
+is_protected_branch() {
+  local branch="$1"
+  local protected
+  for protected in "${protected_branches[@]}"; do
+    if [[ "$branch" == "$protected" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+local candidates_file
+candidates_file=$(mktemp)
+
+local worktree_path=""
+local branch=""
+local kind=""
+while IFS= read -r line; do
+  if [[ "$line" == worktree\ * ]]; then
+    if [[ -n "$worktree_path" && "$kind" != "bare" && "$worktree_path" != "$current_worktree" ]]; then
+      [[ -n "$branch" ]] || branch="detached"
+      if is_protected_branch "$branch"; then
+        echo "Protected: $branch"
+      else
+        printf '%s\t%s\n' "$branch" "$worktree_path" >> "$candidates_file"
+      fi
+    fi
+    worktree_path="${line#worktree }"
+    branch=""
+    kind=""
+  elif [[ "$line" == branch\ * ]]; then
+    branch="${line#branch refs/heads/}"
+  elif [[ "$line" == detached ]]; then
+    branch="detached"
+  elif [[ "$line" == bare ]]; then
+    kind="bare"
+  fi
+done < <(git worktree list --porcelain)
+
+if [[ -n "$worktree_path" && "$kind" != "bare" && "$worktree_path" != "$current_worktree" ]]; then
+  [[ -n "$branch" ]] || branch="detached"
+  if is_protected_branch "$branch"; then
+    echo "Protected: $branch"
+  else
+    printf '%s\t%s\n' "$branch" "$worktree_path" >> "$candidates_file"
+  fi
+fi
+
+if [[ ! -s "$candidates_file" ]]; then
+  echo "No removable worktrees found."
+  rm -f "$candidates_file"
+  return 0
+fi
+
+local selected
+selected=$(fzf --multi --prompt="Force-remove worktrees> " --height=40% --reverse --with-nth=1,2 --header="TAB selects; ENTER confirms; CTRL-A selects all" --bind=ctrl-a:select-all < "$candidates_file") || {
+  rm -f "$candidates_file"
+  return 0
+}
+rm -f "$candidates_file"
+
+if [[ -z "$selected" ]]; then
+  echo "No worktrees selected."
+  return 0
+fi
+
+local selected_file
+selected_file=$(mktemp)
+printf '%s\n' "$selected" > "$selected_file"
+
+echo "\nSelected worktrees to force-remove:"
+while IFS=$'\t' read -r branch worktree_path; do
+  echo "  $branch  $worktree_path"
+done < "$selected_file"
+
+echo -n "\nType 'force' to remove selected worktrees, including dirty changes: "
+local response
+read response
+if [[ "$response" != "force" ]]; then
+  echo "Cancelled."
+  rm -f "$selected_file"
+  return 0
+fi
+
+while IFS=$'\t' read -r branch worktree_path; do
+  if is_protected_branch "$branch"; then
+    echo "Skipping protected branch: $branch"
+    continue
+  fi
+  echo "Force-removing $branch..."
+  git worktree remove --force "$worktree_path" &
+done < "$selected_file"
+wait
+git worktree prune
+rm -f "$selected_file"
+echo "\nDone."

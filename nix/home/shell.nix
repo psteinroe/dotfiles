@@ -50,6 +50,7 @@
       autoload -Uz wtcheckout
       autoload -Uz wtlist
       autoload -Uz wtclean
+      autoload -Uz wtforceclean
       autoload -Uz wtsetup
       autoload -Uz wtensure
       autoload -Uz gh
@@ -69,10 +70,12 @@
       autoload -Uz rwtcheckout
       autoload -Uz rwtlist
       autoload -Uz rwtclean
+      autoload -Uz rwtforceclean
       autoload -Uz rpushdev
       autoload -Uz rssh
       autoload -Uz rrebuild
       autoload -Uz ragentauth
+      autoload -Uz rghauth
     '';
   };
 

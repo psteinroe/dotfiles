@@ -34,6 +34,7 @@ if [[ "$topic" == all || "$topic" == remote ]]; then
   _case_row "rwtcheckout <repo> <branch|pr>" "checkout existing remote branch/PR worktree, attach remote tmux"
   _case_row "rwtlist <repo>" "pick a remote worktree with local fzf, then attach remote tmux"
   _case_row "rwtclean <repo>" "run wtclean on the remote repo"
+  _case_row "rwtforceclean <repo>" "pick remote worktrees and force-remove the selected ones"
   _case_row "rpushdev [repo] [msg]" "commit/push current local branch, then attach it on remote tmux"
   _case_row "rssh [dir]" "open a plain remote psteinroe shell without tmux"
   _case_row "rrebuild [host]" "pull dotfiles and rebuild Home Manager on the remote VM"
@@ -48,6 +49,7 @@ if [[ "$topic" == all || "$topic" == worktree ]]; then
   _case_row "wtcheckout <branch|pr>" "checkout an existing branch or PR into a worktree"
   _case_row "wtlist" "list/select existing worktrees without tmux behavior"
   _case_row "wtclean" "clean merged/closed worktrees"
+  _case_row "wtforceclean" "pick worktrees and force-remove the selected ones"
   _case_row "wtensure <branch|pr>" "upsert worktree and cd into it without tmux"
   [[ "$topic" == all ]] && print
 fi

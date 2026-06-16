@@ -55,9 +55,11 @@ rwtcreate app feature-x
 rdevstack app feature-x feature-child  # stack child branch on existing parent, attach tmux
 rwtcheckout app 123
 rwtlist app
+rwtforceclean app        # explicitly select remote worktrees and force-remove them
 rdev app feature-x       # remote tmux shell/nvim
 rpi app feature-x        # local Pi UI, remote SSH-backed tools
 ragentauth               # copy local Pi + Claude Code subscription auth to the remote
+rghauth                  # copy local GitHub CLI auth to the remote, bypassing exe.dev GitHub integration
 ```
 
 `rdev` upserts the requested remote worktree: if `~/Developer/<repo>.git/<branch>` does not exist, it creates/checks out the worktree first, then attaches tmux. Use `rdevstack <repo> <parent> <branch>` when the new branch should be created from an existing parent branch. Closing the local Ghostty tab detaches SSH but leaves remote zsh/Neovim running.
@@ -65,6 +67,8 @@ ragentauth               # copy local Pi + Claude Code subscription auth to the 
 `rpi` performs the same remote worktree upsert but does **not** attach tmux. It starts Pi locally from a shadow cwd under `~/.cache/pi-remote/...` and passes `--remote-ssh/--remote-cwd` to the Pi `remote-ssh` extension, so Pi input stays local while `read`, `write`, `edit`, `bash`, `ls`, `find`, `grep`, and `!` commands execute on the remote VM. Use `rdev` only when you need a real remote terminal, tmux, or Neovim.
 
 `ragentauth [host] [spec]` copies local subscription auth to the remote user. With no spec it copies the configured Pi provider (`openai-codex` by default) and Claude Code OAuth credentials when available. Use `pi:<provider[,provider...]>`, `pi:all`, or `claude` to copy only selected auth.
+
+`rghauth [host] [github-host]` copies the local GitHub CLI token for `github.com` to the remote user and configures `gh auth setup-git`. After running it, clone/set remotes to real GitHub URLs such as `https://github.com/OWNER/REPO.git`; avoid exe.dev proxy remotes like `https://<integration>.int.exe.xyz/OWNER/REPO.git` when you want PRs opened as your GitHub user.
 
 ## Tailscale (macOS)
 
@@ -155,6 +159,7 @@ wtclone git@github.com:user/repo.git    # creates repo.git/ with main/ worktree
 | `wtcheckout <branch\|pr#>` | Checkout branch/PR into worktree |
 | `wtlist` | List worktrees |
 | `wtclean` | Remove merged/closed PR worktrees |
+| `wtforceclean` | Select worktrees and force-remove them |
 | `wtensure <branch\|pr#>` | Upsert a worktree and cd into it without tmux (used by `rpi`/`wttmux`) |
 
 ### Full Workflow
@@ -177,6 +182,7 @@ gpr                              # quick commit/push/create flow
 
 # 5. After merge, cleanup
 wtclean                          # remove merged worktrees
+wtforceclean                     # manually select worktrees and force-remove them
 ```
 
 ### Review a PR or Branch
