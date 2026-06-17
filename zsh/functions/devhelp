@@ -27,6 +27,7 @@ esac
 if [[ "$topic" == all || "$topic" == remote ]]; then
   _case_header "Remote-from-Mac helpers"
   _case_row "rdev <repo> <branch|pr>" "upsert remote worktree and attach/create its remote tmux session"
+  _case_row "rdevroot <repo>" "attach/create remote tmux session at the bare repo root"
   _case_row "rdevstack <repo> <parent> <branch>" "create/ensure remote branch stacked on parent, attach remote tmux"
   _case_row "rpi <repo> <branch|pr> [-- args]" "upsert remote worktree, run local Pi with remote SSH tools"
   _case_row "rwtclone <url> [repo]" "clone repo on remote VM, set up default worktree, attach remote tmux"

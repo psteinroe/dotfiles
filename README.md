@@ -56,13 +56,14 @@ rdevstack app feature-x feature-child  # stack child branch on existing parent, 
 rwtcheckout app 123
 rwtlist app
 rwtforceclean app        # explicitly select remote worktrees and force-remove them
-rdev app feature-x       # remote tmux shell/nvim
+rdev app feature-x       # remote tmux shell/nvim in a branch worktree
+rdevroot app             # remote tmux shell at ~/Developer/app.git
 rpi app feature-x        # local Pi UI, remote SSH-backed tools
 ragentauth               # copy local Pi + Claude Code subscription auth to the remote
 rghauth                  # copy local GitHub CLI auth to the remote, bypassing exe.dev GitHub integration
 ```
 
-`rdev` upserts the requested remote worktree: if `~/Developer/<repo>.git/<branch>` does not exist, it creates/checks out the worktree first, then attaches tmux. Use `rdevstack <repo> <parent> <branch>` when the new branch should be created from an existing parent branch. Closing the local Ghostty tab detaches SSH but leaves remote zsh/Neovim running.
+`rdev` upserts the requested remote worktree: if `~/Developer/<repo>.git/<branch>` does not exist, it creates/checks out the worktree first, then attaches tmux. Use `rdevroot <repo>` to attach/create a tmux session at the bare repo root (`~/Developer/<repo>.git`) instead of a branch worktree. Use `rdevstack <repo> <parent> <branch>` when the new branch should be created from an existing parent branch. Closing the local Ghostty tab detaches SSH but leaves remote zsh/Neovim running.
 
 `rpi` performs the same remote worktree upsert but does **not** attach tmux. It starts Pi locally from a shadow cwd under `~/.cache/pi-remote/...` and passes `--remote-ssh/--remote-cwd` to the Pi `remote-ssh` extension, so Pi input stays local while `read`, `write`, `edit`, `bash`, `ls`, `find`, `grep`, and `!` commands execute on the remote VM. Use `rdev` only when you need a real remote terminal, tmux, or Neovim.
 
