@@ -18,6 +18,13 @@ fi
 local current_worktree
 current_worktree=$(git rev-parse --show-toplevel 2>/dev/null || true)
 
+local dotfiles="${RDEV_DOTFILES:-$HOME/Developer/dotfiles}"
+source "$dotfiles/zsh/functions/_wt_tmux_helpers" 2>/dev/null || true
+local session_repo_root=""
+if (( $+functions[_wt_main_repo_root] )); then
+  session_repo_root=$(_wt_main_repo_root)
+fi
+
 local default_branch
 default_branch=$(gh repo view --json defaultBranchRef -q '.defaultBranchRef.name' 2>/dev/null)
 if [[ -z "$default_branch" ]]; then
@@ -117,6 +124,9 @@ while IFS=$'\t' read -r branch worktree_path; do
     continue
   fi
   echo "Force-removing $branch..."
+  if (( $+functions[_wt_kill_tmux_for_worktree] )); then
+    _wt_kill_tmux_for_worktree "$session_repo_root" "$worktree_path"
+  fi
   git worktree remove --force "$worktree_path" &
 done < "$selected_file"
 wait

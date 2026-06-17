@@ -159,8 +159,9 @@ wtclone git@github.com:user/repo.git    # creates repo.git/ with main/ worktree
 | `wtcreate <name>` | Create new branch worktree |
 | `wtcheckout <branch\|pr#>` | Checkout branch/PR into worktree |
 | `wtlist` | List worktrees |
-| `wtclean` | Remove merged/closed PR worktrees |
-| `wtforceclean` | Select worktrees and force-remove them |
+| `wtclean` | Remove merged/closed PR worktrees and their matching tmux sessions |
+| `wtforceclean` | Select worktrees and force-remove them plus their matching tmux sessions |
+| `wttmuxclean [--force]` | Clean orphaned repo tmux sessions whose `session_path` no longer exists |
 | `wtensure <branch\|pr#>` | Upsert a worktree and cd into it without tmux (used by `rpi`/`wttmux`) |
 
 ### Full Workflow
@@ -182,8 +183,9 @@ git commit -m "Add feature"
 gpr                              # quick commit/push/create flow
 
 # 5. After merge, cleanup
-wtclean                          # remove merged worktrees
+wtclean                          # remove merged worktrees and matching tmux sessions
 wtforceclean                     # manually select worktrees and force-remove them
+wttmuxclean                      # optional: remove stale repo tmux sessions with missing paths
 ```
 
 ### Review a PR or Branch

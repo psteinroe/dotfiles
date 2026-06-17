@@ -1,0 +1,83 @@
+# Shared helpers for worktree-scoped tmux sessions.
+# Source this file from other zsh functions; it intentionally has no top-level
+# side effects beyond defining helper functions.
+
+_wt_main_repo_root() {
+  git worktree list --porcelain 2>/dev/null | awk '/^worktree / { print substr($0, 10); exit }'
+}
+
+_wt_repo_name_from_root() {
+  local repo_root="$1"
+  local repo_base="$(basename "$repo_root")"
+
+  if [[ "$repo_base" == *.git ]]; then
+    print -r -- "${repo_base%.git}"
+  else
+    print -r -- "$repo_base"
+  fi
+}
+
+_wt_sanitize_tmux_session() {
+  local session="$1"
+  session="${session//\//-}"
+  session="${session//[^A-Za-z0-9_.-]/-}"
+  print -r -- "$session"
+}
+
+_wt_tmux_session_for_worktree() {
+  local repo_root="$1"
+  local worktree_path="$2"
+  local repo_name="$(_wt_repo_name_from_root "$repo_root")"
+  local worktree_name="$(basename "$worktree_path")"
+
+  _wt_sanitize_tmux_session "${repo_name}-${worktree_name}"
+}
+
+_wt_tmux_repo_session_prefix() {
+  local repo_root="$1"
+  local repo_name="$(_wt_repo_name_from_root "$repo_root")"
+
+  _wt_sanitize_tmux_session "${repo_name}-"
+}
+
+_wt_kill_tmux_for_worktree() {
+  local repo_root="$1"
+  local worktree_path="$2"
+
+  command -v tmux >/dev/null 2>&1 || return 0
+  [[ -n "$repo_root" && -n "$worktree_path" ]] || return 0
+
+  local session="$(_wt_tmux_session_for_worktree "$repo_root" "$worktree_path")"
+  [[ -n "$session" ]] || return 0
+
+  tmux kill-session -t "$session" 2>/dev/null || true
+}
+
+_wt_collect_orphaned_tmux_sessions() {
+  local repo_root="$1"
+  local output_file="$2"
+
+  command -v tmux >/dev/null 2>&1 || return 0
+  [[ -n "$repo_root" && -n "$output_file" ]] || return 0
+
+  local prefix="$(_wt_tmux_repo_session_prefix "$repo_root")"
+  local sessions
+  sessions=$(tmux list-sessions -F '#{session_name}	#{session_path}	#{session_attached}' 2>/dev/null) || return 0
+
+  local session_name session_path session_attached
+  while IFS=$'\t' read -r session_name session_path session_attached; do
+    [[ -n "$session_name" ]] || continue
+    [[ "$session_name" == "$prefix"* ]] || continue
+    [[ -n "$session_path" && -d "$session_path" ]] && continue
+    printf '%s\t%s\t%s\n' "$session_name" "$session_path" "$session_attached" >> "$output_file"
+  done <<< "$sessions"
+}
+
+_wt_kill_tmux_session_name() {
+  local session="$1"
+
+  command -v tmux >/dev/null 2>&1 || return 0
+  [[ -n "$session" ]] || return 0
+
+  tmux kill-session -t "$session" 2>/dev/null || true
+}

@@ -57,6 +57,7 @@
       autoload -Uz gh-default-branch
       autoload -Uz wttmux
       autoload -Uz wttmuxlist
+      autoload -Uz wttmuxclean
       autoload -Uz cpi
       autoload -Uz gpr
       autoload -Uz gclean
