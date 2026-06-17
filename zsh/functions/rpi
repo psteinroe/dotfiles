@@ -62,6 +62,12 @@ repo=$repo
 worktree=$worktree_name
 EOF
 
+local local_dotfiles="${LOCAL_DOTFILES:-$HOME/Developer/dotfiles}"
+source "$local_dotfiles/zsh/functions/_rdev_title_helpers" 2>/dev/null || true
+if (( $+functions[_rdev_set_title] )); then
+  _rdev_set_title "π ${repo}/${worktree_name}"
+fi
+
 print -P "%F{cyan}Pi local UI → remote tools:%f $host:$remote_cwd"
 (
   cd "$local_cwd" || exit 1

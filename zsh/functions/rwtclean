@@ -13,6 +13,12 @@ local dotfiles="${RDEV_DOTFILES:-${remote_home}/Developer/dotfiles}"
 local repo="${1%.git}"
 local repo_dir="${remote_home}/Developer/${repo}.git"
 
+local local_dotfiles="${LOCAL_DOTFILES:-$HOME/Developer/dotfiles}"
+source "$local_dotfiles/zsh/functions/_rdev_title_helpers" 2>/dev/null || true
+if (( $+functions[_rdev_set_title] )); then
+  _rdev_set_title "${repo}/wtclean"
+fi
+
 local remote_cmd="cd ${(q)repo_dir} || exit 1; worktree=\$(git worktree list --porcelain | awk '/^worktree / { path = substr(\$0, 10) } /^branch / { print path; exit }'); [ -n \"\$worktree\" ] || { echo \"No branch worktree found for ${(q)repo}\" >&2; exit 1; }; cd \"\$worktree\" || exit 1; source ${(q)dotfiles}/zsh/functions/wtclean"
 local encoded
 encoded=$(printf '%s' "$remote_cmd" | base64 | tr -d '\n') || return

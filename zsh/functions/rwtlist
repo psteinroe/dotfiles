@@ -10,6 +10,12 @@ local remote_user="${RDEV_REMOTE_USER:-psteinroe}"
 local remote_home="${RDEV_HOME:-/home/${remote_user}}"
 local remote_path="${remote_home}/.local/bin:${remote_home}/.nix-profile/bin:/nix/var/nix/profiles/default/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 local repo="${1%.git}"
+local local_dotfiles="${LOCAL_DOTFILES:-$HOME/Developer/dotfiles}"
+source "$local_dotfiles/zsh/functions/_rdev_title_helpers" 2>/dev/null || true
+if (( $+functions[_rdev_set_title] )); then
+  _rdev_set_title "${repo}/list"
+fi
+
 local bare="${repo}.git"
 local repo_dir="${remote_home}/Developer/${bare}"
 local remote_cmd="cd ${(q)repo_dir} && git worktree list --porcelain"

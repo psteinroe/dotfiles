@@ -1,0 +1,27 @@
+# Shared local terminal-title helpers for remote-dev entrypoints.
+# Source from zsh functions immediately before launching ssh/pi so the local
+# shell integration's "current command" title is replaced with repo context.
+
+_rdev_set_title() {
+  [[ -t 1 ]] || return 0
+  local title="$*"
+  [[ -n "$title" ]] || return 0
+  print -n -- $'\e]0;' "$title" $'\a'
+}
+
+_rdev_worktree_title_name() {
+  local input="$1"
+
+  if [[ "$input" =~ ^[0-9]+$ ]]; then
+    print -r -- "pr-$input"
+  else
+    print -r -- "${input//\//-}"
+  fi
+}
+
+_rdev_set_repo_worktree_title() {
+  local repo="$1"
+  local worktree="$2"
+
+  _rdev_set_title "${repo}/$(_rdev_worktree_title_name "$worktree")"
+}

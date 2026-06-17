@@ -18,6 +18,12 @@ local session="${repo}-root"
 session="${session//\//-}"
 session="${session//[^A-Za-z0-9_.-]/-}"
 
+local local_dotfiles="${LOCAL_DOTFILES:-$HOME/Developer/dotfiles}"
+source "$local_dotfiles/zsh/functions/_rdev_title_helpers" 2>/dev/null || true
+if (( $+functions[_rdev_set_title] )); then
+  _rdev_set_title "${repo}/root"
+fi
+
 local inner_cmd="export PATH=${(q)remote_path}; cd ${(q)repo_dir} || { echo Remote repo not found: ${(q)repo_dir} >&2; exit 1; }; if ! infocmp \"\${TERM:-}\" >/dev/null 2>&1; then export TERM=xterm-256color; fi; export COLORTERM=\"\${COLORTERM:-truecolor}\"; session_shell=${(q)remote_home}/.nix-profile/bin/zsh; [[ -x \"\$session_shell\" ]] || session_shell=\"\${SHELL:-/bin/sh}\"; exec tmux new-session -A -s ${(q)session} -c ${(q)repo_dir} \"\$session_shell\" -l"
 local encoded
 encoded=$(printf '%s' "$inner_cmd" | base64 | tr -d '\n') || return

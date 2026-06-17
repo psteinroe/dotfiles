@@ -13,8 +13,18 @@ local dotfiles="${RDEV_DOTFILES:-${remote_home}/Developer/dotfiles}"
 local repo="${1%.git}"
 local repo_dir="${remote_home}/Developer/${repo}.git"
 local clean_arg="${2:-}"
+local clean_invocation="source ${(q)dotfiles}/zsh/functions/wttmuxclean"
+if [[ -n "$clean_arg" ]]; then
+  clean_invocation+=" ${(q)clean_arg}"
+fi
 
-local remote_cmd="cd ${(q)repo_dir} || exit 1; source ${(q)dotfiles}/zsh/functions/wttmuxclean ${(q)clean_arg}"
+local local_dotfiles="${LOCAL_DOTFILES:-$HOME/Developer/dotfiles}"
+source "$local_dotfiles/zsh/functions/_rdev_title_helpers" 2>/dev/null || true
+if (( $+functions[_rdev_set_title] )); then
+  _rdev_set_title "${repo}/tmux-clean"
+fi
+
+local remote_cmd="cd ${(q)repo_dir} || exit 1; $clean_invocation"
 local encoded
 encoded=$(printf '%s' "$remote_cmd" | base64 | tr -d '\n') || return
 local runner="encoded=${(q)encoded}; cmd=\$(printf %s \"\$encoded\" | base64 -d); sudo -u ${(q)remote_user} HOME=${(q)remote_home} USER=${(q)remote_user} LOGNAME=${(q)remote_user} PATH=${(q)remote_path} ${(q)remote_home}/.nix-profile/bin/zsh -lc \"\$cmd\""

@@ -17,6 +17,12 @@ local remote_colorterm="${RDEV_COLORTERM:-truecolor}"
 local repo_dir="${remote_home}/Developer/${repo}.git"
 local dotfiles="${RDEV_DOTFILES:-${remote_home}/Developer/dotfiles}"
 
+local local_dotfiles="${LOCAL_DOTFILES:-$HOME/Developer/dotfiles}"
+source "$local_dotfiles/zsh/functions/_rdev_title_helpers" 2>/dev/null || true
+if (( $+functions[_rdev_set_repo_worktree_title] )); then
+  _rdev_set_repo_worktree_title "$repo" "$requested"
+fi
+
 local inner_cmd="export PATH=${(q)remote_path}; cd ${(q)repo_dir} || { echo Remote repo not found: ${(q)repo_dir} >&2; exit 1; }; source ${(q)dotfiles}/zsh/functions/wttmux ${(q)requested}"
 local encoded
 encoded=$(printf '%s' "$inner_cmd" | base64 | tr -d '\n') || return
