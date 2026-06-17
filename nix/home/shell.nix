@@ -73,6 +73,7 @@
       autoload -Uz rwtlist
       autoload -Uz rwtclean
       autoload -Uz rwtforceclean
+      autoload -Uz rwttmuxclean
       autoload -Uz rpushdev
       autoload -Uz rssh
       autoload -Uz rrebuild

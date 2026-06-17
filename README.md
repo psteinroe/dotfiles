@@ -56,6 +56,7 @@ rdevstack app feature-x feature-child  # stack child branch on existing parent, 
 rwtcheckout app 123
 rwtlist app
 rwtforceclean app        # explicitly select remote worktrees and force-remove them
+rwttmuxclean app         # clean orphaned remote tmux sessions for this repo
 rdev app feature-x       # remote tmux shell/nvim in a branch worktree
 rdevroot app             # remote tmux shell at ~/Developer/app.git
 rpi app feature-x        # local Pi UI, remote SSH-backed tools
@@ -186,6 +187,7 @@ gpr                              # quick commit/push/create flow
 wtclean                          # remove merged worktrees and matching tmux sessions
 wtforceclean                     # manually select worktrees and force-remove them
 wttmuxclean                      # optional: remove stale repo tmux sessions with missing paths
+rwttmuxclean app                 # same orphaned-session cleanup on remote rdev
 ```
 
 ### Review a PR or Branch
