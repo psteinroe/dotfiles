@@ -9,6 +9,7 @@ let currentModel: string | undefined;
 let sessionName: string | undefined;
 let isWorking = false;
 let currentTool: string | undefined;
+let remoteTitle = process.env.RDEV_REMOTE_TITLE === "1";
 let spinnerTimer: ReturnType<typeof setInterval> | undefined;
 let completionTimer: ReturnType<typeof setTimeout> | undefined;
 let frameIndex = 0;
@@ -33,13 +34,26 @@ function setNvimTitle(title: string): void {
 	child.unref();
 }
 
+function remoteTitlePrefix(): string {
+	return remoteTitle ? process.env.RDEV_TITLE_PREFIX ?? "🌐 " : "";
+}
+
+function prefixedTitle(title: string): string {
+	const prefix = remoteTitlePrefix();
+	return prefix && !title.startsWith(prefix) ? `${prefix}${title}` : title;
+}
+
+function argvHasRemoteSshFlag(): boolean {
+	return process.argv.some((arg) => arg === "--remote-ssh" || arg.startsWith("--remote-ssh="));
+}
+
 function buildTitle(extra?: string): string {
 	const segments: string[] = ["π"];
 	segments.push(path.basename(process.cwd()));
 	if (sessionName) segments.push(sessionName);
 	if (extra) segments.push(extra);
 	else if (currentModel) segments.push(currentModel);
-	return segments.join(" · ");
+	return prefixedTitle(segments.join(" · "));
 }
 
 function startSpinner() {
@@ -77,6 +91,11 @@ export default function statusTitleExtension(pi: ExtensionAPI) {
 		if (!ctx.hasUI) return;
 		currentModel = ctx.model?.id;
 		sessionName = pi.getSessionName();
+		try {
+			remoteTitle = remoteTitle || Boolean(pi.getFlag("remote-ssh")) || argvHasRemoteSshFlag();
+		} catch {
+			remoteTitle = remoteTitle || argvHasRemoteSshFlag();
+		}
 		setNvimTitle(buildTitle());
 	});
 

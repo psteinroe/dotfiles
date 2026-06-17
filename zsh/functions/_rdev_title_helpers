@@ -2,9 +2,24 @@
 # Source from zsh functions immediately before launching ssh/pi so the local
 # shell integration's "current command" title is replaced with repo context.
 
+_rdev_title_prefix() {
+  print -r -- "${RDEV_TITLE_PREFIX-🌐 }"
+}
+
+_rdev_prefix_title() {
+  local title="$*"
+  local prefix="$(_rdev_title_prefix)"
+
+  if [[ -n "$prefix" && "${title[1,${#prefix}]}" != "$prefix" ]]; then
+    title="${prefix}${title}"
+  fi
+
+  print -r -- "$title"
+}
+
 _rdev_set_title() {
   [[ -t 1 ]] || return 0
-  local title="$*"
+  local title="$(_rdev_prefix_title "$*")"
   [[ -n "$title" ]] || return 0
   print -n -- $'\e]0;' "$title" $'\a'
 }

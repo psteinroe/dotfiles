@@ -22,8 +22,9 @@ source "$local_dotfiles/zsh/functions/_rdev_title_helpers" 2>/dev/null || true
 if (( $+functions[_rdev_set_repo_worktree_title] )); then
   _rdev_set_repo_worktree_title "$repo" "$requested"
 fi
+local title_prefix="${RDEV_TITLE_PREFIX-🌐 }"
 
-local inner_cmd="export PATH=${(q)remote_path}; cd ${(q)repo_dir} || { echo Remote repo not found: ${(q)repo_dir} >&2; exit 1; }; source ${(q)dotfiles}/zsh/functions/wttmux ${(q)requested}"
+local inner_cmd="export PATH=${(q)remote_path}; export RDEV_REMOTE_TITLE=1 RDEV_TITLE_PREFIX=${(q)title_prefix}; cd ${(q)repo_dir} || { echo Remote repo not found: ${(q)repo_dir} >&2; exit 1; }; source ${(q)dotfiles}/zsh/functions/wttmux ${(q)requested}"
 local encoded
 encoded=$(printf '%s' "$inner_cmd" | base64 | tr -d '\n') || return
 local remote_cmd="encoded=${(q)encoded}; cmd=\$(printf %s \"\$encoded\" | base64 -d); sudo -u ${(q)remote_user} HOME=${(q)remote_home} USER=${(q)remote_user} LOGNAME=${(q)remote_user} PATH=${(q)remote_path} TERM=${(q)remote_term} COLORTERM=${(q)remote_colorterm} ${(q)remote_home}/.nix-profile/bin/zsh -lc \"\$cmd\""

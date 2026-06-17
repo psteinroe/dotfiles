@@ -17,7 +17,14 @@ if [[ "$1" == "-h" || "$1" == "--help" || $# -gt 1 ]]; then
   return $([[ $# -gt 1 ]] && echo 1 || echo 0)
 fi
 
-local inner_cmd="cd ${(q)remote_dir} || exit 1; exec ${(q)remote_home}/.nix-profile/bin/zsh -l"
+local local_dotfiles="${LOCAL_DOTFILES:-$HOME/Developer/dotfiles}"
+source "$local_dotfiles/zsh/functions/_rdev_title_helpers" 2>/dev/null || true
+if (( $+functions[_rdev_set_title] )); then
+  _rdev_set_title "${host}:${remote_dir/#$remote_home/~}"
+fi
+local title_prefix="${RDEV_TITLE_PREFIX-🌐 }"
+
+local inner_cmd="export RDEV_REMOTE_TITLE=1 RDEV_TITLE_PREFIX=${(q)title_prefix}; cd ${(q)remote_dir} || exit 1; exec ${(q)remote_home}/.nix-profile/bin/zsh -l"
 local encoded
 encoded=$(printf '%s' "$inner_cmd" | base64 | tr -d '\n') || return
 local remote_cmd="encoded=${(q)encoded}; cmd=\$(printf %s \"\$encoded\" | base64 -d); sudo -u ${(q)remote_user} HOME=${(q)remote_home} USER=${(q)remote_user} LOGNAME=${(q)remote_user} PATH=${(q)remote_path} TERM=${(q)remote_term} COLORTERM=${(q)remote_colorterm} ${(q)remote_home}/.nix-profile/bin/zsh -lc \"\$cmd\""

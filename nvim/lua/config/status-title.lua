@@ -12,20 +12,37 @@ local function literal_title(title)
   return title:gsub("%%", "%%%%")
 end
 
+local function remote_title_prefix()
+  if vim.env.RDEV_REMOTE_TITLE ~= "1" and not vim.env.SSH_CONNECTION and not vim.env.SSH_TTY then
+    return ""
+  end
+
+  return vim.env.RDEV_TITLE_PREFIX or "🌐 "
+end
+
+local function prefixed_title(title)
+  local prefix = remote_title_prefix()
+  if prefix ~= "" and title:sub(1, #prefix) ~= prefix then
+    return prefix .. title
+  end
+
+  return title
+end
+
 function M.update_title()
   if explicit_title then
-    vim.o.titlestring = literal_title(explicit_title)
+    vim.o.titlestring = literal_title(prefixed_title(explicit_title))
     return
   end
 
   local cwd = vim.fn.getcwd()
   local project = vim.fn.fnamemodify(cwd, ":t")
   local icon = status and status_icons[status]
+  local title = project
   if icon then
-    vim.o.titlestring = icon .. " " .. project
-  else
-    vim.o.titlestring = project
+    title = icon .. " " .. project
   end
+  vim.o.titlestring = literal_title(prefixed_title(title))
 end
 
 function M.set_title(title)

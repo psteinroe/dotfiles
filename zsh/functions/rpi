@@ -67,11 +67,12 @@ source "$local_dotfiles/zsh/functions/_rdev_title_helpers" 2>/dev/null || true
 if (( $+functions[_rdev_set_title] )); then
   _rdev_set_title "π ${repo}/${worktree_name}"
 fi
+local title_prefix="${RDEV_TITLE_PREFIX-🌐 }"
 
 print -P "%F{cyan}Pi local UI → remote tools:%f $host:$remote_cwd"
 (
   cd "$local_cwd" || exit 1
-  command pi \
+  RDEV_REMOTE_TITLE=1 RDEV_TITLE_PREFIX="$title_prefix" command pi \
     -c \
     --remote-ssh "$host" \
     --remote-cwd "$remote_cwd" \
