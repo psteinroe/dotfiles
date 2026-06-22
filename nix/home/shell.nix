@@ -1,5 +1,19 @@
 { pkgs, dotfilesPath, ... }:
 
+let
+  starshipZshInit = pkgs.runCommand "starship-init.zsh" { } ''
+    ${pkgs.starship}/bin/starship init zsh > $out
+  '';
+  atuinZshInit = pkgs.runCommand "atuin-init.zsh" { } ''
+    HOME=$TMPDIR ${pkgs.atuin}/bin/atuin init zsh > $out
+  '';
+  zoxideZshInit = pkgs.runCommand "zoxide-init.zsh" { } ''
+    ${pkgs.zoxide}/bin/zoxide init zsh > $out
+  '';
+  fzfZshInit = pkgs.runCommand "fzf-init.zsh" { } ''
+    ${pkgs.fzf}/bin/fzf --zsh > $out
+  '';
+in
 {
   programs.zsh = {
     enable = true;
@@ -7,27 +21,28 @@
     autosuggestion.enable = true;
     syntaxHighlighting.enable = true;
 
-    plugins = [
-      {
-        name = "zsh-vi-mode";
-        src = pkgs.zsh-vi-mode;
-        file = "share/zsh-vi-mode/zsh-vi-mode.plugin.zsh";
-      }
-    ];
-
     initContent = ''
       # Source modular zsh config
       ZSH_DIR="${dotfilesPath}/zsh"
       source "$ZSH_DIR/completions.zsh"
 
-      # `compdump` hangs in this environment as soon as we have any custom
-      # completion files in fpath. Use `compinit -D` to keep completions fully
-      # working without writing/refreshing ~/.zcompdump.
+      # Cache completion metadata. `compinit -D` re-scans every completion file
+      # on every shell startup, which dominates new-tab latency.
+      ZSH_COMPDUMP="''${XDG_CACHE_HOME:-$HOME/.cache}/zsh/zcompdump-$ZSH_VERSION"
+      mkdir -p "''${ZSH_COMPDUMP:h}"
       autoload -U compinit
-      compinit -D
+      if [[ -r "$ZSH_COMPDUMP" ]]; then
+        compinit -C -d "$ZSH_COMPDUMP"
+      else
+        compinit -d "$ZSH_COMPDUMP"
+      fi
 
       source "$ZSH_DIR/env.zsh"
       source "$ZSH_DIR/path.zsh"
+      source ${zoxideZshInit}
+      if [[ $options[zle] = on ]]; then
+        source ${fzfZshInit} 2>/dev/null
+      fi
       source "$ZSH_DIR/options.zsh"
       source "$ZSH_DIR/keybindings.zsh"
       source "$ZSH_DIR/aliases.zsh"
@@ -79,27 +94,35 @@
       autoload -Uz rrebuild
       autoload -Uz ragentauth
       autoload -Uz rghauth
+
+      if [[ $TERM != "dumb" ]]; then
+        source ${starshipZshInit}
+      fi
+
+      if [[ $options[zle] = on ]]; then
+        source ${atuinZshInit}
+      fi
     '';
   };
 
   programs.starship = {
     enable = true;
-    enableZshIntegration = true;
+    enableZshIntegration = false;
   };
 
   programs.atuin = {
     enable = true;
-    enableZshIntegration = true;
+    enableZshIntegration = false;
   };
 
   programs.zoxide = {
     enable = true;
-    enableZshIntegration = true;
+    enableZshIntegration = false;
   };
 
   programs.fzf = {
     enable = true;
-    enableZshIntegration = true;
+    enableZshIntegration = false;
   };
 
   programs.direnv = {

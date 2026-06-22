@@ -1,11 +1,7 @@
 bindkey -v
 
-# zsh-vi-mode overrides keybindings, so rebind after it initializes
-zvm_after_init_commands+=(
-  'bindkey -M viins "^r" atuin-search-viins'
-  'bindkey -M vicmd "^r" atuin-search-vicmd'
-)
-
+# Atuin's Home Manager integration binds Ctrl-R for vi insert/normal mode
+# after this file is sourced.
 # Alt-R for FZF as fallback
 bindkey -M viins '^[r' fzf-history-widget
 bindkey -M viins '^f' fzf-file-widget

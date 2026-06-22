@@ -3,6 +3,13 @@ set -euo pipefail
 
 session_file=".claude-session-id"
 
+if [[ -z "${ANTHROPIC_API_KEY:-}" ]] && command -v security >/dev/null 2>&1; then
+  ANTHROPIC_API_KEY="$(security find-generic-password -w -a "${USER}" -D "environment variable" -s ANTHROPIC_API_KEY 2>/dev/null || true)"
+  if [[ -n "$ANTHROPIC_API_KEY" ]]; then
+    export ANTHROPIC_API_KEY
+  fi
+fi
+
 # Ensure session file is always gitignored
 if [[ -f ".gitignore" ]]; then
   grep -q '^\.claude-session-id$' .gitignore || echo ".claude-session-id" >> .gitignore

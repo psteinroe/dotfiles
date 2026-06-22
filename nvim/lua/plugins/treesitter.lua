@@ -15,21 +15,9 @@ return {
       "latex",
     }
 
-    require("nvim-treesitter").setup {
-      install_dir = install_dir,
-    }
-    require("nvim-treesitter").install(languages)
-
-    vim.api.nvim_create_autocmd("FileType", {
-      pattern = { "nix", "query", "markdown", "html", "yaml", "tex", "latex" },
-      callback = function(args)
-        pcall(vim.treesitter.start, args.buf)
-        vim.bo[args.buf].indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
-      end,
-    })
-
     -- Work around a Neovim 0.12 markdown injection crash triggered by
-    -- nvim-treesitter's #set-lang-from-info-string! directive.
+    -- legacy nvim-treesitter's #set-lang-from-info-string! directive. Set this
+    -- before plugin setup so the override is still active if setup degrades.
     vim.treesitter.query.set(
       "markdown",
       "injections",
@@ -64,5 +52,36 @@ return {
           (#set! injection.language "latex"))
       ]]
     )
+
+    local ok, treesitter = pcall(require, "nvim-treesitter")
+    local has_new_api = ok and type(treesitter.install) == "function"
+    if has_new_api then
+      treesitter.setup {
+        install_dir = install_dir,
+      }
+      treesitter.install(languages)
+    else
+      -- Local machines can have an older lazy checkout than the lockfile. Keep
+      -- startup usable long enough for :Lazy restore/sync to repair it.
+      vim.opt.runtimepath:prepend(install_dir)
+      local ok_configs, configs = pcall(require, "nvim-treesitter.configs")
+      if ok_configs then
+        configs.setup {
+          parser_install_dir = install_dir,
+          ensure_installed = languages,
+          sync_install = false,
+          auto_install = false,
+        }
+      end
+    end
+
+    local indentexpr = has_new_api and "v:lua.require'nvim-treesitter'.indentexpr()" or "nvim_treesitter#indent()"
+    vim.api.nvim_create_autocmd("FileType", {
+      pattern = { "nix", "query", "markdown", "html", "yaml", "tex", "latex" },
+      callback = function(args)
+        pcall(vim.treesitter.start, args.buf)
+        vim.bo[args.buf].indentexpr = indentexpr
+      end,
+    })
   end,
 }

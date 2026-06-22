@@ -14,16 +14,15 @@ export FZF_CTRL_T_OPTS="--preview 'bat --color=always --style=numbers {}' --bind
 export FZF_ALT_C_COMMAND="fd --type d $FD_OPTIONS --color=never --hidden"
 export FZF_ALT_C_OPTS="--preview 'tree -C {} | head -50'"
 
-case "$(uname -s)" in
-  Darwin)
+case "$OSTYPE" in
+  darwin*)
     # Postgres Language Server
     export PGT_LOG_PATH="$HOME/Library/Caches/dev.supabase-community.pgt/pgt-logs"
 
-    # API keys from macOS Keychain
-    export ANTHROPIC_API_KEY=$(keychain-environment-variable ANTHROPIC_API_KEY 2>/dev/null || echo "")
-    export OPENCODE_SERVER_PASSWORD=$(keychain-environment-variable OPENCODE_SERVER_PASSWORD 2>/dev/null || echo "")
+    # API keys are loaded lazily by the commands that need them. Avoid hitting
+    # macOS Keychain during every shell startup.
     ;;
-  Linux)
+  linux*)
     export PGT_LOG_PATH="${XDG_CACHE_HOME:-$HOME/.cache}/dev.supabase-community.pgt/pgt-logs"
     ;;
 esac

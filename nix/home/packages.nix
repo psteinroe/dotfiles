@@ -13,6 +13,14 @@ let
   piAgent = lib.attrByPath [ system "pi" ] null inputs.llm-agents.packages;
   tuicr = lib.attrByPath [ system "default" ] null inputs.tuicr.packages;
   optionalPackage = pkg: lib.optional (pkg != null) pkg;
+
+  # Node 24.15 currently emits noisy unmanaged-FD warnings (and has related
+  # aarch64-darwin crash reports) during large pnpm installs. Use Node 26, and
+  # make sure pnpm's shebang points at the same runtime instead of nixpkgs'
+  # default nodejs-slim 24.x runtime.
+  globalNode = pkgs.nodejs_26;
+  globalPnpm = pkgs.pnpm.override { nodejs-slim = pkgs.nodejs-slim_26; };
+
   piWebToolsNodeModules = pkgs.buildNpmPackage {
     pname = "pi-web-tools-extension-deps";
     version = "0.1.0";
@@ -45,7 +53,7 @@ in
         fd
 
         # Languages
-        nodejs_24
+        globalNode
         go
         lua
         elixir
@@ -76,7 +84,7 @@ in
         imagemagick
         awscli2
         tailscale
-        pnpm
+        globalPnpm
         bun
 
         # Formatters

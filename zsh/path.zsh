@@ -10,8 +10,8 @@ path=(
   $path
 )
 
-case "$(uname -s)" in
-  Darwin)
+case "$OSTYPE" in
+  darwin*)
     path=(
       $HOME/Library/pnpm              # PNPM
       $HOME/Developer/postgres-language-server.git/main/target/debug  # PGLS debug

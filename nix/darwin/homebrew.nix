@@ -7,6 +7,9 @@
 
   homebrew = {
     enable = true;
+    # zsh/path.zsh already puts Homebrew on PATH. Avoid running
+    # `brew shellenv` from /etc/zshrc for every new terminal tab.
+    enableZshIntegration = false;
 
     onActivation = {
       cleanup = "zap";

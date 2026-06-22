@@ -20,6 +20,10 @@
   programs.zsh = {
     enable = true;
     enableCompletion = false;
+    enableBashCompletion = false;
+    # Home Manager installs starship, so don't spend startup time initialising
+    # nix-darwin's default prompt first just to replace it later.
+    promptInit = "";
   };
 
   # Set primary user for user-specific options

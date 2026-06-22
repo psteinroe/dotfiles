@@ -137,6 +137,9 @@
               enable = true;
               user = username;
               autoMigrate = true;
+              # zsh/path.zsh already includes Homebrew paths; don't inject a
+              # per-shell `brew shellenv` call into /etc/zshrc.
+              enableZshIntegration = false;
             };
           }
 
