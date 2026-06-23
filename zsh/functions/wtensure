@@ -52,6 +52,7 @@ wtcheckout() { source "$dotfiles/zsh/functions/wtcheckout" "$@"; }
 wtensure_pull_origin_if_clean() {
   local branch="$1"
   local git_status
+  local counts ahead behind
 
   git_status=$(git status --porcelain) || return
   if [[ -n "$git_status" ]]; then
@@ -59,7 +60,28 @@ wtensure_pull_origin_if_clean() {
     return 0
   fi
 
-  git merge --ff-only "origin/$branch"
+  counts=$(git rev-list --left-right --count "HEAD...origin/$branch") || return
+  ahead="${counts%%[[:space:]]*}"
+  behind="${counts##*[[:space:]]}"
+
+  if (( ahead == 0 && behind == 0 )); then
+    return 0
+  elif (( ahead == 0 )); then
+    git merge --ff-only "origin/$branch"
+  elif (( behind == 0 )); then
+    echo "Local $branch is $ahead commit(s) ahead of origin/$branch; leaving it as-is." >&2
+    return 0
+  elif [[ "${WTENSURE_AUTO_REBASE:-1}" == 0 ]]; then
+    echo "Local $branch and origin/$branch have diverged ($ahead local, $behind remote commit(s)); set WTENSURE_AUTO_REBASE=1 or run: git rebase origin/$branch" >&2
+    return 1
+  else
+    echo "Local $branch and origin/$branch have diverged ($ahead local, $behind remote commit(s)); rebasing clean local commits onto origin/$branch..." >&2
+    git rebase "origin/$branch" || {
+      local status=$?
+      echo "Automatic rebase failed in $PWD. Resolve conflicts with git rebase --continue, or abort with git rebase --abort." >&2
+      return $status
+    }
+  fi
 }
 
 # Always fetch first so a just-pushed local branch is visible before deciding
@@ -71,7 +93,7 @@ if [[ ! -d "$worktree_path" ]]; then
     wtcheckout "$input" || return
   elif git show-ref --verify --quiet "refs/remotes/origin/$input"; then
     if git show-ref --verify --quiet "refs/heads/$input"; then
-      git branch --set-upstream-to="origin/$input" "$input" 2>/dev/null || true
+      git branch --set-upstream-to="origin/$input" "$input" >/dev/null 2>&1 || true
       git worktree add "$worktree_path" "$input" || return
     else
       git worktree add --track -b "$input" "$worktree_path" "origin/$input" || return
@@ -95,7 +117,7 @@ else
 fi
 
 if [[ ! "$input" =~ ^[0-9]+$ ]] && git show-ref --verify --quiet "refs/remotes/origin/$input" && [[ "$(git branch --show-current 2>/dev/null)" == "$input" ]]; then
-  git branch --set-upstream-to="origin/$input" "$input" 2>/dev/null || true
+  git branch --set-upstream-to="origin/$input" "$input" >/dev/null 2>&1 || true
   wtensure_pull_origin_if_clean "$input" || return
 fi
 

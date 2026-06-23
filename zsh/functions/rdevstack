@@ -64,8 +64,8 @@ remote_lines=(
   '  exit 1'
   'fi'
   'if git show-ref --verify --quiet "refs/remotes/origin/$branch"; then'
-  '  git branch --set-upstream-to="origin/$branch" "$branch" 2>/dev/null || true'
-  '  git merge --ff-only "origin/$branch" || exit 1'
+  '  git branch --set-upstream-to="origin/$branch" "$branch" >/dev/null 2>&1 || true'
+  '  wtensure_pull_origin_if_clean "$branch" || exit 1'
   'fi'
 )
 local remote_cmd="${(F)remote_lines}"
