@@ -30,4 +30,4 @@ local encoded
 encoded=$(printf '%s' "$inner_cmd" | base64 | tr -d '\n') || return
 local remote_cmd="encoded=${(q)encoded}; cmd=\$(printf %s \"\$encoded\" | base64 -d); sudo -u ${(q)remote_user} HOME=${(q)remote_home} USER=${(q)remote_user} LOGNAME=${(q)remote_user} PATH=${(q)remote_path} TERM=${(q)remote_term} COLORTERM=${(q)remote_colorterm} ${(q)remote_home}/.nix-profile/bin/zsh -lc \"\$cmd\""
 
-ssh -t "$host" "$remote_cmd"
+ssh -tt "$host" "$remote_cmd"

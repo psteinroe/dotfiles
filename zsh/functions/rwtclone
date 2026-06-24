@@ -21,7 +21,7 @@ local remote_cmd="mkdir -p ${(q)dev_dir} && cd ${(q)dev_dir} || exit 1; git clon
 local encoded
 encoded=$(printf '%s' "$remote_cmd" | base64 | tr -d '\n') || return
 local runner="encoded=${(q)encoded}; cmd=\$(printf %s \"\$encoded\" | base64 -d); sudo -u ${(q)remote_user} HOME=${(q)remote_home} USER=${(q)remote_user} LOGNAME=${(q)remote_user} PATH=${(q)remote_path} ${(q)remote_home}/.nix-profile/bin/zsh -lc \"\$cmd\""
-ssh -t "$host" "$runner" || return
+ssh -tt "$host" "$runner" || return
 
 local default_branch_cmd="cd ${(q)repo_dir} || exit 1; source ${(q)dotfiles}/zsh/functions/gh-default-branch"
 encoded=$(printf '%s' "$default_branch_cmd" | base64 | tr -d '\n') || return
