@@ -14,12 +14,9 @@ let
   tuicr = lib.attrByPath [ system "default" ] null inputs.tuicr.packages;
   optionalPackage = pkg: lib.optional (pkg != null) pkg;
 
-  # Node 24.15 currently emits noisy unmanaged-FD warnings (and has related
-  # aarch64-darwin crash reports) during large pnpm installs. Use Node 26, and
-  # make sure pnpm's shebang points at the same runtime instead of nixpkgs'
-  # default nodejs-slim 24.x runtime.
-  globalNode = pkgs.nodejs_26;
-  globalPnpm = pkgs.pnpm.override { nodejs-slim = pkgs.nodejs-slim_26; };
+  # Keep pnpm's shebang pointed at the same runtime as the global Node install.
+  globalNode = pkgs.nodejs_24;
+  globalPnpm = pkgs.pnpm.override { nodejs-slim = pkgs.nodejs-slim_24; };
 
   piWebToolsNodeModules = pkgs.buildNpmPackage {
     pname = "pi-web-tools-extension-deps";
