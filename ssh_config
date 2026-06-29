@@ -13,7 +13,6 @@ Host rdev
   ControlMaster auto
   ControlPath ~/.ssh/cm-%r@%h:%p
   ControlPersist 10m
-  ServerAliveInterval 30
 
 Host github.com
   AddKeysToAgent yes

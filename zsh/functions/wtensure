@@ -19,8 +19,10 @@ export PATH="$HOME/.local/bin:$HOME/.nix-profile/bin:/nix/var/nix/profiles/defau
 
 local input="$1"
 local worktree_name="$input"
+local input_is_pr=0
 
 if [[ "$input" =~ ^[0-9]+$ ]]; then
+  input_is_pr=1
   worktree_name="pr-$input"
 else
   worktree_name="${input//\//-}"
@@ -36,13 +38,37 @@ fi
 local repo_base="$(basename "$repo_root")"
 local repo_parent="$(dirname "$repo_root")"
 local repo_name="$repo_base"
+local worktree_root
 local worktree_path
+local existing_worktree_path=""
 
 if [[ "$repo_base" == *.git ]]; then
   repo_name="${repo_base%.git}"
-  worktree_path="$repo_parent/$repo_base/$worktree_name"
+  worktree_root="$repo_parent/$repo_base"
 else
-  worktree_path="$repo_parent/$repo_base.git/$worktree_name"
+  worktree_root="$repo_parent/$repo_base.git"
+fi
+
+worktree_path="$worktree_root/$worktree_name"
+
+# Prefer an already-registered worktree at the exact path the caller supplied.
+# This preserves older/manual worktrees created with slashy branch names as
+# nested directories (for example repo.git/fix/journey-templates), while new
+# branch upserts continue to use the normalized repo.git/fix-journey-templates
+# path. Numeric inputs keep their existing PR-number meaning unless an absolute
+# worktree path is supplied.
+if [[ "$input" == /* ]]; then
+  existing_worktree_path="$input"
+elif (( input_is_pr == 0 )); then
+  existing_worktree_path="$worktree_root/$input"
+fi
+
+if [[ -n "$existing_worktree_path" ]] && git worktree list --porcelain 2>/dev/null | awk -v path="$existing_worktree_path" '/^worktree / { if (substr($0, 10) == path) found = 1 } END { exit found ? 0 : 1 }'; then
+  worktree_path="$existing_worktree_path"
+  worktree_name="${existing_worktree_path#$worktree_root/}"
+  if [[ "$worktree_name" == "$existing_worktree_path" ]]; then
+    worktree_name="$(basename "$existing_worktree_path")"
+  fi
 fi
 
 local dotfiles="${RDEV_DOTFILES:-$HOME/Developer/dotfiles}"
