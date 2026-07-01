@@ -163,6 +163,86 @@ Cons:
 
 Recommendation: start with plain SSH over Tailscale. Consider Tailscale SSH only after the transport issue is solved.
 
+## Follow-up: Mosh over Tailscale
+
+Mosh belongs in this Tailscale migration, not the initial Herdr rollout.
+
+### Why here
+
+Mosh needs inbound UDP from client to server. A direct UDP probe to `psteinroe-dev.exe.xyz:60000` timed out, and exe.dev's documented proxy surface is HTTP/TCP-oriented. Therefore Mosh should be validated only after the VM has a working Tailscale address/MagicDNS name.
+
+### What Mosh adds
+
+Use Mosh for roaming/mobile/flaky-network interactive sessions:
+
+- survives laptop sleep/wake and IP changes
+- roams across Wi-Fi/cellular/Tailscale path changes
+- handles lossy links better than SSH
+- can run a remote command such as `herdr --session <repo>`
+
+Constraints:
+
+- requires `mosh` locally and `mosh-server` remotely
+- requires UDP over the selected Tailscale path
+- is interactive only; it cannot replace non-interactive SSH commands, port forwarding, or Herdr's `--remote` SSH bridge
+- running Herdr through Mosh runs the Herdr client on the remote host, so it does not provide Herdr thin-client features like local image clipboard bridging
+
+### Install plan
+
+Add `mosh` to the shared Home Manager package list only after Tailscale is working:
+
+```nix
+# Remote connectivity over Tailscale
+mosh
+```
+
+This should install:
+
+- local `mosh` / `mosh-client` on macOS
+- remote `mosh` / `mosh-server` on Linux
+
+### Validation
+
+After Tailscale is authenticated on both ends:
+
+```bash
+command -v mosh
+ssh rdev 'command -v mosh-server || command -v /home/psteinroe/.nix-profile/bin/mosh-server'
+mosh rdev -- true
+```
+
+If using a temporary alias before flipping `rdev` to Tailscale:
+
+```bash
+mosh <temporary-tailscale-ssh-host> -- true
+```
+
+If Mosh reports `Nothing received from the server on UDP port ...`, SSH setup worked but UDP over the chosen path is not working.
+
+### Future helpers
+
+Only after validation, add optional helpers:
+
+```bash
+rmherdr <repo> [worktree-or-branch]
+rherdr --mosh <repo> [worktree-or-branch]
+rmosh [command...]
+```
+
+`rmherdr` should reuse the Herdr plan's remote preparation/sync logic, then attach by running Herdr on the remote host as `psteinroe`:
+
+```bash
+mosh rdev -- sudo -u psteinroe   HOME=/home/psteinroe USER=psteinroe LOGNAME=psteinroe   PATH=/home/psteinroe/.local/bin:/home/psteinroe/.nix-profile/bin:/nix/var/nix/profiles/default/bin:/usr/local/bin:/usr/bin:/bin   /home/psteinroe/.nix-profile/bin/herdr --session <repo>
+```
+
+If `mosh-server` is not on the SSH login user's path, pass it explicitly:
+
+```bash
+mosh --server=/home/psteinroe/.nix-profile/bin/mosh-server rdev -- <remote-command>
+```
+
+Keep these helpers as follow-ups. Do not make Mosh the default `rdev` path; plain SSH over Tailscale remains the baseline transport for wrappers and non-interactive commands.
+
 ## Dotfiles changes to make later
 
 Do **not** do these until ready to migrate.
@@ -186,6 +266,11 @@ Do **not** do these until ready to migrate.
 4. Optional helper functions
    - `rdev-exe` helper only if needed for explicit fallback.
    - Avoid `rdev-ts`; Tailscale should be the default `rdev`.
+
+5. Mosh follow-up after Tailscale validation
+   - Add `mosh` to shared packages.
+   - Add `rmherdr` / `rherdr --mosh` / `rmosh` only after UDP over Tailscale is confirmed.
+   - Document Mosh as roaming/mobile interactive attach, not as the default remote transport.
 
 ## Migration sequence
 
@@ -211,11 +296,17 @@ Do **not** do these until ready to migrate.
    ssh -T <temporary-tailscale-ssh-host> 'for i in $(seq 1 60); do date; sleep 1; done'
    ```
 
-5. If stable, flip defaults:
+5. Validate Mosh over the same Tailscale path as a follow-up:
+
+   ```bash
+   mosh <temporary-tailscale-ssh-host> -- true
+   ```
+
+6. If stable, flip defaults:
    - `rdev` -> Tailscale
    - `rdev-exe` -> exe.dev gateway fallback
 
-6. Update README and bootstrap docs.
+7. Update README and bootstrap docs.
 
 ## Rollback plan
 
@@ -236,6 +327,8 @@ Keep exe.dev SSH config around permanently as a recovery path.
 - Should direct SSH as `psteinroe` replace the current `exedev -> sudo -u psteinroe` pattern?
 - Do we want unattended bootstrap via `TAILSCALE_AUTHKEY`, and where should that secret live?
 - Should `rpi` also default to Tailscale once `rdev` does?
+- Should Mosh helpers be added once Tailscale UDP works, or kept as manual commands?
+- Should Mosh use the default UDP range `60000-61000`, or should wrappers pass a narrower range?
 
 ## Acceptance criteria
 
@@ -244,3 +337,4 @@ Keep exe.dev SSH config around permanently as a recovery path.
 - Sustained-output SSH repro survives for at least 60 seconds over normal network.
 - `rdev-exe` remains available for recovery.
 - README documents Tailscale as the primary transport and exe.dev SSH as fallback.
+- Follow-up Mosh validation over Tailscale is documented and either passes or records why UDP is unavailable.

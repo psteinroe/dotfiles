@@ -35,7 +35,7 @@ Core mapping:
 Connectivity modes:
 
 - **Normal laptop mode:** `herdr --remote rdev --session <repo>` for Herdr's local thin client, local keybindings, and local clipboard/image-paste bridging.
-- **Roaming/mobile/bad-network mode:** `mosh rdev -- herdr --session <repo>` for resilient terminal attach when switching networks or sleeping/waking a laptop.
+- **Roaming/mobile/bad-network mode:** deferred to `TAILSCALE_PLAN.md` once Tailscale UDP connectivity is working.
 - **Fallback mode:** existing `rdev` tmux helpers stay available while the Herdr workflow matures.
 
 ## Current repo facts this plan builds on
@@ -54,37 +54,7 @@ Connectivity modes:
   - pull clean existing branches
   - print the resolved worktree path with `WTENSURE_PRINT_PATH=1`
 - `wtclean` and `wtforceclean` already know how to remove worktrees safely and kill matching tmux sessions.
-- Mosh can improve the remote terminal experience for unstable networks, but it is not a drop-in transport for Herdr's `--remote` thin-client protocol. It should be used as an alternate attach path that runs the Herdr TUI on the remote host.
-
-## Mosh capabilities and constraints relevant to this setup
-
-Mosh (`mobile-shell/mosh`) is a remote terminal application that logs in via SSH, starts `mosh-server` remotely, then carries the terminal session over encrypted UDP.
-
-Useful properties:
-
-- survives intermittent connectivity, laptop sleep/wake, and IP changes
-- roams across Wi-Fi/cellular/Tailscale path changes
-- provides predictive local echo for lower perceived latency
-- handles packet loss better than SSH for interactive terminals
-- has no daemon and no privileged code; server processes are per connection
-- works with normal SSH authentication and SSH config aliases
-- can run a remote command, e.g. `mosh host -- herdr --session repo`
-
-Important constraints:
-
-- Mosh requires `mosh-client` locally and `mosh-server` remotely.
-- Mosh requires UDP reachability from client to server. By default it uses UDP ports in the `60000-61000` range, or a fixed port/range with `-p`.
-- Mosh is only for interactive terminal sessions. It does not support SSH port forwarding or non-interactive SSH-style command execution.
-- Mosh is not a byte-stream transport, so it cannot directly replace the SSH bridge used by `herdr --remote`.
-- Running Herdr over Mosh means the Herdr client is remote, not local. This gives roaming robustness but loses Herdr thin-client niceties such as local clipboard image-paste bridging and local-client audio behavior.
-- Mosh synchronizes visible terminal state, not outer terminal scrollback. Herdr's own pane scrollback still exists inside the Herdr session, but the host terminal's scrollback should not be treated as complete.
-- Mosh requires UTF-8 locales on both sides.
-
-Recommended use:
-
-- Keep `rherdr` as the default for normal local-laptop work.
-- Add `rmherdr` / `rherdr --mosh` for roaming, phone, train, spotty Wi-Fi, or long-lived interactive monitoring.
-- Prefer using Mosh over Tailscale if the public/exe.dev path does not expose UDP.
+- Mosh over the public exe.dev hostname appears out of scope for this Herdr rollout because it needs UDP and belongs with the Tailscale transport migration. See `TAILSCALE_PLAN.md` for the Mosh follow-up.
 
 ## Herdr capabilities relevant to this setup
 
@@ -144,6 +114,23 @@ Recommended phased plugin split:
    - optional event hook for Herdr-native `worktree.created` events if using Herdr's own `worktree create`
    - optional pane entrypoint for a worktree manager UI
 
+### Plugin-system evidence from `cloudmanic/herdr-plus`
+
+`cloudmanic/herdr-plus` demonstrates the plugin system is already powerful enough for most of what we want:
+
+- It installs as a normal Herdr plugin with `herdr plugin install cloudmanic/herdr-plus`.
+- Its manifest declares actions and panes for fuzzy project/quick-action launchers.
+- Its manifest declares `[[events]]` for `worktree.created` and `worktree.opened`.
+- Its worktree handler reads `HERDR_PLUGIN_EVENT_JSON` plus `HERDR_WORKSPACE_ID`, `HERDR_TAB_ID`, and `HERDR_PANE_ID`.
+- It applies layouts by calling Herdr socket/CLI APIs such as pane split/send-input, tab create, workspace create/close, pane list/get/read.
+- Its config is stored in Herdr's managed plugin config dir via `HERDR_PLUGIN_CONFIG_DIR`.
+
+Implication for us:
+
+- Build a dotfiles-owned plugin that wraps our existing worktree conventions and exposes Herdr-native actions.
+- Use shell wrappers only for pre-attach concerns such as `rherdr <repo> [branch]` and SSH connection selection.
+- Let the plugin own in-session operations: sync, open existing worktree, create worktree, cleanup UI, and layout bootstrap.
+
 ## Files to add
 
 ### `herdr/config.toml`
@@ -155,10 +142,27 @@ Initial suggested content:
 ```toml
 onboarding = false
 
+[theme]
+# Match the rest of the dotfiles: Ghostty uses "Gruvbox Dark Hard",
+# Neovim uses gruvbox-material hard, tuicr/Pi use Gruvbox variants.
+# Herdr exposes built-in "gruvbox" / "gruvbox-light".
+name = "gruvbox"
+auto_switch = false
+# If we ever want host light/dark switching:
+# auto_switch = true
+# dark_name = "gruvbox"
+# light_name = "gruvbox-light"
+
 [ui]
 show_agent_labels_on_pane_borders = true
 agent_panel_scope = "all"
 confirm_close = true
+
+[remote]
+# Herdr --remote writes a private temporary SSH config that includes
+# ~/.ssh/config and /etc/ssh/ssh_config, then adds fallback keepalives.
+# Our rdev SSH alias remains the source of truth and user settings win.
+manage_ssh_config = true
 
 [ui.toast]
 delivery = "terminal"
@@ -173,12 +177,60 @@ enabled = false
 # Herdr-native worktree commands are used manually.
 directory = "~/Developer/.herdr-worktrees"
 
-# Keep prefix pane movement as the guaranteed fallback.
+# Tmux-ish, smooth keymap.
 [keys]
+prefix = "ctrl+b"
+
+# Basics.
+help = "prefix+?"
+detach = ["prefix+d", "prefix+q"]
+reload_config = "prefix+shift+r"
+goto = "prefix+g"
+
+# Workspaces are project/worktree views. Keep both Herdr and tmux-ish muscle memory.
+workspace_picker = ["prefix+w", "prefix+s"]
+new_workspace = "prefix+shift+n"
+rename_workspace = "prefix+shift+w"
+close_workspace = "prefix+shift+d"
+previous_workspace = "prefix+("
+next_workspace = "prefix+)"
+
+# Tabs are closest to tmux windows.
+new_tab = "prefix+c"
+previous_tab = "prefix+p"
+next_tab = "prefix+n"
+switch_tab = "prefix+1..9"
+rename_tab = "prefix+comma"
+close_tab = "prefix+shift+x"
+
+# Pane creation/management.
+split_vertical = "prefix+backslash" # split right, like tmux split-window -h
+split_horizontal = "prefix+minus"   # split down
+close_pane = "prefix+x"
+zoom = "prefix+z"
+copy_mode = "prefix+["
+resize_mode = "prefix+r"
+cycle_pane_next = "prefix+tab"
+cycle_pane_previous = "prefix+shift+tab"
+
+# Prefix pane movement remains the guaranteed fallback.
 focus_pane_left = "prefix+h"
 focus_pane_down = "prefix+j"
 focus_pane_up = "prefix+k"
 focus_pane_right = "prefix+l"
+
+# Herdr navigate-mode movement.
+navigate_workspace_up = "up"
+navigate_workspace_down = "down"
+navigate_pane_left = "h"
+navigate_pane_down = "j"
+navigate_pane_up = "k"
+navigate_pane_right = "l"
+
+# Disable native Herdr worktree shortcuts; our plugin owns these flows.
+new_worktree = ""
+open_worktree = ""
+remove_worktree = ""
 
 # vim-herdr-navigation: seamless movement across Neovim splits and Herdr panes.
 [[keys.command]]
@@ -204,13 +256,91 @@ key = "ctrl+l"
 type = "plugin_action"
 command = "vim-herdr-navigation.right"
 description = "navigate right (vim/herdr)"
+
+# Dotfiles worktree plugin shortcuts.
+[[keys.command]]
+key = "prefix+shift+g"
+type = "plugin_action"
+command = "psteinroe.worktree-sync.create"
+description = "create worktree"
+
+[[keys.command]]
+key = "prefix+shift+o"
+type = "plugin_action"
+command = "psteinroe.worktree-sync.open"
+description = "open worktree"
+
+[[keys.command]]
+key = "prefix+shift+h"
+type = "plugin_action"
+command = "psteinroe.worktree-sync.hide"
+description = "hide current worktree"
+
+[[keys.command]]
+key = "prefix+shift+m"
+type = "plugin_action"
+command = "psteinroe.worktree-sync.manager"
+description = "worktree manager"
+
+[[keys.command]]
+key = "prefix+shift+s"
+type = "plugin_action"
+command = "psteinroe.worktree-sync.sync-visible"
+description = "sync visible worktrees"
+
+[[keys.command]]
+key = "prefix+alt+s"
+type = "plugin_action"
+command = "psteinroe.worktree-sync.sync-all"
+description = "open all worktrees"
+
+[[keys.command]]
+key = "prefix+alt+d"
+type = "plugin_action"
+command = "psteinroe.worktree-sync.clean"
+description = "clean worktrees"
 ```
 
 Notes:
 
-- These global `ctrl+h/j/k/l` Herdr bindings intentionally shadow shell readline defaults like `ctrl+l` clear-screen and `ctrl+k` kill-line in non-Vim panes.
+- `ctrl+h/j/k/l` is the smooth movement layer across Neovim splits and Herdr panes, via `vim-herdr-navigation`.
+- These global `ctrl+h/j/k/l` bindings intentionally shadow shell readline defaults like `ctrl+l` clear-screen and `ctrl+k` kill-line in non-Vim panes.
 - Keep `prefix+h/j/k/l` as fallback for apps that should receive raw `ctrl+h/j/k/l` or for troubleshooting.
+- Worktree shortcuts are plugin-owned: `prefix+shift+g` create, `prefix+shift+o` open, `prefix+shift+h` hide, `prefix+shift+m` manager, `prefix+alt+d` clean.
 - Set `HERDR_NAV_PASSTHROUGH_RE` if a non-Vim TUI should receive the chords itself, for example `^(lazygit|k9s)$`.
+- Theme choice is `gruvbox` because the repo consistently uses Gruvbox variants: Ghostty `Gruvbox Dark Hard`, Neovim `gruvbox-material` hard, tuicr `gruvbox-readable`, and Pi `gruvbox-high-contrast`.
+- `[remote].manage_ssh_config = true` only affects Herdr thin-client mode (`herdr --remote ...`). Mosh is deferred to `TAILSCALE_PLAN.md`.
+
+### Keybinding rationale
+
+This keymap is deliberately close to tmux while keeping Herdr defaults where they are already good:
+
+- Herdr/tmux default prefix stays `ctrl+b`.
+- `prefix+c`, `prefix+n`, `prefix+p`, `prefix+1..9`, `prefix+x`, `prefix+z`, and `prefix+[` retain familiar tmux/Herdr meanings.
+- `prefix+backslash` follows tmux's horizontal split muscle memory for "split right".
+- `prefix+minus` stays Herdr's default split-down binding because it is easy and documented.
+- `prefix+w` remains Herdr workspace navigation; `prefix+s` is added as a tmux-session-like workspace picker.
+- Direct `ctrl+h/j/k/l` is handled by `vim-herdr-navigation`, mirroring the `vim-tmux-navigator` experience and examples from Herdr users.
+- `prefix+h/j/k/l` remains fallback pane focus if direct navigation conflicts with a TUI.
+- Native Herdr worktree shortcuts are disabled so `psteinroe.worktree-sync` owns create/open/hide/clean semantics for the existing `~/Developer/<repo>.git/<worktree>` layout.
+
+Daily muscle memory target:
+
+```text
+ctrl+h/j/k/l       move through Neovim splits and Herdr panes
+prefix+h/j/k/l     fallback pane movement
+prefix+\          split right
+prefix+-           split down
+prefix+c           new tab
+prefix+n/p         next/previous tab
+prefix+w or s      workspace picker
+prefix+shift+g     create worktree
+prefix+shift+o     open worktree
+prefix+shift+h     hide current worktree
+prefix+shift+m     worktree manager
+prefix+alt+d       clean worktrees
+prefix+d or q      detach
+```
 
 ### `nvim/lua/plugins/vim-herdr-navigation.lua`
 
@@ -280,86 +410,7 @@ Behavior:
 
 Important: `rherdr` should not create or kill tmux sessions.
 
-Mosh option:
-
-- accept `--mosh` to attach through Mosh after sync instead of Herdr remote thin client:
-
-  ```bash
-  rherdr --mosh <repo> [worktree-or-branch-or-pr]
-  ```
-
-- implementation can delegate to `rmherdr` after the same remote sync step.
-
-### `zsh/functions/rmherdr`
-
-Local macOS wrapper for roaming/mobile attach.
-
-Usage:
-
-```bash
-rmherdr <repo> [worktree-or-branch-or-pr]
-rherdr --mosh <repo> [worktree-or-branch-or-pr]
-```
-
-Behavior:
-
-1. Reuse the same remote sync logic as `rherdr`:
-   - verify repo exists
-   - optionally run `wtensure`
-   - run `hsyncworktrees --prune`
-2. Attach with Mosh by running Herdr on the remote host:
-
-   ```bash
-   mosh "$host" -- sudo -u "$remote_user"      HOME="$remote_home" USER="$remote_user" LOGNAME="$remote_user"      PATH="$remote_path"      "$remote_home/.nix-profile/bin/herdr" --session "$repo"
-   ```
-
-3. If the remote `mosh-server` is not on the SSH login user's default PATH, pass an explicit server path:
-
-   ```bash
-   mosh --server="$remote_home/.nix-profile/bin/mosh-server" "$host" -- <remote-command>
-   ```
-
-4. If public UDP is unavailable, use a Tailscale SSH host alias, e.g. `rdev-ts`, and attach with:
-
-   ```bash
-   RDEV_MOSH_HOST=rdev-ts rmherdr hellomateo
-   ```
-
-5. If a narrow UDP range is configured, pass a port or range:
-
-   ```bash
-   mosh -p 60000:60020 "$host" -- <remote-command>
-   ```
-
-Tradeoffs versus `rherdr`:
-
-- better roaming and sleep/wake behavior
-- better behavior on lossy or high-latency links
-- remote Herdr client/keybindings/config are used
-- no Herdr local thin-client clipboard image-paste bridge
-- requires UDP reachability and UTF-8 locale
-
-### `zsh/functions/rmosh`
-
-Optional generic helper for a resilient remote shell.
-
-Usage:
-
-```bash
-rmosh [command...]
-```
-
-Behavior:
-
-- defaults to an interactive remote zsh as `psteinroe`
-- uses the same host/user/home/path variables as `rdev`
-- useful for phone/tablet or unreliable networks when not specifically attaching to Herdr
-
-Example remote command:
-
-```bash
-mosh "$host" -- sudo -u "$remote_user" HOME="$remote_home"   USER="$remote_user" LOGNAME="$remote_user" PATH="$remote_path"   "$remote_home/.nix-profile/bin/zsh" -l
-```
+Mosh/roaming attach is intentionally deferred to `TAILSCALE_PLAN.md`; `rherdr` should stay focused on Herdr remote attach for this rollout.
 
 ### `zsh/functions/hsyncworktrees`
 
@@ -471,17 +522,101 @@ Guidelines:
 - Fall back to `herdr workspace list` and cwd matching if needed.
 - Never close workspaces whose cwd does not live under the current repo root unless the Herdr worktree metadata proves association.
 
-### Optional local plugin: `herdr/plugins/worktree-sync/`
+### Overriding Herdr worktree handling for this repo layout
+
+Herdr has a built-in `[worktrees].directory`, but it creates checkouts under:
+
+```text
+<directory>/<repo>/<branch-slug>
+```
+
+Our established layout is different:
+
+```text
+~/Developer/<repo>.git/<worktree>
+```
+
+Therefore the plan is **not** to make Herdr's built-in creation path the source of truth. Instead:
+
+- use Herdr workspaces/worktree records to represent existing worktrees
+- use our wrappers/plugins to create/delete/sync worktrees according to the dotfiles layout
+- keep Herdr-native worktree creation as a manual fallback only
+
+Concretely:
+
+1. `hsyncworktrees` opens existing dotfiles-layout worktrees in Herdr:
+
+   ```bash
+   HERDR_SESSION=<repo> herdr worktree open      --path ~/Developer/<repo>.git/<worktree>      --label <worktree>      --no-focus      --json
+   ```
+
+2. If `herdr worktree open` is too opinionated for an existing checkout, fallback to plain workspaces:
+
+   ```bash
+   HERDR_SESSION=<repo> herdr workspace create      --cwd ~/Developer/<repo>.git/<worktree>      --label <worktree>      --no-focus
+   ```
+
+3. `hwtcreate <branch>` creates via existing `wtensure`/`wtcreate` semantics, then calls `hsyncworktrees --focus-path ...`.
+
+4. Cleanup remains owned by `wtclean`/`wtforceclean`; those commands close matching Herdr workspaces before removing Git worktrees.
+
+5. Optional keybinding override: disable Herdr's built-in `new_worktree` binding and put our custom action on the same key:
+
+   ```toml
+   [keys]
+   new_worktree = ""
+
+   [[keys.command]]
+   key = "prefix+shift+g"
+   type = "plugin_action"
+   command = "psteinroe.worktree-sync.create"
+   description = "create dotfiles-layout worktree"
+
+   [[keys.command]]
+   key = "prefix+shift+o"
+   type = "plugin_action"
+   command = "psteinroe.worktree-sync.open"
+   description = "open dotfiles-layout worktree"
+
+   [[keys.command]]
+   key = "prefix+shift+m"
+   type = "plugin_action"
+   command = "psteinroe.worktree-sync.manager"
+   description = "worktree manager for this project"
+   ```
+
+6. The sidebar/context-menu built-in worktree action may still exist. Treat it as unsupported for repos managed by these dotfiles unless Herdr later exposes a path-template/hook setting.
+
+Why not just set `[worktrees].directory = "~/Developer"`?
+
+- Herdr would create `~/Developer/<repo>/<branch>`, not `~/Developer/<repo>.git/<branch>`.
+- It would not reuse the existing bare-repo root as the parent directory.
+- It would diverge from `wtensure`, `rwtclone`, `rwtclean`, `rdevstack`, and the tmux fallback flow.
+
+If Herdr later adds a configurable worktree path template or creation hook, replace `hwtcreate`/plugin creation with that native extension point.
+
+Herdr-plus-style event hooks give us one extra win: if a user does use a Herdr-native worktree dialog, our plugin can still catch `worktree.created` / `worktree.opened` and apply layout/bootstrap. It cannot change where Herdr created that checkout after the fact, but it can keep the experience consistent once a workspace exists.
+
+### First-class local plugin: `herdr/plugins/worktree-sync/`
+
+`cloudmanic/herdr-plus` proves the Herdr plugin system is powerful enough for this workflow. It uses actions, panes, and `worktree.created` / `worktree.opened` event hooks to apply layouts automatically when Herdr creates or opens worktrees. We should treat our project/worktree integration as a first-class plugin, not just a later nice-to-have.
 
 Structure:
 
 ```text
 herdr/plugins/worktree-sync/
 ├── herdr-plugin.toml
+├── lib/project-context.zsh
 ├── sync.sh
+├── open.sh
 ├── create.sh
-└── bootstrap.sh
+├── clean.sh
+├── bootstrap.sh
+├── on-worktree.sh
+└── manager.sh
 ```
+
+Important product decision: **one Herdr named session is one project/repo**. Plugin UIs must not ask the user to select a repo. They should infer the project from the current Herdr session/workspace context and only ask for worktree-specific inputs such as branch name, base branch, PR number, or layout.
 
 Manifest sketch:
 
@@ -490,7 +625,7 @@ id = "psteinroe.worktree-sync"
 name = "Worktree Sync"
 version = "0.1.0"
 min_herdr_version = "0.7.0"
-description = "Sync Herdr project workspaces with psteinroe dotfiles worktrees."
+description = "Make Herdr workspaces follow psteinroe dotfiles worktrees."
 platforms = ["linux", "macos"]
 
 [[actions]]
@@ -500,10 +635,22 @@ contexts = ["workspace"]
 command = ["zsh", "sync.sh"]
 
 [[actions]]
+id = "open"
+title = "Open existing dotfiles worktree"
+contexts = ["workspace"]
+command = ["zsh", "open.sh"]
+
+[[actions]]
 id = "create"
-title = "Create worktree and open workspace"
+title = "Create dotfiles-layout worktree"
 contexts = ["workspace"]
 command = ["zsh", "create.sh"]
+
+[[actions]]
+id = "clean"
+title = "Clean merged/closed worktrees"
+contexts = ["workspace"]
+command = ["zsh", "clean.sh"]
 
 [[actions]]
 id = "bootstrap"
@@ -511,29 +658,123 @@ title = "Bootstrap panes for this workspace"
 contexts = ["workspace"]
 command = ["zsh", "bootstrap.sh"]
 
-# Optional only if Herdr-native worktree creation is used.
+[[panes]]
+id = "manager"
+title = "Worktree Manager"
+placement = "overlay"
+command = ["zsh", "manager.sh"]
+
+# Catch Herdr-native worktree operations too.
 [[events]]
 on = "worktree.created"
-command = ["zsh", "sync.sh"]
+command = ["zsh", "on-worktree.sh"]
+
+[[events]]
+on = "worktree.opened"
+command = ["zsh", "on-worktree.sh"]
 ```
 
 Plugin action behavior:
 
-- `sync.sh` calls the managed zsh helper:
+- `lib/project-context.zsh` resolves the current project without repo selection:
+  1. Prefer the active workspace/worktree cwd from `HERDR_PLUGIN_CONTEXT_JSON`.
+  2. Walk up through `git worktree list --porcelain` to find the bare repo root.
+  3. Derive project name from `<repo>.git` basename.
+  4. Load optional repo config from `$HERDR_PLUGIN_CONFIG_DIR/repos/<project>.toml`.
+  5. If no active cwd is available, fail with a clear message: "Open this action from a project/worktree workspace." Do not show a repo picker.
+- `sync.sh` calls the managed zsh helper from the resolved repo/bare dir:
 
   ```bash
-  source "$HOME/Developer/dotfiles/zsh/functions/hsyncworktrees" --prune
+  cd "$PROJECT_BARE_DIR" && source "$HOME/Developer/dotfiles/zsh/functions/hsyncworktrees" --prune
   ```
 
-- `create.sh` should probably open an overlay/prompt later. In v1, keep creation as shell command `hwtcreate <branch>` rather than an action requiring interactive input.
-- `bootstrap.sh` can use Herdr CLI like the official `dev-layout-bootstrap` example:
+- `open.sh` should fuzzy-pick only among worktrees for the current project, then call `herdr worktree open --path ...` or focus an existing matching workspace.
+- `create.sh` should prompt for branch/base/PR for the current project only, run `wtensure`/`wtcreate`, then call `hsyncworktrees --focus-path ...`.
+- `clean.sh` should launch the existing safe cleanup flow (`wtclean` or `wtforceclean`) for the current project only, so confirmation remains explicit.
+- `manager.sh` is an overlay TUI for the current project only:
+  - show project name and bare dir at the top
+  - list current worktrees
+  - actions: open, create, sync, clean, bootstrap
+  - no repo selector
+- `on-worktree.sh` should react to Herdr's `worktree.created` / `worktree.opened` events and apply a repo layout if one exists.
+- `bootstrap.sh` can use Herdr CLI like the official `dev-layout-bootstrap` and `herdr-plus` examples:
   - rename current pane
   - split panes
+  - create tabs
   - start `pi`, `claude`, `just test`, server/log commands, etc.
+
+Plugin config directory:
+
+```text
+$HERDR_PLUGIN_CONFIG_DIR/
+├── repos/
+│   ├── hellomateo.toml
+│   └── postgres-language-server.toml
+├── layouts/
+│   ├── default.toml
+│   └── hellomateo.toml
+└── quick-actions/
+```
+
+Repo config sketch:
+
+```toml
+# File: $HERDR_PLUGIN_CONFIG_DIR/repos/hellomateo.toml
+# This config supplements inferred context; it is not selected interactively.
+name = "hellomateo"
+bare_dir = "~/Developer/hellomateo.git"
+default_branch = "main"
+
+[layout]
+name = "default"
+
+[[tabs]]
+name = "agent"
+command = "pi"
+
+[[tabs]]
+name = "shell"
+
+[[tabs]]
+name = "git"
+command = "lazygit"
+```
+
+Create UI flow:
+
+```text
+prefix+shift+g
+→ psteinroe.worktree-sync.create
+→ overlay/pane for current project, e.g. "hellomateo"
+→ prompt: branch or PR number
+→ optional prompt/fzf: base branch, defaulting to repo config default_branch
+→ run wtensure/wtcreate in ~/Developer/hellomateo.git
+→ hsyncworktrees --focus-path <new-worktree>
+→ focus new workspace
+→ optionally offer bootstrap layout
+```
+
+Open UI flow:
+
+```text
+prefix+shift+o
+→ psteinroe.worktree-sync.open
+→ fzf only worktrees from the current repo
+→ focus existing workspace or open missing workspace
+```
+
+Manager UI flow:
+
+```text
+prefix+shift+m
+→ psteinroe.worktree-sync.manager pane
+→ current project dashboard
+→ no repo picker
+```
 
 When to add the plugin:
 
-- after `rherdr`, `hsyncworktrees`, and cleanup hooks work reliably from plain shell commands.
+- move it earlier than originally planned: implement shell helpers first, then immediately wrap them with plugin actions once sync/create/cleanup semantics are clear.
 
 ## Files to modify
 
@@ -579,12 +820,6 @@ Then include:
 ++ optionalPackage herdr
 ```
 
-Also add Mosh from nixpkgs to the common package list so both local macOS and remote Linux have `mosh`, `mosh-client`, and `mosh-server` available:
-
-```nix
-# Remote connectivity
-mosh
-```
 
 Fallback if package attr differs after inspection:
 
@@ -609,49 +844,15 @@ Autoload new helpers:
 
 ```zsh
 autoload -Uz rherdr
-autoload -Uz rmherdr
-autoload -Uz rmosh
 autoload -Uz hsyncworktrees
 autoload -Uz hwtcreate
 ```
 
 `_wt_herdr_helpers` is sourced by other functions and does not need direct autoload unless used interactively.
 
-### `ssh_config` and optional Tailscale host alias
+### Tailscale/Mosh follow-up
 
-Mosh uses SSH only for setup, then UDP to the selected host. If `psteinroe-dev.exe.xyz` does not expose UDP, add a Tailscale-specific host alias and use it for Mosh attach.
-
-Example:
-
-```sshconfig
-Host rdev-ts
-  HostName psteinroe-dev
-  User exedev
-  IdentityFile ~/.ssh/id_ed25519
-  ControlMaster auto
-  ControlPath ~/.ssh/cm-%r@%h:%p
-  ControlPersist 10m
-```
-
-Exact `HostName` should be whichever Tailscale MagicDNS name or 100.x address is stable for the devbox.
-
-Keep `rdev` as the normal SSH/Herdr thin-client alias. Use `rdev-ts` through `RDEV_MOSH_HOST` only if Mosh over the public/exe.dev endpoint cannot receive UDP.
-
-### Remote firewall / UDP access for Mosh
-
-Mosh needs UDP from client to remote host. Options:
-
-1. **Preferred:** use Tailscale path for Mosh, avoiding public firewall/NAT surprises.
-2. **If public UDP is available:** allow a small UDP range such as `60000-60020` rather than the full default `60000-61000`.
-3. **If using a fixed port/range:** configure wrappers to pass `-p`, e.g. `MOSH_PORTS=60000:60020`.
-
-Validation command:
-
-```bash
-mosh -p 60000:60020 rdev-ts -- true
-```
-
-If Mosh reports `Nothing received from the server on UDP port ...`, SSH setup worked but UDP is blocked or routed incorrectly.
+Mosh and Tailscale host-alias work has moved to `TAILSCALE_PLAN.md`. The Herdr rollout should not add `rdev-ts`, `rmherdr`, `rmosh`, or Mosh package requirements until the Tailscale transport migration validates UDP connectivity.
 
 ### `nix/home/agents.nix` or a new `nix/home/herdr.nix`
 
@@ -803,8 +1004,6 @@ Update the Remote Dev Workflow section with:
 ```bash
 rherdr hellomateo                # attach via Herdr local thin client
 rherdr hellomateo feature-x      # ensure/focus worktree workspace, then attach
-rmherdr hellomateo               # attach via Mosh for roaming/flaky networks
-rherdr --mosh hellomateo         # equivalent Mosh mode if implemented as flag
 hwtcreate feature-y              # from inside Herdr: create worktree workspace
 hsyncworktrees --prune           # sync Herdr workspace list with Git worktrees
 ```
@@ -847,18 +1046,6 @@ Expected behavior:
 
 2. Sync opens/focuses workspace `feature-x`.
 3. Local thin client attaches to session `hellomateo`.
-
-### `rmherdr hellomateo feature-x`
-
-Expected behavior:
-
-1. Runs the same remote preparation as `rherdr hellomateo feature-x`.
-2. Starts a Mosh connection to the remote host.
-3. Runs `herdr --session hellomateo` on the remote host as user `psteinroe`.
-4. Uses the remote Herdr client and remote Herdr config.
-5. Survives laptop sleep/wake and network roaming better than SSH.
-
-Use this mode when mobility/connection resilience matters more than Herdr `--remote` thin-client features.
 
 ### `hwtcreate feature-y`
 
@@ -974,30 +1161,17 @@ herdr --remote rdev --session dotfiles
 
 Detach with Herdr prefix + `q`.
 
-### 3b. Mosh attach smoke test
-
-Verify both ends have Mosh:
+Verify config intent:
 
 ```bash
-command -v mosh
-ssh rdev 'command -v mosh-server || command -v /home/psteinroe/.nix-profile/bin/mosh-server'
+herdr status client
+herdr --default-config | rg -n "\[theme\]|\[remote\]|manage_ssh_config"
 ```
 
-Try the Tailscale alias first if available:
+Expected plan values once `herdr/config.toml` exists:
 
-```bash
-mosh rdev-ts -- true
-```
-
-Then try remote Herdr over Mosh:
-
-```bash
-rmherdr dotfiles
-# or
-rherdr --mosh dotfiles
-```
-
-If it fails after SSH setup with `Nothing received from the server on UDP port ...`, fix UDP routing/firewall or use the Tailscale host alias.
+- `[theme].name = "gruvbox"`
+- `[remote].manage_ssh_config = true`
 
 ### 4. Worktree sync dry run
 
@@ -1091,15 +1265,6 @@ If it does not work:
 - Rebuild local and remote.
 - Manually run `herdr --remote rdev --session dotfiles`.
 
-### Phase A2: Mosh install and connectivity validation
-
-- Add `mosh` to Home Manager packages.
-- Rebuild local and remote.
-- Verify `mosh` locally and `mosh-server` remotely.
-- Add optional `rdev-ts` SSH alias if public UDP is unavailable.
-- Validate `mosh rdev-ts -- true` or `mosh rdev -- true`.
-- Do not make Mosh the default attach path yet.
-
 ### Phase A3: Neovim/Herdr navigation
 
 - Add `vim-herdr-navigation` flake input.
@@ -1133,9 +1298,10 @@ If it does not work:
 - Add Herdr skill to `agents/skills/herdr/SKILL.md`.
 - Validate Pi/Claude/Codex/OpenCode status and session restore.
 
-### Phase F: Optional plugin
+### Phase F: First-class worktree plugin
 
-- Add local plugin directory.
+- Add local plugin directory for `psteinroe.worktree-sync`.
+- Expose sync/open/create/clean/bootstrap actions and worktree event handlers.
 - Link it declaratively or with an idempotent activation command:
 
   ```bash
@@ -1159,9 +1325,7 @@ If it does not work:
 3. Should Herdr integrations be installed by running `herdr integration install` during Home Manager activation, or should their generated hook files be copied into the dotfiles and managed directly?
 4. Should Herdr plugin linking happen automatically on rebuild, or should the plugin remain a later manual opt-in?
 5. Should the default remote workflow switch from `rdev` to `rherdr` in README immediately, or only after a trial period?
-6. Should Mosh use the public `rdev` hostname or a separate Tailscale-only alias such as `rdev-ts`?
-7. Should Mosh use the default UDP range `60000-61000`, or should wrappers enforce a narrower range such as `60000-60020`?
-8. Should `HERDR_NAV_PASSTHROUGH_RE` include `lazygit`, `k9s`, or other TUIs by default?
+6. Should `HERDR_NAV_PASSTHROUGH_RE` include `lazygit`, `k9s`, or other TUIs by default?
 
 ## Recommended answer to open questions for first implementation
 
@@ -1170,6 +1334,4 @@ If it does not work:
 3. Try `herdr integration install` in activation; if it fights symlinks, switch to managed generated files.
 4. Do not link a plugin in the first implementation; keep plugin as Phase F.
 5. Document `rherdr` as experimental/default-candidate, with `rdev` as stable fallback.
-6. Prefer a Tailscale-only alias for Mosh unless the public/exe.dev endpoint is known to pass UDP reliably.
-7. Use a narrow UDP range initially, e.g. `60000-60020`, and make it configurable with `MOSH_PORTS`.
-8. Start with `HERDR_NAV_PASSTHROUGH_RE='^(lazygit|k9s)$'` if those tools are commonly used inside Herdr panes; otherwise leave it unset until a conflict appears.
+6. Start with `HERDR_NAV_PASSTHROUGH_RE='^(lazygit|k9s)$'` if those tools are commonly used inside Herdr panes; otherwise leave it unset until a conflict appears.
