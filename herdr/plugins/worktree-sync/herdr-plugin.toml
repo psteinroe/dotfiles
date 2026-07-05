@@ -1,0 +1,62 @@
+id = "psteinroe.worktree-sync"
+name = "Psteinroe Worktree Sync"
+version = "0.1.0"
+min_herdr_version = "0.7.0"
+description = "Make Herdr workspaces follow psteinroe dotfiles Git worktrees."
+platforms = ["linux", "macos"]
+
+[[actions]]
+id = "sync"
+title = "Sync Git worktrees into Herdr"
+contexts = ["workspace"]
+command = ["zsh", "sync.sh"]
+
+[[actions]]
+id = "open"
+title = "Open existing worktree"
+contexts = ["workspace"]
+command = ["zsh", "open.sh"]
+
+[[actions]]
+id = "create"
+title = "Create worktree"
+contexts = ["workspace"]
+command = ["zsh", "create.sh"]
+
+[[actions]]
+id = "hide"
+title = "Hide current worktree workspace"
+contexts = ["workspace"]
+command = ["zsh", "hide.sh"]
+
+[[actions]]
+id = "manager"
+title = "Open worktree manager"
+contexts = ["workspace"]
+command = ["zsh", "manager-action.sh"]
+
+[[actions]]
+id = "bootstrap"
+title = "Bootstrap panes for this workspace"
+contexts = ["workspace"]
+command = ["zsh", "bootstrap.sh"]
+
+[[actions]]
+id = "clean"
+title = "Clean merged/closed worktrees"
+contexts = ["workspace"]
+command = ["zsh", "clean.sh"]
+
+[[panes]]
+id = "manager"
+title = "Worktree Manager"
+placement = "overlay"
+command = ["zsh", "manager.sh"]
+
+[[events]]
+on = "worktree.created"
+command = ["zsh", "on-worktree.sh"]
+
+[[events]]
+on = "worktree.opened"
+command = ["zsh", "on-worktree.sh"]

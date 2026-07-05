@@ -15,7 +15,7 @@ const DEFAULTS = {
 	fetchMaxResponseMB: 5,
 	fetchBlockPrivateHosts: true,
 	fetchMaxRedirects: 5,
-	fetchFallbackUserAgent: "opencode",
+	fetchFallbackUserAgent: "pi",
 	searchEnabled: true,
 	searchProvider: "exa",
 	searchEndpoint: "https://m.mulroy.dev/m/e",

@@ -52,10 +52,6 @@ in
       autoload -Uz keychain-environment-variable
       autoload -Uz set-keychain-environment-variable
       autoload -Uz video_to_gif
-      autoload -Uz ccode
-      autoload -Uz ccodex
-      autoload -Uz copen
-      autoload -Uz copenweb
       autoload -Uz rebuild
       autoload -Uz devhelp
       autoload -Uz coffee
@@ -68,31 +64,27 @@ in
       autoload -Uz wtforceclean
       autoload -Uz wtsetup
       autoload -Uz wtensure
+      autoload -Uz hdev
+      autoload -Uz hprepare
+      autoload -Uz hsyncworktrees
+      autoload -Uz hwtcreate
       autoload -Uz gh
       autoload -Uz gh-default-branch
-      autoload -Uz wttmux
-      autoload -Uz wttmuxlist
-      autoload -Uz wttmuxclean
       autoload -Uz cpi
       autoload -Uz gpr
       autoload -Uz gclean
       autoload -Uz greset
-      autoload -Uz rdev-host
       autoload -Uz rdev
-      autoload -Uz rdevroot
-      autoload -Uz rdevstack
-      autoload -Uz rpi
-      autoload -Uz rwtclone
-      autoload -Uz rwtcreate
-      autoload -Uz rwtcheckout
-      autoload -Uz rwtlist
+      autoload -Uz rherdr
+      autoload -Uz rhsyncworktrees
+      autoload -Uz rhwtcreate
       autoload -Uz rwtclean
       autoload -Uz rwtforceclean
-      autoload -Uz rwttmuxclean
       autoload -Uz rpushdev
       autoload -Uz rssh
       autoload -Uz rrebuild
       autoload -Uz ragentauth
+      autoload -Uz rmcpauth
       autoload -Uz rghauth
 
       if [[ $TERM != "dumb" ]]; then

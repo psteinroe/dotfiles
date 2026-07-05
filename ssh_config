@@ -3,13 +3,24 @@
 # This won't be added again if you remove it.
 Include ~/.orbstack/ssh/config
 
-Host exe.dev rdev *.exe.xyz
+Host exe.dev *.exe.xyz
   IdentitiesOnly yes
   IdentityFile ~/.ssh/id_ed25519
 
-Host rdev
+Host rdev-exe
   HostName psteinroe-dev.exe.xyz
   User exedev
+  IdentitiesOnly yes
+  IdentityFile ~/.ssh/id_ed25519
+  ControlMaster auto
+  ControlPath ~/.ssh/cm-%r@%h:%p
+  ControlPersist 10m
+
+Host rdev
+  HostName 100.73.58.101
+  User psteinroe
+  IdentitiesOnly yes
+  IdentityFile ~/.ssh/id_ed25519
   ControlMaster auto
   ControlPath ~/.ssh/cm-%r@%h:%p
   ControlPersist 10m

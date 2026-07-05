@@ -1,0 +1,25 @@
+# Print the Herdr binary this dotfiles setup should use.
+# Prefer the active Home Manager generation because nix-darwin's
+# /etc/profiles/per-user link can lag until the next sudo system activation.
+_herdr_binary() {
+  local candidate
+  for candidate in \
+    "${HERDR_BIN:-}" \
+    "$HOME/.local/state/nix/profiles/home-manager/home-path/bin/herdr" \
+    "$HOME/.nix-profile/bin/herdr" \
+    "/etc/profiles/per-user/$USER/bin/herdr" \
+    herdr
+  do
+    [[ -n "$candidate" ]] || continue
+    if [[ "$candidate" == */* ]]; then
+      [[ -x "$candidate" ]] || continue
+      print -r -- "$candidate"
+      return 0
+    fi
+    command -v "$candidate"
+    return $?
+  done
+
+  echo "herdr is not on PATH" >&2
+  return 1
+}

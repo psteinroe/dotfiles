@@ -61,11 +61,9 @@ vim.keymap.set("n", "YY", "va{Vy")
 vim.keymap.set("n", "gu", "<cmd>diffget //2<cr>")
 vim.keymap.set("n", "gh", "<cmd>diffget //3<cr>")
 
--- navigate between panes
-vim.keymap.set("n", "<c-k>", ":wincmd k<CR>")
-vim.keymap.set("n", "<c-j>", ":wincmd j<CR>")
-vim.keymap.set("n", "<c-h>", ":wincmd h<CR>")
-vim.keymap.set("n", "<c-l>", ":wincmd l<CR>")
+-- Pane navigation is owned by paulbkim-dev/vim-herdr-navigation.
+-- It preserves normal Neovim window movement outside Herdr/tmux and crosses
+-- Herdr pane edges when $HERDR_PANE_ID is present.
 
 local function open_latest_migration()
   local path = "supabase/migrations/"

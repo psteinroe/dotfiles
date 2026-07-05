@@ -65,8 +65,24 @@ return {
       tsgo_capabilities.workspace = tsgo_capabilities.workspace or {}
       tsgo_capabilities.workspace.didChangeWatchedFiles = tsgo_capabilities.workspace.didChangeWatchedFiles or {}
       tsgo_capabilities.workspace.didChangeWatchedFiles.dynamicRegistration = false
+      local function start_tsgo(dispatchers, config)
+        local cmd = "tsgo"
+        local local_cmd = (config or {}).root_dir and config.root_dir .. "/node_modules/.bin/tsgo"
+        if local_cmd and vim.fn.executable(local_cmd) == 1 then
+          cmd = local_cmd
+        end
+
+        return vim.lsp.rpc.start({ cmd, "--lsp", "--stdio" }, dispatchers, {
+          env = {
+            GOMEMLIMIT = "4GiB",
+            GOGC = "50",
+          },
+        })
+      end
+
       vim.lsp.config("tsgo", {
         capabilities = tsgo_capabilities,
+        cmd = start_tsgo,
       })
 
       -- Filter for React DTS (keep existing logic for gd)
@@ -107,6 +123,10 @@ return {
         callback = function(args)
           local opts = { buffer = args.buf, remap = false }
           local filetype = vim.bo[args.buf].filetype
+
+          if vim.lsp.inlay_hint then
+            vim.lsp.inlay_hint.enable(false, { bufnr = args.buf })
+          end
 
           local function keymap_opts(desc)
             return vim.tbl_extend("force", opts, { desc = desc })

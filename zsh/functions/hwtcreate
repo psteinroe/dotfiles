@@ -1,0 +1,30 @@
+# Create/ensure a Git worktree and focus/open it as a Herdr workspace.
+# Usage: hwtcreate <branch|pr-number>
+if [[ $# -ne 1 ]]; then
+  echo "Usage: hwtcreate <branch|pr-number>" >&2
+  return 1
+fi
+
+local dotfiles="${RDEV_DOTFILES:-$HOME/Developer/dotfiles}"
+source "$dotfiles/zsh/functions/_herdr_worktree_helpers" || return
+
+_h_require_herdr || return
+
+local requested="$1"
+local current_branch
+current_branch=$(git branch --show-current 2>/dev/null || true)
+
+if [[ -n "$current_branch" && "$requested" == "$current_branch" ]]; then
+  _h_repo_context || return
+  typeset -g WTENSURE_WORKTREE_PATH="$PWD"
+  typeset -g WTENSURE_WORKTREE_NAME="$(_h_worktree_label "$PWD")"
+else
+  WTENSURE_PRINT_PATH=0 source "$dotfiles/zsh/functions/wtensure" "$requested" || return
+  # wtensure cd's into the resolved worktree and exports WTENSURE_* globals.
+  _h_repo_context || return
+fi
+
+local label="${WTENSURE_WORKTREE_NAME:-$(_h_worktree_label "$PWD")}"
+local wt_path="${WTENSURE_WORKTREE_PATH:-$PWD}"
+
+_h_ensure_workspace "$wt_path" "$label" 1

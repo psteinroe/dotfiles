@@ -1,0 +1,19 @@
+# Open a local project as a Herdr named session.
+# Usage: hdev <repo> [worktree|branch|pr-number]
+if [[ $# -lt 1 || $# -gt 2 ]]; then
+  echo "Usage: hdev <repo> [worktree|branch|pr-number]" >&2
+  return 1
+fi
+
+local repo="${1%.git}"
+local dotfiles="${LOCAL_DOTFILES:-$HOME/Developer/dotfiles}"
+source "$dotfiles/zsh/functions/_herdr_binary" || return
+local herdr_bin
+herdr_bin="$(_herdr_binary)" || return
+
+_hdev_prepare() {
+  source "$dotfiles/zsh/functions/hprepare" "$@"
+}
+
+_hdev_prepare "$@" || return
+"$herdr_bin" --session "$repo"

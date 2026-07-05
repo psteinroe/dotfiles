@@ -1,0 +1,30 @@
+# Sync Herdr workspaces with existing Git worktrees for the current repo.
+# Usage: hsyncworktrees [--prune]
+#
+# Non-destructive: never deletes Git worktrees. With --prune, only closes Herdr
+# workspaces whose cwd is under this repo's worktree root and no longer exists
+# or is no longer registered with git worktree.
+if [[ $# -gt 1 || ( $# -eq 1 && "$1" != "--prune" ) ]]; then
+  echo "Usage: hsyncworktrees [--prune]" >&2
+  return 1
+fi
+
+local dotfiles="${RDEV_DOTFILES:-$HOME/Developer/dotfiles}"
+source "$dotfiles/zsh/functions/_herdr_worktree_helpers" || return
+
+_h_require_herdr || return
+_h_repo_context || return
+
+local prune=0
+[[ "${1:-}" == "--prune" ]] && prune=1
+
+local wt_path label
+while IFS= read -r wt_path; do
+  [[ -n "$wt_path" && -d "$wt_path" ]] || continue
+  label="$(_h_worktree_label "$wt_path")"
+  _h_ensure_workspace "$wt_path" "$label" 0 || return
+done < <(_h_git_worktree_paths)
+
+if (( prune )); then
+  _h_prune_missing_workspaces
+fi

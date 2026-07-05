@@ -1,0 +1,106 @@
+# From Mac: copy local Pi MCP OAuth credentials to the remote user.
+# Usage: rmcpauth [--host host] [all|server ...]
+#
+# Copies ~/.pi/agent/mcp-oauth, not mcp.json. With no server args, copies all
+# local MCP OAuth credentials. Server args are directory names under
+# ~/.pi/agent/mcp-oauth, e.g. linear, figma, tally, executor.
+if [[ $# -gt 0 && ( "$1" == "-h" || "$1" == "--help" ) ]]; then
+  echo "Usage: rmcpauth [--host host] [all|server ...]" >&2
+  return 0
+fi
+
+local host="${RDEV_HOST:-rdev}"
+if [[ "${1:-}" == "--host" ]]; then
+  if [[ $# -lt 2 ]]; then
+    echo "Usage: rmcpauth [--host host] [all|server ...]" >&2
+    return 1
+  fi
+  host="$2"
+  shift 2
+fi
+
+local local_oauth_dir="${PI_MCP_OAUTH_DIR:-$HOME/.pi/agent/mcp-oauth}"
+if [[ ! -d "$local_oauth_dir" ]]; then
+  echo "MCP OAuth directory not found: $local_oauth_dir" >&2
+  return 1
+fi
+
+local mode="selected"
+local -a servers
+if [[ $# -eq 0 || ( $# -eq 1 && "$1" == "all" ) ]]; then
+  mode="all"
+  servers=()
+else
+  servers=("$@")
+fi
+
+local server
+for server in "${servers[@]}"; do
+  if [[ -z "$server" || "$server" == */* || "$server" == .* ]]; then
+    echo "Invalid MCP OAuth server directory name: $server" >&2
+    return 1
+  fi
+  if [[ ! -d "$local_oauth_dir/$server" ]]; then
+    echo "Local MCP OAuth credentials not found for '$server': $local_oauth_dir/$server" >&2
+    return 1
+  fi
+done
+
+local remote_user="${RDEV_REMOTE_USER:-psteinroe}"
+local remote_home="${RDEV_HOME:-/home/${remote_user}}"
+local remote_path="${remote_home}/.local/bin:${remote_home}/.nix-profile/bin:/nix/var/nix/profiles/default/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+local server_list_b64
+server_list_b64=$(printf '%s\n' "${servers[@]}" | base64 | tr -d '\n') || return
+
+local remote_cmd='set -euo pipefail
+umask 077
+agent_dir="$HOME/.pi/agent"
+target="$agent_dir/mcp-oauth"
+tmp=$(mktemp -d)
+trap '\''rm -rf "$tmp"'\'' EXIT
+mkdir -p "$agent_dir" "$target"
+
+tar -xzf - -C "$tmp"
+if [ ! -d "$tmp/mcp-oauth" ]; then
+  echo "Archive did not contain mcp-oauth directory" >&2
+  exit 1
+fi
+
+if [ "${RMCPAUTH_MODE:-selected}" = "all" ]; then
+  rm -rf "$target"
+  mkdir -p "$target"
+  cp -R "$tmp/mcp-oauth/." "$target/"
+else
+  printf %s "$RMCPAUTH_SERVERS_B64" | base64 -d | while IFS= read -r server; do
+    [ -n "$server" ] || continue
+    case "$server" in */*|.*) echo "Invalid server name in payload: $server" >&2; exit 1;; esac
+    if [ ! -d "$tmp/mcp-oauth/$server" ]; then
+      echo "Archive missing server credentials: $server" >&2
+      exit 1
+    fi
+    rm -rf "$target/$server"
+    cp -R "$tmp/mcp-oauth/$server" "$target/$server"
+  done
+fi
+chmod -R go-rwx "$target"
+find "$target" -type d -exec chmod 700 {} +
+find "$target" -type f -exec chmod 600 {} +
+'
+
+local encoded
+encoded=$(printf '%s' "$remote_cmd" | base64 | tr -d '\n') || return
+local runner="encoded=${(q)encoded}; cmd=\$(printf %s \"\$encoded\" | base64 -d); sudo -u ${(q)remote_user} HOME=${(q)remote_home} USER=${(q)remote_user} LOGNAME=${(q)remote_user} PATH=${(q)remote_path} RMCPAUTH_MODE=${(q)mode} RMCPAUTH_SERVERS_B64=${(q)server_list_b64} bash -lc \"\$cmd\""
+
+if [[ "$mode" == all ]]; then
+  COPYFILE_DISABLE=1 tar --no-xattrs -czf - -C "${local_oauth_dir:h}" "${local_oauth_dir:t}" | ssh "$host" "$runner" || return
+  print -r -- "Copied all local Pi MCP OAuth credentials to $host:$remote_user:$remote_home/.pi/agent/mcp-oauth"
+else
+  local -a tar_paths
+  tar_paths=()
+  for server in "${servers[@]}"; do
+    tar_paths+=("${local_oauth_dir:t}/$server")
+  done
+  COPYFILE_DISABLE=1 tar --no-xattrs -czf - -C "${local_oauth_dir:h}" "${tar_paths[@]}" | ssh "$host" "$runner" || return
+  print -r -- "Copied Pi MCP OAuth credentials (${(@j:, :)servers}) to $host:$remote_user:$remote_home/.pi/agent/mcp-oauth"
+fi

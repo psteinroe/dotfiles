@@ -5,7 +5,7 @@
 #   1. detect current local branch
 #   2. commit dirty changes after confirmation
 #   3. push the branch to origin
-#   4. run `rdev <repo> <branch>` to checkout/attach remote tmux
+#   4. run `rdev <repo> <branch>` to open the remote Herdr workspace
 local repo="${1:-}"
 if [[ $# -gt 0 ]]; then
   shift

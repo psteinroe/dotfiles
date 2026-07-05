@@ -1,6 +1,0 @@
-# marketplaces
-anthropics/claude-code
-anthropics/claude-plugins-official
-
-# mcps
-scryfall:pnpx scryfall-mcp-server

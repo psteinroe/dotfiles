@@ -1,0 +1,83 @@
+# Prepare a Herdr project session and focus the workspace for a Git worktree.
+# Usage: hprepare <repo> [worktree|branch|pr-number]
+if [[ $# -lt 1 || $# -gt 2 ]]; then
+  echo "Usage: hprepare <repo> [worktree|branch|pr-number]" >&2
+  return 1
+fi
+
+export PATH="$HOME/.local/bin:$HOME/.nix-profile/bin:/nix/var/nix/profiles/default/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}"
+
+local repo="${1%.git}"
+local requested="${2:-}"
+local dotfiles="${RDEV_DOTFILES:-$HOME/Developer/dotfiles}"
+source "$dotfiles/zsh/functions/_herdr_binary" || return
+local herdr_bin
+herdr_bin="$(_herdr_binary)" || return
+export PATH="${herdr_bin:h}:$PATH"
+local repo_dir="$HOME/Developer/${repo}.git"
+local plain_repo_dir="$HOME/Developer/${repo}"
+local start_dir target_path label
+
+if [[ -d "$repo_dir" ]]; then
+  start_dir="$repo_dir"
+elif [[ -d "$plain_repo_dir" ]]; then
+  start_dir="$plain_repo_dir"
+else
+  echo "Repo not found: $repo_dir or $plain_repo_dir" >&2
+  return 1
+fi
+
+cd "$start_dir" || return
+
+_hprepare_first_worktree() {
+  git worktree list --porcelain 2>/dev/null | awk '
+    /^worktree / { path = substr($0, 10); bare = 0; next }
+    /^bare$/ { bare = 1; next }
+    /^$/ { if (path != "" && bare == 0) { print path; exit }; path = ""; bare = 0; next }
+    END { if (path != "" && bare == 0) print path }
+  ' | head -n 1
+}
+
+_hprepare_worktree_for_branch() {
+  local branch="$1"
+  git worktree list --porcelain 2>/dev/null | awk -v branch="refs/heads/$branch" '
+    /^worktree / { path = substr($0, 10); next }
+    /^branch / && substr($0, 8) == branch { print path; exit }
+  ' | head -n 1
+}
+
+if [[ -n "$requested" ]]; then
+  target_path=$(_hprepare_worktree_for_branch "$requested")
+  if [[ -n "$target_path" ]]; then
+    label="$(basename "$target_path")"
+  else
+    WTENSURE_PRINT_PATH=0 source "$dotfiles/zsh/functions/wtensure" "$requested" || return
+    target_path="${WTENSURE_WORKTREE_PATH:-$PWD}"
+    label="${WTENSURE_WORKTREE_NAME:-$(basename "$target_path")}"
+  fi
+elif [[ -d "$repo_dir/main" ]]; then
+  target_path="$repo_dir/main"
+  label="main"
+else
+  target_path="$(_hprepare_first_worktree)"
+  [[ -n "$target_path" ]] || target_path="$PWD"
+  label="$(basename "$target_path")"
+fi
+
+cd "$target_path" 2>/dev/null || cd "$start_dir" || return
+
+if ! HERDR_SESSION="$repo" "$herdr_bin" workspace list >/dev/null 2>&1; then
+  HERDR_SESSION="$repo" nohup "$herdr_bin" server >/tmp/herdr-${repo}.log 2>&1 &
+  local i
+  for i in {1..30}; do
+    HERDR_SESSION="$repo" "$herdr_bin" workspace list >/dev/null 2>&1 && break
+    sleep 0.1
+  done
+fi
+
+export HERDR_SESSION="$repo"
+export RDEV_DOTFILES="$dotfiles"
+source "$dotfiles/zsh/functions/hsyncworktrees" --prune >/dev/null 2>&1 || true
+source "$dotfiles/zsh/functions/_herdr_worktree_helpers" || return
+_h_repo_context || return
+_h_ensure_workspace "$target_path" "$label" 1 >/dev/null || return

@@ -43,7 +43,6 @@
       "orbstack"
       "spotify"
       "steam"
-      "codex-app"
       "google-chrome"
       "font-fira-code-nerd-font"
       {

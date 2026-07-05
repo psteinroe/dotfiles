@@ -80,8 +80,5 @@
     }
   ];
 
-  claude = [ ];
-  codex = [ ];
-  opencode = [ ];
   pi = [ ];
 }

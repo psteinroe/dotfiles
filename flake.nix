@@ -22,18 +22,6 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # Claude Code CLI (pre-built binary)
-    claude-code = {
-      url = "github:sadjow/claude-code-nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
-    # OpenAI Codex CLI (pre-built binary)
-    codex-cli = {
-      url = "github:sadjow/codex-cli-nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
     # Pi coding agent (from llm-agents.nix)
     llm-agents = {
       url = "github:numtide/llm-agents.nix";
@@ -44,6 +32,18 @@
     tuicr = {
       url = "github:agavra/tuicr";
       inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    # Herdr terminal workspace manager
+    herdr = {
+      url = "github:ogulcancelik/herdr";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    # Herdr/Neovim pane navigation plugin
+    vim-herdr-navigation = {
+      url = "github:paulbkim-dev/vim-herdr-navigation";
+      flake = false;
     };
 
     # Remote skill sources

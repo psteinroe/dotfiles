@@ -103,9 +103,9 @@ wtensure_pull_origin_if_clean() {
   else
     echo "Local $branch and origin/$branch have diverged ($ahead local, $behind remote commit(s)); rebasing clean local commits onto origin/$branch..." >&2
     git rebase "origin/$branch" || {
-      local status=$?
+      local rebase_status=$?
       echo "Automatic rebase failed in $PWD. Resolve conflicts with git rebase --continue, or abort with git rebase --abort." >&2
-      return $status
+      return $rebase_status
     }
   fi
 }

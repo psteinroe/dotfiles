@@ -20,9 +20,14 @@ current_worktree=$(git rev-parse --show-toplevel 2>/dev/null || true)
 
 local dotfiles="${RDEV_DOTFILES:-$HOME/Developer/dotfiles}"
 source "$dotfiles/zsh/functions/_wt_tmux_helpers" 2>/dev/null || true
+source "$dotfiles/zsh/functions/_herdr_worktree_helpers" 2>/dev/null || true
 local session_repo_root=""
 if (( $+functions[_wt_main_repo_root] )); then
   session_repo_root=$(_wt_main_repo_root)
+fi
+local herdr_repo_name=""
+if (( $+functions[_h_repo_context] )); then
+  _h_repo_context >/dev/null 2>&1 && herdr_repo_name="${H_REPO_NAME:-}"
 fi
 
 local default_branch
@@ -127,9 +132,15 @@ while IFS=$'\t' read -r branch worktree_path; do
   if (( $+functions[_wt_kill_tmux_for_worktree] )); then
     _wt_kill_tmux_for_worktree "$session_repo_root" "$worktree_path"
   fi
+  if (( $+functions[_h_close_workspace_for_path] )); then
+    _h_close_workspace_for_path "$worktree_path" "$herdr_repo_name" || true
+  fi
   git worktree remove --force "$worktree_path" &
 done < "$selected_file"
 wait
 git worktree prune
+if (( $+functions[_h_prune_missing_workspaces] )) && [[ -n "$herdr_repo_name" ]]; then
+  HERDR_SESSION="$herdr_repo_name" _h_prune_missing_workspaces || true
+fi
 rm -f "$selected_file"
 echo "\nDone."

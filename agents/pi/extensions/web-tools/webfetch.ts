@@ -18,9 +18,9 @@ import { truncateTextOutput } from "./truncation.ts";
 import type { WebFetchDetails, WebFetchFormat } from "./types.ts";
 
 const WEBFETCH_FORMATS = ["text", "markdown", "html"] as const;
-export const OPENCODE_WEBFETCH_DEFAULT_USER_AGENT =
+export const PI_WEBFETCH_DEFAULT_USER_AGENT =
 	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36";
-export const OPENCODE_WEBFETCH_FALLBACK_USER_AGENT = "opencode";
+export const PI_WEBFETCH_FALLBACK_USER_AGENT = "pi";
 
 export function createWebFetchTool() {
 	return {
@@ -236,7 +236,7 @@ function getAcceptHeader(format: WebFetchFormat): string {
 	}
 }
 
-export function createWebFetchHeaders(accept: string, userAgent = OPENCODE_WEBFETCH_DEFAULT_USER_AGENT): Record<string, string> {
+export function createWebFetchHeaders(accept: string, userAgent = PI_WEBFETCH_DEFAULT_USER_AGENT): Record<string, string> {
 	return {
 		"User-Agent": userAgent,
 		Accept: accept,
@@ -246,7 +246,7 @@ export function createWebFetchHeaders(accept: string, userAgent = OPENCODE_WEBFE
 
 export function getFallbackUserAgent(configuredUserAgent?: string): string {
 	const trimmed = configuredUserAgent?.trim();
-	return trimmed || OPENCODE_WEBFETCH_FALLBACK_USER_AGENT;
+	return trimmed || PI_WEBFETCH_FALLBACK_USER_AGENT;
 }
 
 export function shouldRetryWithFallbackUserAgent(response: Pick<Response, "status" | "headers">): boolean {

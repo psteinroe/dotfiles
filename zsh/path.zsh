@@ -2,6 +2,7 @@ path=(
   $HOME/Developer/dotfiles/bin
   $HOME/.local/bin
   $HOME/.npm-global/bin               # npm global prefix
+  $HOME/.local/state/nix/profiles/home-manager/home-path/bin  # active Home Manager generation
   /run/current-system/sw/bin          # NixOS/nix-darwin system packages
   /etc/profiles/per-user/$USER/bin    # home-manager packages
   $HOME/.nix-profile/bin              # nix profile fallback

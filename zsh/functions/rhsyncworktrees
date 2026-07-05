@@ -1,0 +1,39 @@
+# From Mac: sync remote Git worktrees into a running remote Herdr session.
+# Usage: rhsyncworktrees <repo> [--prune]
+#
+# If the remote Herdr session is not running and this shell is interactive,
+# opens `rherdr <repo>` first; detach from Herdr to continue the sync.
+# Non-destructive for Git: --prune only closes stale Herdr workspaces.
+if [[ $# -lt 1 || $# -gt 2 || ( $# -eq 2 && "$2" != "--prune" ) ]]; then
+  echo "Usage: rhsyncworktrees <repo> [--prune]" >&2
+  return 1
+fi
+
+local host="${RDEV_HOST:-rdev}"
+local remote_user="${RDEV_REMOTE_USER:-psteinroe}"
+local remote_home="${RDEV_HOME:-/home/${remote_user}}"
+local remote_path="${remote_home}/.local/bin:${remote_home}/.nix-profile/bin:/nix/var/nix/profiles/default/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+local dotfiles="${RDEV_DOTFILES:-${remote_home}/Developer/dotfiles}"
+local repo="${1%.git}"
+local prune_arg="${2:-}"
+local repo_dir="${remote_home}/Developer/${repo}.git"
+local plain_repo_dir="${remote_home}/Developer/${repo}"
+local socket_path="${remote_home}/.config/herdr/sessions/${repo}/herdr.sock"
+local check_runner="sudo -u ${(q)remote_user} HOME=${(q)remote_home} USER=${(q)remote_user} LOGNAME=${(q)remote_user} test -S ${(q)socket_path}"
+
+if ! ssh -T "$host" "$check_runner" >/dev/null 2>&1; then
+  if [[ -t 0 && -t 1 ]]; then
+    echo "Remote Herdr session '$repo' is not running; starting rherdr. Detach to continue..." >&2
+    rherdr "$repo" || return
+  else
+    echo "Remote Herdr session '$repo' is not running. Start it with: rherdr $repo" >&2
+    return 1
+  fi
+fi
+
+local inner_cmd="export PATH=${(q)remote_path}; if [[ ! -S ${(q)socket_path} ]]; then echo Remote Herdr session ${(q)repo} is not running. Start it with: rherdr ${(q)repo} >&2; exit 1; fi; if [[ -d ${(q)repo_dir} ]]; then cd ${(q)repo_dir}; elif [[ -d ${(q)plain_repo_dir} ]]; then cd ${(q)plain_repo_dir}; else echo Remote repo not found: ${(q)repo_dir} or ${(q)plain_repo_dir} >&2; exit 1; fi; export HERDR_SOCKET_PATH=${(q)socket_path}; export RDEV_DOTFILES=${(q)dotfiles}; source ${(q)dotfiles}/zsh/functions/hsyncworktrees ${(q)prune_arg}"
+local encoded
+encoded=$(printf '%s' "$inner_cmd" | base64 | tr -d '\n') || return
+local runner="encoded=${(q)encoded}; cmd=\$(printf %s \"\$encoded\" | base64 -d); sudo -u ${(q)remote_user} HOME=${(q)remote_home} USER=${(q)remote_user} LOGNAME=${(q)remote_user} PATH=${(q)remote_path} ${(q)remote_home}/.nix-profile/bin/zsh -lc \"\$cmd\""
+
+ssh -T "$host" "$runner"

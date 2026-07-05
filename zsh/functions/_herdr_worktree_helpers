@@ -1,0 +1,205 @@
+# Shared helpers for Herdr + existing git worktree layout.
+# Internal; source from hsyncworktrees/hwtcreate.
+
+# Be robust in sparse remote/sudo shells.
+export PATH="$HOME/.local/bin:$HOME/.nix-profile/bin:/nix/var/nix/profiles/default/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}"
+
+_h_require_herdr() {
+  if ! command -v herdr >/dev/null 2>&1; then
+    echo "herdr is not on PATH" >&2
+    return 1
+  fi
+  if ! herdr workspace list >/dev/null 2>&1; then
+    echo "No running Herdr session found for this shell. Run inside Herdr or attach with rherdr/herdr first." >&2
+    return 1
+  fi
+}
+
+_h_repo_context() {
+  local repo_root repo_base repo_parent
+  repo_root=$(git worktree list --porcelain 2>/dev/null | awk '/^worktree / { print substr($0, 10); exit }')
+  if [[ -z "$repo_root" ]]; then
+    echo "Not in a git worktree repository" >&2
+    return 1
+  fi
+
+  repo_base="$(basename "$repo_root")"
+  repo_parent="$(dirname "$repo_root")"
+
+  typeset -g H_REPO_ROOT="$repo_root"
+  if [[ "$repo_base" == *.git ]]; then
+    typeset -g H_REPO_NAME="${repo_base%.git}"
+    typeset -g H_WORKTREE_ROOT="$repo_root"
+  else
+    typeset -g H_REPO_NAME="$repo_base"
+    typeset -g H_WORKTREE_ROOT="$repo_parent/$repo_base.git"
+  fi
+}
+
+_h_git_worktree_paths() {
+  git worktree list --porcelain 2>/dev/null | awk '
+    /^worktree / { path = substr($0, 10); bare = 0; next }
+    /^bare$/ { bare = 1; next }
+    /^$/ {
+      if (path != "" && bare == 0) print path
+      path = ""; bare = 0
+      next
+    }
+    END { if (path != "" && bare == 0) print path }
+  '
+}
+
+_h_worktree_label() {
+  local wt_path="$1"
+  if [[ -n "${H_WORKTREE_ROOT:-}" && "$wt_path" == "$H_WORKTREE_ROOT/"* ]]; then
+    print -r -- "${wt_path#$H_WORKTREE_ROOT/}"
+  else
+    basename "$wt_path"
+  fi
+}
+
+_h_session_dir() {
+  if [[ -n "${HERDR_SOCKET_PATH:-}" ]]; then
+    dirname "$HERDR_SOCKET_PATH"
+  elif [[ -n "${HERDR_SESSION:-}" && "$HERDR_SESSION" != "default" ]]; then
+    print -r -- "${XDG_CONFIG_HOME:-$HOME/.config}/herdr/sessions/$HERDR_SESSION"
+  else
+    print -r -- "${XDG_CONFIG_HOME:-$HOME/.config}/herdr"
+  fi
+}
+
+_h_session_json() {
+  local session_dir
+  session_dir="$(_h_session_dir)" || return
+  print -r -- "$session_dir/session.json"
+}
+
+_h_workspace_rows() {
+  local session_json
+  session_json="$(_h_session_json)" || return
+  [[ -r "$session_json" ]] || return 0
+  jq -r '.workspaces[]? | [.id, (.identity_cwd // ""), (.custom_name // "")] | @tsv' "$session_json" 2>/dev/null || return 1
+}
+
+_h_workspace_id_for_path_or_label() {
+  local wt_path="$1"
+  local label="$2"
+  local row id cwd custom
+
+  while IFS=$'\t' read -r id cwd custom; do
+    [[ -n "$id" ]] || continue
+    if [[ "$cwd" == "$wt_path" || "$custom" == "$label" ]]; then
+      if herdr workspace get "$id" >/dev/null 2>&1; then
+        print -r -- "$id"
+        return 0
+      fi
+    fi
+  done < <(_h_workspace_rows 2>/dev/null)
+
+  herdr workspace list 2>/dev/null \
+    | jq -r --arg label "$label" '.result.workspaces[]? | select(.label == $label) | .workspace_id' 2>/dev/null \
+    | head -n 1
+}
+
+_h_ensure_workspace() {
+  local wt_path="$1"
+  local label="$2"
+  local focus="${3:-0}"
+  local id
+
+  id="$(_h_workspace_id_for_path_or_label "$wt_path" "$label")"
+  if [[ -n "$id" ]]; then
+    if [[ "$focus" == 1 ]]; then
+      herdr workspace focus "$id" >/dev/null || return
+      echo "Focused existing Herdr workspace: $label ($wt_path)"
+    else
+      echo "Herdr workspace already exists: $label ($wt_path)"
+    fi
+    return 0
+  fi
+
+  if [[ "$focus" == 1 ]]; then
+    herdr workspace create --cwd "$wt_path" --label "$label" --focus >/dev/null || return
+  else
+    herdr workspace create --cwd "$wt_path" --label "$label" --no-focus >/dev/null || return
+  fi
+  echo "Created Herdr workspace: $label ($wt_path)"
+}
+
+_h_close_workspace_for_path() {
+  local wt_path="$1"
+  local repo_name="${2:-${H_REPO_NAME:-}}"
+  local old_session="${HERDR_SESSION-}"
+  local had_session=$+HERDR_SESSION
+  local id cwd custom closed=0
+
+  command -v herdr >/dev/null 2>&1 || return 0
+
+  _h_restore_session_env() {
+    (( had_session )) && export HERDR_SESSION="$old_session" || unset HERDR_SESSION
+  }
+
+  _h_close_workspace_for_path_in_current_session() {
+    local attempt matched
+    herdr workspace list >/dev/null 2>&1 || return 0
+    for attempt in {1..10}; do
+      matched=0
+      while IFS=$'\t' read -r id cwd custom; do
+        [[ -n "$id" && "$cwd" == "$wt_path" ]] || continue
+        matched=1
+        echo "Closing Herdr workspace for removed worktree: ${custom:-$id} ($wt_path)"
+        herdr workspace close "$id" >/dev/null 2>&1 || true
+        closed=$((closed + 1))
+      done < <(_h_workspace_rows 2>/dev/null) || true
+      (( matched == 0 && closed == 0 )) || break
+      sleep 0.1
+    done
+  }
+
+  if [[ -n "${HERDR_SOCKET_PATH:-}" ]] || (( had_session )); then
+    _h_close_workspace_for_path_in_current_session
+    _h_restore_session_env
+    return 0
+  fi
+
+  if [[ -n "$repo_name" ]]; then
+    export HERDR_SESSION="$repo_name"
+    _h_close_workspace_for_path_in_current_session
+  fi
+
+  # If cleanup is run outside a named Herdr pane, also try the default session.
+  # Matching is still exact cwd/path, never label-only.
+  unset HERDR_SESSION
+  _h_close_workspace_for_path_in_current_session
+
+  _h_restore_session_env
+}
+
+_h_prune_missing_workspaces() {
+  local session_json row id cwd custom registered_paths
+  session_json="$(_h_session_json)" || return
+  if [[ ! -r "$session_json" ]]; then
+    echo "No Herdr session.json found; skipping prune." >&2
+    return 0
+  fi
+
+  registered_paths="$(_h_git_worktree_paths | sort)" || {
+    echo "Could not list git worktrees; skipping prune." >&2
+    return 0
+  }
+
+  while IFS=$'\t' read -r id cwd custom; do
+    [[ -n "$id" && -n "$cwd" ]] || continue
+
+    # Only prune workspaces that are clearly part of this repo's worktree root.
+    [[ "$cwd" == "$H_WORKTREE_ROOT/"* ]] || continue
+
+    if [[ ! -d "$cwd" ]] || ! print -r -- "$registered_paths" | grep -Fxq -- "$cwd"; then
+      echo "Closing stale Herdr workspace: ${custom:-$id} ($cwd)"
+      herdr workspace close "$id" >/dev/null || true
+    fi
+  done < <(_h_workspace_rows 2>/dev/null) || {
+    echo "Could not parse Herdr session.json; skipping prune." >&2
+    return 0
+  }
+}

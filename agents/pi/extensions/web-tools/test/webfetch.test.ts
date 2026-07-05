@@ -3,24 +3,24 @@ import assert from "node:assert/strict";
 import {
 	createWebFetchHeaders,
 	getFallbackUserAgent,
-	OPENCODE_WEBFETCH_DEFAULT_USER_AGENT,
-	OPENCODE_WEBFETCH_FALLBACK_USER_AGENT,
+	PI_WEBFETCH_DEFAULT_USER_AGENT,
+	PI_WEBFETCH_FALLBACK_USER_AGENT,
 	shouldRetryWithFallbackUserAgent,
 } from "../webfetch.ts";
 
-test("createWebFetchHeaders uses the OpenCode browser-like default user agent", () => {
+test("createWebFetchHeaders uses the browser-like default user agent", () => {
 	const headers = createWebFetchHeaders("text/html");
-	assert.equal(headers["User-Agent"], OPENCODE_WEBFETCH_DEFAULT_USER_AGENT);
+	assert.equal(headers["User-Agent"], PI_WEBFETCH_DEFAULT_USER_AGENT);
 	assert.equal(headers.Accept, "text/html");
 	assert.equal(headers["Accept-Language"], "en-US,en;q=0.9");
 });
 
-test("getFallbackUserAgent prefers the configured setting and otherwise falls back to opencode", () => {
+test("getFallbackUserAgent prefers the configured setting and otherwise falls back to pi", () => {
 	assert.equal(getFallbackUserAgent("my-agent/1.0"), "my-agent/1.0");
 	assert.equal(getFallbackUserAgent("  custom-agent  "), "custom-agent");
-	assert.equal(getFallbackUserAgent(""), OPENCODE_WEBFETCH_FALLBACK_USER_AGENT);
-	assert.equal(getFallbackUserAgent("   "), OPENCODE_WEBFETCH_FALLBACK_USER_AGENT);
-	assert.equal(getFallbackUserAgent(undefined), OPENCODE_WEBFETCH_FALLBACK_USER_AGENT);
+	assert.equal(getFallbackUserAgent(""), PI_WEBFETCH_FALLBACK_USER_AGENT);
+	assert.equal(getFallbackUserAgent("   "), PI_WEBFETCH_FALLBACK_USER_AGENT);
+	assert.equal(getFallbackUserAgent(undefined), PI_WEBFETCH_FALLBACK_USER_AGENT);
 });
 
 test("shouldRetryWithFallbackUserAgent only retries the Cloudflare challenge case", () => {

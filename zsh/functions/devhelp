@@ -1,9 +1,9 @@
 # List dotfiles helper commands and what they do.
-# Usage: devhelp [remote|worktree|tmux|auth|all]
+# Usage: devhelp [remote|worktree|auth|all]
 local topic="${1:-all}"
 
 if [[ $# -gt 1 ]]; then
-  echo "Usage: devhelp [remote|worktree|tmux|auth|all]" >&2
+  echo "Usage: devhelp [remote|worktree|auth|all]" >&2
   return 1
 fi
 
@@ -12,59 +12,64 @@ _case_header() {
 }
 
 _case_row() {
-  printf '  %-28s %s\n' "$1" "$2"
+  printf '  %-32s %s\n' "$1" "$2"
 }
 
 case "$topic" in
-  all|remote|worktree|tmux|auth) ;;
+  all|remote|worktree|auth) ;;
   *)
     echo "Unknown devhelp topic: $topic" >&2
-    echo "Usage: devhelp [remote|worktree|tmux|auth|all]" >&2
+    echo "Usage: devhelp [remote|worktree|auth|all]" >&2
     return 1
     ;;
 esac
 
-if [[ "$topic" == all || "$topic" == remote ]]; then
-  _case_header "Remote-from-Mac helpers"
-  _case_row "rdev <repo> <branch|pr>" "upsert remote worktree and attach/create its remote tmux session"
-  _case_row "rdevroot <repo>" "attach/create remote tmux session at the bare repo root"
-  _case_row "rdevstack <repo> <parent> <branch>" "create/ensure remote branch stacked on parent, attach remote tmux"
-  _case_row "rpi <repo> <branch|pr> [-- args]" "upsert remote worktree, run local Pi with remote SSH tools"
-  _case_row "rwtclone <url> [repo]" "clone repo on remote VM, set up default worktree, attach remote tmux"
-  _case_row "rwtcreate <repo> <branch>" "create new remote branch worktree, attach remote tmux"
-  _case_row "rwtcheckout <repo> <branch|pr>" "checkout existing remote branch/PR worktree, attach remote tmux"
-  _case_row "rwtlist <repo>" "pick a remote worktree with local fzf, then attach remote tmux"
-  _case_row "rwtclean <repo>" "run wtclean on the remote repo"
-  _case_row "rwtforceclean <repo>" "pick remote worktrees and force-remove the selected ones"
-  _case_row "rpushdev [repo] [msg]" "commit/push current local branch, then attach it on remote tmux"
-  _case_row "rssh [dir]" "open a plain remote psteinroe shell without tmux"
-  _case_row "rrebuild [host]" "pull dotfiles and rebuild Home Manager on the remote VM"
-  _case_row "rdev-host <host> <repo> <branch|pr>" "internal explicit-host variant used by wrappers"
+if [[ "$topic" == all || "$topic" == remote || "$topic" == worktree ]]; then
+  _case_header "Project shortcuts"
+  _case_row "hellomateo / rhellomateo" "open local/remote Herdr project session"
+  _case_row "dotfiles / rdotfiles" "open local/remote Herdr project session"
+  _case_row "sbch / rsbch" "supabase-cache-helpers local/remote session"
+  _case_row "pgls / rpgls" "postgres-language-server local/remote session"
+  _case_row "pgconductor / rpgconductor" "postgres-conductor local/remote session"
+  _case_row "toolshed / rtoolshed" "toolshed local/remote session"
+  [[ "$topic" == all ]] && print
+
+  _case_header "Local / remote pairs"
+  _case_row "rebuild / rrebuild [host]" "rebuild local or remote Home Manager"
+  _case_row "hdev / rdev <repo> [branch|pr]" "open Herdr project session"
+  _case_row "wtclean / rwtclean <repo>" "clean merged/closed worktrees"
+  _case_row "wtforceclean / rwtforceclean <repo>" "select and force-remove worktrees"
+  _case_row "hwtcreate / rhwtcreate" "ensure worktree and focus/open Herdr workspace"
+  _case_row "hsyncworktrees / rhsyncworktrees" "sync Git worktrees into Herdr workspaces"
   [[ "$topic" == all ]] && print
 fi
 
 if [[ "$topic" == all || "$topic" == worktree ]]; then
-  _case_header "Worktree helpers on the current machine"
+  _case_header "Local worktree commands"
   _case_row "wtclone <url> [name]" "bare clone into worktree layout"
   _case_row "wtcreate <branch>" "create a new worktree branch"
   _case_row "wtcheckout <branch|pr>" "checkout an existing branch or PR into a worktree"
-  _case_row "wtlist" "list/select existing worktrees without tmux behavior"
-  _case_row "wtclean" "clean merged/closed worktrees"
-  _case_row "wtforceclean" "pick worktrees and force-remove the selected ones"
-  _case_row "wtensure <branch|pr>" "upsert worktree and cd into it without tmux"
+  _case_row "wtlist" "list/select existing worktrees"
+  _case_row "wtensure <branch|pr>" "upsert worktree and cd into it"
   [[ "$topic" == all ]] && print
 fi
 
-if [[ "$topic" == all || "$topic" == tmux ]]; then
-  _case_header "Explicit tmux helpers, mainly for the remote VM"
-  _case_row "wttmux <branch|pr>" "wtensure plus attach/create tmux session"
-  _case_row "wttmuxlist" "pick existing worktree in current repo and attach/create its tmux session"
+if [[ "$topic" == all || "$topic" == remote ]]; then
+  _case_header "Remote-only helpers"
+  _case_row "ragentauth [host] [spec]" "copy Pi auth to the remote"
+  _case_row "rmcpauth [--host h] [all|server...]" "copy Pi MCP OAuth credentials to the remote"
+  _case_row "rghauth [host] [github-host]" "copy GitHub CLI auth to the remote"
+  _case_row "rssh [dir]" "open a plain remote psteinroe shell"
+  _case_row "rpushdev [repo] [msg]" "commit/push current branch, then open it with rdev"
+  _case_row "ssh rdev-exe" "recovery path via exe.dev gateway"
   [[ "$topic" == all ]] && print
 fi
 
 if [[ "$topic" == all || "$topic" == auth ]]; then
   _case_header "Auth/helper utilities"
   _case_row "gh" "wrap gh to auto-use exe.dev integration hosts from origin"
-  _case_row "ragentauth [host] [spec]" "copy Pi provider auth and/or Claude Code subscription auth to remote"
+  _case_row "ragentauth [host] [spec]" "copy Pi auth to the remote"
+  _case_row "rmcpauth [--host h] [all|server...]" "copy Pi MCP OAuth credentials to the remote"
+  _case_row "rghauth [host] [github-host]" "copy GitHub CLI auth to the remote"
   _case_row "devhelp [topic]" "show this command reference"
 fi

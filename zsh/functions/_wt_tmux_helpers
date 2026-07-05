@@ -28,7 +28,21 @@ _wt_tmux_session_for_worktree() {
   local repo_root="$1"
   local worktree_path="$2"
   local repo_name="$(_wt_repo_name_from_root "$repo_root")"
-  local worktree_name="$(basename "$worktree_path")"
+  local repo_base="$(basename "$repo_root")"
+  local repo_parent="$(dirname "$repo_root")"
+  local worktree_root
+  local worktree_name
+
+  if [[ "$repo_base" == *.git ]]; then
+    worktree_root="$repo_parent/$repo_base"
+  else
+    worktree_root="$repo_parent/$repo_base.git"
+  fi
+
+  worktree_name="${worktree_path#$worktree_root/}"
+  if [[ "$worktree_name" == "$worktree_path" ]]; then
+    worktree_name="$(basename "$worktree_path")"
+  fi
 
   _wt_sanitize_tmux_session "${repo_name}-${worktree_name}"
 }

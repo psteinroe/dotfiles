@@ -12,13 +12,26 @@ alias mkdir='mkdir -p'
 alias vim='nvim'
 alias v='nvim'
 
-# Directory shortcuts
-alias dotfiles="cd $HOME/Developer/dotfiles"
-alias hellomateo="cd $HOME/Developer/hellomateo.git"
-alias sbch="cd $HOME/Developer/supabase-cache-helpers.git"
-alias pglsp="cd $HOME/Developer/postgres-language-server.git"
-alias pgconductor="cd $HOME/Developer/postgres-conductor.git"
-alias toolshed="cd $HOME/Developer/toolshed.git"
+# Project shortcuts open Herdr sessions. Pass an optional worktree/branch/PR.
+dotfiles() { hdev dotfiles "$@"; }
+rdotfiles() { rdev dotfiles "$@"; }
+
+hellomateo() { hdev hellomateo "$@"; }
+rhellomateo() { rdev hellomateo "$@"; }
+
+sbch() { hdev supabase-cache-helpers "$@"; }
+rsbch() { rdev supabase-cache-helpers "$@"; }
+
+pgls() { hdev postgres-language-server "$@"; }
+pglsp() { pgls "$@"; }
+rpgls() { rdev postgres-language-server "$@"; }
+rpglsp() { rpgls "$@"; }
+
+pgconductor() { hdev postgres-conductor "$@"; }
+rpgconductor() { rdev postgres-conductor "$@"; }
+
+toolshed() { hdev toolshed "$@"; }
+rtoolshed() { rdev toolshed "$@"; }
 
 # Nix
 alias ndc='nix develop -c'
@@ -30,10 +43,6 @@ alias week='date +%V'
 alias timer='echo "Timer started. Stop with Ctrl-D." && date && time cat && date'
 alias cleanup="find . -type f -name '*.DS_Store' -ls -delete"
 alias explain='open $HOME/Developer/dotfiles/scripts/explain.html'
-
-# AI helpers
-alias oc='copen'
-alias ocweb='copenweb'
 
 # pnpm
 alias pn="pnpm"

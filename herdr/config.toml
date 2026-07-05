@@ -1,0 +1,97 @@
+onboarding = false
+
+[terminal]
+# Use the Home Manager zsh so interactive panes load zsh/*.zsh aliases/functions
+# such as `v`, `gs`, `j`, etc. Without this, remote Herdr can fall back to the
+# VM login shell (`/bin/bash`) because SSH enters as `exedev` before sudo.
+default_shell = "zsh"
+shell_mode = "auto"
+new_cwd = "follow"
+
+[theme]
+name = "gruvbox"
+auto_switch = false
+
+[remote]
+manage_ssh_config = true
+
+[ui.sound]
+enabled = false
+
+[ui.toast]
+delivery = "terminal"
+
+[keys]
+# Dotfiles owns worktree create/open/remove so Herdr does not use its default
+# ~/Developer/.herdr-worktrees layout for these shortcuts.
+new_worktree = ""
+open_worktree = ""
+remove_worktree = ""
+
+# vim-herdr-navigation: seamless movement across Neovim splits and Herdr panes.
+[[keys.command]]
+key = "ctrl+h"
+type = "plugin_action"
+command = "vim-herdr-navigation.left"
+description = "navigate left (vim/herdr)"
+
+[[keys.command]]
+key = "ctrl+j"
+type = "plugin_action"
+command = "vim-herdr-navigation.down"
+description = "navigate down (vim/herdr)"
+
+[[keys.command]]
+key = "ctrl+k"
+type = "plugin_action"
+command = "vim-herdr-navigation.up"
+description = "navigate up (vim/herdr)"
+
+[[keys.command]]
+key = "ctrl+l"
+type = "plugin_action"
+command = "vim-herdr-navigation.right"
+description = "navigate right (vim/herdr)"
+
+# psteinroe.worktree-sync: project-local worktree actions.
+[[keys.command]]
+key = "prefix+shift+g"
+type = "plugin_action"
+command = "psteinroe.worktree-sync.create"
+description = "create/open dotfiles-layout worktree"
+
+[[keys.command]]
+key = "prefix+shift+o"
+type = "plugin_action"
+command = "psteinroe.worktree-sync.open"
+description = "open dotfiles-layout worktree"
+
+[[keys.command]]
+key = "prefix+shift+h"
+type = "plugin_action"
+command = "psteinroe.worktree-sync.hide"
+description = "hide current worktree workspace"
+
+[[keys.command]]
+key = "prefix+shift+m"
+type = "plugin_action"
+command = "psteinroe.worktree-sync.manager"
+description = "open worktree manager"
+
+[[keys.command]]
+key = "prefix+shift+s"
+type = "plugin_action"
+command = "psteinroe.worktree-sync.sync"
+description = "sync current-project worktrees"
+
+[[keys.command]]
+key = "prefix+shift+b"
+type = "plugin_action"
+command = "psteinroe.worktree-sync.bootstrap"
+description = "bootstrap panes for current worktree"
+
+[[keys.command]]
+key = "prefix+alt+d"
+type = "plugin_action"
+command = "psteinroe.worktree-sync.clean"
+description = "clean merged/closed worktrees"

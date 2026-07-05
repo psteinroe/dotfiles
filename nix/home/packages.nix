@@ -8,10 +8,9 @@
 }:
 
 let
-  claudeCode = lib.attrByPath [ system "default" ] null inputs.claude-code.packages;
-  codexCli = lib.attrByPath [ system "default" ] null inputs.codex-cli.packages;
   piAgent = lib.attrByPath [ system "pi" ] null inputs.llm-agents.packages;
   tuicr = lib.attrByPath [ system "default" ] null inputs.tuicr.packages;
+  herdr = lib.attrByPath [ system "default" ] null inputs.herdr.packages;
   optionalPackage = pkg: lib.optional (pkg != null) pkg;
 
   # Keep pnpm's shebang pointed at the same runtime as the global Node install.
@@ -122,13 +121,10 @@ in
         # Version control
         diffnav # GitHub-like diff pager for git/gh PR diffs
 
-        # AI coding assistants from nixpkgs
-        opencode
       ]
       ++ lib.optional isLinux tmux
       ++ optionalPackage tuicr
-      ++ optionalPackage claudeCode
-      ++ optionalPackage codexCli
+      ++ optionalPackage herdr
       ++ optionalPackage piAgent;
 
   }

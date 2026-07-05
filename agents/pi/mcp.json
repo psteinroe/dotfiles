@@ -3,55 +3,19 @@
         "autoAuth": true
     },
     "mcpServers": {
-        "signoz": {
-            "url": "https://mcp.eu.signoz.cloud/mcp"
-        },
-        "sentry" : {
-            "url" : "https://mcp.sentry.dev/mcp"
-        },
-        "supabase": {
-            "url": "https://mcp.supabase.com/mcp?project_ref=uagvwyhbnlutltxparir&read_only=true"
-        },
         "scryfall": {
             "command": "pnpx",
             "args": [
                 "scryfall-mcp-server"
             ]
         },
-        "linear": {
-            "url": "https://mcp.linear.app/mcp",
-            "auth": "oauth"
-        },
-        "figma": {
-            "url": "https://mcp.figma.com/mcp",
-            "auth": "oauth",
-            "excludeTools": [
-                "get_figjam",
-                "generate_figma_design",
-                "generate_diagram",
-                "get_code_connect_map",
-                "whoami",
-                "add_code_connect_map",
-                "get_code_connect_suggestions",
-                "send_code_connect_mappings",
-                "get_context_for_code_connect",
-                "use_figma",
-                "get_libraries",
-                "search_design_system",
-                "create_new_file"
-            ],
-            "oauth": {
-                "clientName": "Claude Code",
-                "clientUri": "https://www.anthropic.com/claude-code"
-            }
-        },
-        "tally": {
-            "url": "https://api.tally.so/mcp",
-            "auth": "oauth"
-        },
-        "notion": {
-            "url": "https://mcp.notion.com/mcp",
-            "auth": "oauth"
+        "executor": {
+            "url": "https://executor.getmateo.com/mcp/toolkits/developer",
+            "directTools": [
+                "execute",
+                "skills",
+                "resume"
+            ]
         }
     }
 }
