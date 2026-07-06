@@ -28,6 +28,11 @@ new_worktree = ""
 open_worktree = ""
 remove_worktree = ""
 
+# In navigate mode (`prefix+w`), use both arrow keys and vim keys to move the
+# highlighted worktree/workspace in the sidebar.
+navigate_workspace_up = ["up", "k"]
+navigate_workspace_down = ["down", "j"]
+
 # vim-herdr-navigation: seamless movement across Neovim splits and Herdr panes.
 [[keys.command]]
 key = "ctrl+h"

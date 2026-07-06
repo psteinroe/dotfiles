@@ -33,4 +33,4 @@ encoded=$(printf '%s' "$prepare_cmd" | base64 | tr -d '\n') || return
 runner="encoded=${(q)encoded}; cmd=\$(printf %s \"\$encoded\" | base64 -d); HOME=${(q)remote_home} USER=${(q)remote_user} LOGNAME=${(q)remote_user} PATH=${(q)remote_path} ${(q)remote_home}/.nix-profile/bin/zsh -lc \"\$cmd\""
 
 ssh -T "$host" "$runner" || return
-"$herdr_bin" --remote "$host" --session "$repo"
+"$herdr_bin" --remote "$host" --remote-keybindings server --session "$repo"
