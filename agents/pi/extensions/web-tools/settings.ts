@@ -1,3 +1,7 @@
+import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import {
 	type SearchDepth,
 	type SearchProviderName,
@@ -18,7 +22,7 @@ const DEFAULTS = {
 	fetchFallbackUserAgent: "pi",
 	searchEnabled: true,
 	searchProvider: "exa",
-	searchEndpoint: "https://m.mulroy.dev/m/e",
+	searchEndpoint: "https://mcp.exa.ai/mcp",
 	searchTimeoutSeconds: 25,
 	searchDefaultMaxResults: 8,
 	searchDefaultDepth: "auto",
@@ -54,6 +58,47 @@ export function parseEnumSetting<T extends string>(
 	return allowed.includes(normalized) ? normalized : fallback;
 }
 
+function readKeychainEnvironmentVariable(name: string): string | undefined {
+	if (process.platform !== "darwin") return undefined;
+	try {
+		return execFileSync("security", [
+			"find-generic-password",
+			"-w",
+			"-a",
+			os.userInfo().username,
+			"-D",
+			"environment variable",
+			"-s",
+			name,
+		], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim() || undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+function readSecretFile(filePath: string | undefined): string | undefined {
+	if (!filePath) return undefined;
+	try {
+		return readFileSync(filePath, "utf8").trim() || undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+function readDefaultExaApiKeyFile(): string | undefined {
+	const configHome = process.env.XDG_CONFIG_HOME?.trim() || path.join(os.homedir(), ".config");
+	return readSecretFile(path.join(configHome, "exa", "api_key"));
+}
+
+function readExaApiKey(): string | undefined {
+	return process.env.EXA_API_KEY?.trim()
+		|| process.env.EXA_API_TOKEN?.trim()
+		|| readSecretFile(process.env.EXA_API_KEY_FILE?.trim())
+		|| readKeychainEnvironmentVariable("EXA_API_KEY")
+		|| readKeychainEnvironmentVariable("EXA_API_TOKEN")
+		|| readDefaultExaApiKeyFile();
+}
+
 export function getWebToolsSettings(): WebToolsSettings {
 	const fetchDefaultFormat = parseEnumSetting(undefined, FETCH_DEFAULT_FORMAT_VALUES, DEFAULTS.fetchDefaultFormat);
 	const searchProvider = parseEnumSetting(undefined, SEARCH_PROVIDER_VALUES, DEFAULTS.searchProvider);
@@ -71,7 +116,8 @@ export function getWebToolsSettings(): WebToolsSettings {
 		search: {
 			enabled: DEFAULTS.searchEnabled,
 			provider: searchProvider,
-			endpoint: DEFAULTS.searchEndpoint,
+			endpoint: process.env.EXA_MCP_URL?.trim() || DEFAULTS.searchEndpoint,
+			apiKey: readExaApiKey(),
 			timeoutSeconds: DEFAULTS.searchTimeoutSeconds,
 			defaultMaxResults: DEFAULTS.searchDefaultMaxResults,
 			defaultDepth: searchDefaultDepth,

@@ -46,6 +46,7 @@ Current defaults:
 - `enabled`: `true`
 - `provider`: `exa`
 - `endpoint`: `https://mcp.exa.ai/mcp`
+- `apiKey`: read from `EXA_API_KEY` / `EXA_API_TOKEN`, `EXA_API_KEY_FILE`, the macOS Keychain entries used by `set-keychain-environment-variable`, or `~/.config/exa/api_key`
 - `timeoutSeconds`: `25`
 - `defaultMaxResults`: `8`
 - `defaultDepth`: `auto`
@@ -77,6 +78,7 @@ The extension has an internal settings shape:
     enabled: boolean;
     provider: "exa";
     endpoint: string;
+    apiKey?: string;
     timeoutSeconds: number;
     defaultMaxResults: number;
     defaultDepth: "auto" | "fast" | "deep";
@@ -90,7 +92,7 @@ That means:
 
 - `webfetch.format` and `webfetch.timeout` can be overridden per call
 - `websearch.maxResults` and `websearch.depth` can be overridden per call
-- the underlying defaults are not currently exposed through Pi settings, extension settings, or env vars
+- the endpoint can be overridden with `EXA_MCP_URL`, and auth is read from `EXA_API_KEY` / `EXA_API_TOKEN`, `EXA_API_KEY_FILE`, matching macOS Keychain entries, or `~/.config/exa/api_key`; other underlying defaults are not currently exposed through Pi settings or extension settings
 
 To change the defaults, edit:
 

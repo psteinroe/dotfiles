@@ -51,10 +51,12 @@ alt-shift-f = 'layout floating tiling'
 alt-g = 'exec-and-forget /Users/psteinroe/Developer/dotfiles/bin/aerospace-grid-2col focused'
 
 # Focus
-alt-h = 'focus left'
-alt-j = 'focus down'
-alt-k = 'focus up'
-alt-l = 'focus right'
+# Leave plain Option+h/j/k/l to terminal apps (Herdr/Pi). Use the service mode
+# join commands or mouse/AeroSpace UI for window-level focus instead.
+alt-h = []
+alt-j = []
+alt-k = []
+alt-l = []
 
 # Move windows
 alt-shift-h = 'move left'

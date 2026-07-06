@@ -182,7 +182,7 @@ function createProvider(): SearchProvider {
 	const settings = getWebToolsSettings();
 	switch (settings.search.provider) {
 		case "exa":
-			return new ExaSearchProvider(settings.search.endpoint);
+			return new ExaSearchProvider(settings.search.endpoint, settings.search.apiKey);
 	}
 }
 

@@ -28,7 +28,11 @@ _ws_pick_worktree() {
     return 1
   fi
 
-  if command -v fzf >/dev/null 2>&1; then
+  # Prefer the simple numbered menu inside Herdr overlay panes. fzf can briefly
+  # flash and exit in some remote/mobile terminal combinations, which makes the
+  # Shift+O shortcut look broken. Keep fzf available as an explicit opt-in for
+  # local debugging with HWS_USE_FZF=1.
+  if [[ "${HWS_USE_FZF:-0}" == 1 ]] && command -v fzf >/dev/null 2>&1; then
     selected=$(print -r -- "$rows" | fzf \
       --prompt="$WS_PROJECT_NAME worktree> " \
       --height=85% \

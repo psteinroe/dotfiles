@@ -1,0 +1,364 @@
+# Copy local development auth credentials to a remote machine.
+# Usage: rauth [--host host] [--user user] [--home home] [all|gh[:host]|pi[:provider[,provider]|all]|mcp[:all|server[,server]]|exa|codex]...
+# Defaults to: rauth all
+
+_rauth_usage() {
+  cat >&2 <<'EOF'
+Usage: rauth [--host host] [--user user] [--home home] [spec ...]
+
+Specs:
+  all                         copy gh, default Pi provider, all MCP OAuth, and Exa
+  gh[:github-host]            copy GitHub CLI auth (default: github.com)
+  pi                          copy default Pi provider auth (default: openai-codex)
+  pi:provider[,provider...]   copy selected Pi providers from ~/.pi/agent/auth.json
+  pi:all                      copy all Pi providers
+  codex                       alias for pi:openai-codex
+  mcp                         copy all Pi MCP OAuth credentials
+  mcp:server[,server...]      copy selected ~/.pi/agent/mcp-oauth/<server> dirs
+  exa                         copy Exa API key to ~/.config/exa/api_key
+
+Options:
+  --host host                 SSH host (default: rdev)
+  --user user                 remote user (default: psteinroe)
+  --home path                 remote home (default: /home/<user>)
+EOF
+}
+
+if [[ $# -gt 0 && ( "${1:-}" == "--help" || "${1:-}" == "-?" ) ]]; then
+  _rauth_usage
+  return 0
+fi
+
+local host="${RDEV_HOST:-rdev}"
+local remote_user="${RDEV_REMOTE_USER:-psteinroe}"
+local remote_home=""
+local -a specs
+specs=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --host)
+      [[ $# -ge 2 ]] || { _rauth_usage; return 1; }
+      host="$2"
+      shift 2
+      ;;
+    --user)
+      [[ $# -ge 2 ]] || { _rauth_usage; return 1; }
+      remote_user="$2"
+      shift 2
+      ;;
+    --home)
+      [[ $# -ge 2 ]] || { _rauth_usage; return 1; }
+      remote_home="$2"
+      shift 2
+      ;;
+    --)
+      shift
+      specs+=("$@")
+      break
+      ;;
+    -*)
+      echo "Unknown rauth option: $1" >&2
+      _rauth_usage
+      return 1
+      ;;
+    *)
+      specs+=("$1")
+      shift
+      ;;
+  esac
+done
+
+[[ -n "$remote_home" ]] || remote_home="/home/${remote_user}"
+local remote_path="${remote_home}/.local/bin:${remote_home}/.nix-profile/bin:/nix/var/nix/profiles/default/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+if [[ ${#specs[@]} -eq 0 ]]; then
+  specs=(all)
+fi
+
+_rauth_runner() {
+  local remote_cmd="$1"
+  local env_extra="${2:-}"
+  local encoded env_assignments
+  encoded=$(printf '%s' "$remote_cmd" | base64 | tr -d '\n') || return
+  env_assignments="HOME=${(q)remote_home} USER=${(q)remote_user} LOGNAME=${(q)remote_user} PATH=${(q)remote_path} ${env_extra}"
+  print -r -- "encoded=${(q)encoded}; cmd=\$(printf %s \"\$encoded\" | base64 -d); if [ \"\$(id -un)\" = ${(q)remote_user} ]; then ${env_assignments} bash -lc \"\$cmd\"; else sudo -u ${(q)remote_user} ${env_assignments} bash -lc \"\$cmd\"; fi"
+}
+
+_rauth_check_jq() {
+  command -v jq >/dev/null 2>&1 || { echo "rauth requires jq locally" >&2; return 1; }
+  ssh "$host" 'command -v jq >/dev/null 2>&1' >/dev/null 2>&1 || {
+    echo "rauth requires jq on $host; run rrebuild/bootstrap first" >&2
+    return 1
+  }
+}
+
+_rauth_copy_pi() {
+  local provider_spec="$1"
+  local local_pi_auth="${PI_AUTH_FILE:-$HOME/.pi/agent/auth.json}"
+  local default_pi_providers="${RAUTH_PI_PROVIDERS:-${RAGENTAUTH_PI_PROVIDERS:-${PI_AUTH_PROVIDERS:-${PI_CODEX_PROVIDER:-openai-codex}}}}"
+  local -a pi_providers
+  local copy_pi_all=0
+
+  [[ -f "$local_pi_auth" ]] || { echo "Pi auth file not found: $local_pi_auth" >&2; return 1; }
+  _rauth_check_jq || return
+
+  if [[ -z "$provider_spec" ]]; then
+    pi_providers=(${(@s:,:)default_pi_providers})
+  elif [[ "$provider_spec" == all ]]; then
+    copy_pi_all=1
+  else
+    pi_providers=(${(@s:,:)provider_spec})
+  fi
+
+  local pi_auth
+  if (( copy_pi_all )); then
+    pi_auth=$(jq -c '.' "$local_pi_auth") || return
+  else
+    local jq_filter='with_entries(select(.key as $k | $providers | index($k)))'
+    local providers_json
+    providers_json=$(printf '%s\n' "${pi_providers[@]}" | jq -R . | jq -s .) || return
+    pi_auth=$(jq -c --argjson providers "$providers_json" "$jq_filter" "$local_pi_auth") || return
+    if [[ "$(jq 'length' <<<"$pi_auth")" == 0 ]]; then
+      echo "No requested Pi providers found in $local_pi_auth: ${pi_providers[*]}" >&2
+      return 1
+    fi
+  fi
+
+  local remote_cmd='set -euo pipefail
+if ! command -v jq >/dev/null 2>&1; then
+  echo "rauth requires jq on the remote; run rrebuild/bootstrap first" >&2
+  exit 1
+fi
+umask 077
+payload=$(mktemp)
+trap '\''rm -f "$payload" "$HOME/.pi/agent/auth.json.tmp"'\'' EXIT
+cat > "$payload"
+mkdir -p "$HOME/.pi/agent"
+auth="$HOME/.pi/agent/auth.json"
+if [ -f "$auth" ]; then
+  jq -s '\''.[0] * .[1]'\'' "$auth" "$payload" > "$auth.tmp"
+else
+  jq -c . "$payload" > "$auth.tmp"
+fi
+mv "$auth.tmp" "$auth"
+chmod 600 "$auth"
+'
+  local runner
+  runner=$(_rauth_runner "$remote_cmd") || return
+  printf '%s' "$pi_auth" | ssh "$host" "$runner" || return
+
+  if (( copy_pi_all )); then
+    print -r -- "Copied all Pi auth providers to $host:$remote_user:$remote_home/.pi/agent/auth.json"
+  else
+    print -r -- "Copied Pi auth providers (${(@j:, :)pi_providers}) to $host:$remote_user:$remote_home/.pi/agent/auth.json"
+  fi
+}
+
+_rauth_copy_gh() {
+  local gh_host="${1:-github.com}"
+  command -v gh >/dev/null 2>&1 || { echo "rauth gh requires gh locally" >&2; return 1; }
+  if ! gh auth status --hostname "$gh_host" >/dev/null 2>&1; then
+    echo "Local gh is not authenticated for $gh_host. Run: gh auth login --hostname $gh_host" >&2
+    return 1
+  fi
+
+  local remote_cmd='set -euo pipefail
+if ! command -v gh >/dev/null 2>&1; then
+  echo "rauth gh requires gh on the remote; run rrebuild/bootstrap first" >&2
+  exit 1
+fi
+umask 077
+token=$(mktemp)
+trap '\''rm -f "$token"'\'' EXIT
+cd "$HOME"
+cat > "$token"
+if [ ! -s "$token" ]; then
+  echo "No GitHub token received on stdin" >&2
+  exit 1
+fi
+unset GH_HOST GH_TOKEN GITHUB_TOKEN GH_ENTERPRISE_TOKEN GITHUB_ENTERPRISE_TOKEN
+gh auth login --hostname "$RAUTH_GH_HOST" --with-token < "$token"
+gh auth setup-git --hostname "$RAUTH_GH_HOST"
+gh auth status --hostname "$RAUTH_GH_HOST" >/dev/null
+'
+  local runner
+  runner=$(_rauth_runner "$remote_cmd" "RAUTH_GH_HOST=${(q)gh_host}") || return
+  gh auth token --hostname "$gh_host" | ssh "$host" "$runner" || return
+  print -r -- "Copied GitHub CLI auth for $gh_host to $host:$remote_user:$remote_home"
+}
+
+_rauth_copy_mcp() {
+  local server_spec="$1"
+  local local_oauth_dir="${PI_MCP_OAUTH_DIR:-$HOME/.pi/agent/mcp-oauth}"
+  [[ -d "$local_oauth_dir" ]] || { echo "MCP OAuth directory not found: $local_oauth_dir" >&2; return 1; }
+
+  local mode="all"
+  local -a servers tar_paths
+  servers=()
+  if [[ -n "$server_spec" && "$server_spec" != all ]]; then
+    mode="selected"
+    servers=(${(@s:,:)server_spec})
+  fi
+
+  local server
+  for server in "${servers[@]}"; do
+    if [[ -z "$server" || "$server" == */* || "$server" == .* ]]; then
+      echo "Invalid MCP OAuth server directory name: $server" >&2
+      return 1
+    fi
+    if [[ ! -d "$local_oauth_dir/$server" ]]; then
+      echo "Local MCP OAuth credentials not found for '$server': $local_oauth_dir/$server" >&2
+      return 1
+    fi
+  done
+
+  local server_list_b64
+  server_list_b64=$(printf '%s\n' "${servers[@]}" | base64 | tr -d '\n') || return
+
+  local remote_cmd='set -euo pipefail
+umask 077
+agent_dir="$HOME/.pi/agent"
+target="$agent_dir/mcp-oauth"
+tmp=$(mktemp -d)
+trap '\''rm -rf "$tmp"'\'' EXIT
+mkdir -p "$agent_dir" "$target"
+tar -xzf - -C "$tmp"
+if [ ! -d "$tmp/mcp-oauth" ]; then
+  echo "Archive did not contain mcp-oauth directory" >&2
+  exit 1
+fi
+if [ "${RAUTH_MCP_MODE:-selected}" = "all" ]; then
+  rm -rf "$target"
+  mkdir -p "$target"
+  cp -R "$tmp/mcp-oauth/." "$target/"
+else
+  printf %s "$RAUTH_MCP_SERVERS_B64" | base64 -d | while IFS= read -r server; do
+    [ -n "$server" ] || continue
+    case "$server" in */*|.*) echo "Invalid server name in payload: $server" >&2; exit 1;; esac
+    if [ ! -d "$tmp/mcp-oauth/$server" ]; then
+      echo "Archive missing server credentials: $server" >&2
+      exit 1
+    fi
+    rm -rf "$target/$server"
+    cp -R "$tmp/mcp-oauth/$server" "$target/$server"
+  done
+fi
+chmod -R go-rwx "$target"
+find "$target" -type d -exec chmod 700 {} +
+find "$target" -type f -exec chmod 600 {} +
+'
+  local runner
+  runner=$(_rauth_runner "$remote_cmd" "RAUTH_MCP_MODE=${(q)mode} RAUTH_MCP_SERVERS_B64=${(q)server_list_b64}") || return
+
+  if [[ "$mode" == all ]]; then
+    COPYFILE_DISABLE=1 tar --no-xattrs -czf - -C "${local_oauth_dir:h}" "${local_oauth_dir:t}" | ssh "$host" "$runner" || return
+    print -r -- "Copied all Pi MCP OAuth credentials to $host:$remote_user:$remote_home/.pi/agent/mcp-oauth"
+  else
+    tar_paths=()
+    for server in "${servers[@]}"; do
+      tar_paths+=("${local_oauth_dir:t}/$server")
+    done
+    COPYFILE_DISABLE=1 tar --no-xattrs -czf - -C "${local_oauth_dir:h}" "${tar_paths[@]}" | ssh "$host" "$runner" || return
+    print -r -- "Copied Pi MCP OAuth credentials (${(@j:, :)servers}) to $host:$remote_user:$remote_home/.pi/agent/mcp-oauth"
+  fi
+}
+
+_rauth_read_secret_file() {
+  local file="$1"
+  [[ -n "$file" && -f "$file" ]] || return 1
+  local value
+  value=$(<"$file") || return 1
+  value="${value//$'\n'/}"
+  value="${value//$'\r'/}"
+  [[ -n "$value" ]] || return 1
+  print -r -- "$value"
+}
+
+_rauth_read_keychain_env() {
+  local name="$1"
+  [[ "$(uname -s)" == Darwin ]] || return 1
+  security find-generic-password -w -a "${USER}" -D "environment variable" -s "$name" 2>/dev/null
+}
+
+_rauth_read_exa_key() {
+  if [[ -n "${EXA_API_KEY:-}" ]]; then print -r -- "$EXA_API_KEY"; return 0; fi
+  if [[ -n "${EXA_API_TOKEN:-}" ]]; then print -r -- "$EXA_API_TOKEN"; return 0; fi
+  if [[ -n "${EXA_API_KEY_FILE:-}" ]] && _rauth_read_secret_file "$EXA_API_KEY_FILE"; then return 0; fi
+  if _rauth_read_keychain_env EXA_API_KEY; then return 0; fi
+  if _rauth_read_keychain_env EXA_API_TOKEN; then return 0; fi
+  _rauth_read_secret_file "${XDG_CONFIG_HOME:-$HOME/.config}/exa/api_key"
+}
+
+_rauth_copy_exa() {
+  local exa_key
+  exa_key=$(_rauth_read_exa_key) || {
+    echo "No Exa API key found. Set EXA_API_KEY, EXA_API_TOKEN, EXA_API_KEY_FILE, keychain EXA_API_KEY, or ~/.config/exa/api_key." >&2
+    return 1
+  }
+
+  local remote_cmd='set -euo pipefail
+umask 077
+mkdir -p "$HOME/.config/exa"
+tmp=$(mktemp "$HOME/.config/exa/api_key.XXXXXX")
+trap '\''rm -f "$tmp"'\'' EXIT
+cat > "$tmp"
+if [ ! -s "$tmp" ]; then
+  echo "No Exa API key received on stdin" >&2
+  exit 1
+fi
+mv "$tmp" "$HOME/.config/exa/api_key"
+chmod 600 "$HOME/.config/exa/api_key"
+'
+  local runner
+  runner=$(_rauth_runner "$remote_cmd") || return
+  printf '%s\n' "$exa_key" | ssh "$host" "$runner" || return
+  print -r -- "Copied Exa API key to $host:$remote_user:$remote_home/.config/exa/api_key"
+}
+
+local spec name arg
+for spec in "${specs[@]}"; do
+  case "$spec" in
+    all)
+      _rauth_copy_gh github.com || return
+      _rauth_copy_pi "" || return
+      _rauth_copy_mcp all || return
+      _rauth_copy_exa || return
+      ;;
+    gh|github)
+      _rauth_copy_gh github.com || return
+      ;;
+    gh:*|github:*)
+      arg="${spec#*:}"
+      [[ -n "$arg" ]] || { echo "Invalid rauth spec: $spec" >&2; return 1; }
+      _rauth_copy_gh "$arg" || return
+      ;;
+    pi|agent)
+      _rauth_copy_pi "" || return
+      ;;
+    pi:*|agent:*)
+      arg="${spec#*:}"
+      [[ -n "$arg" ]] || { echo "Invalid rauth spec: $spec" >&2; return 1; }
+      _rauth_copy_pi "$arg" || return
+      ;;
+    codex)
+      _rauth_copy_pi openai-codex || return
+      ;;
+    mcp)
+      _rauth_copy_mcp all || return
+      ;;
+    mcp:*)
+      arg="${spec#mcp:}"
+      [[ -n "$arg" ]] || { echo "Invalid rauth spec: $spec" >&2; return 1; }
+      _rauth_copy_mcp "$arg" || return
+      ;;
+    exa)
+      _rauth_copy_exa || return
+      ;;
+    *)
+      echo "Unknown rauth spec: $spec" >&2
+      _rauth_usage
+      return 1
+      ;;
+  esac
+done

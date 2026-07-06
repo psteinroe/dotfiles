@@ -56,9 +56,7 @@ fi
 
 if [[ "$topic" == all || "$topic" == remote ]]; then
   _case_header "Remote-only helpers"
-  _case_row "ragentauth [host] [spec]" "copy Pi auth to the remote"
-  _case_row "rmcpauth [--host h] [all|server...]" "copy Pi MCP OAuth credentials to the remote"
-  _case_row "rghauth [host] [github-host]" "copy GitHub CLI auth to the remote"
+  _case_row "rauth [all|gh|pi|mcp|exa]" "copy GitHub/Pi/MCP/Exa auth to the remote"
   _case_row "rssh [dir]" "open a plain remote psteinroe shell"
   _case_row "rpushdev [repo] [msg]" "commit/push current branch, then open it with rdev"
   _case_row "ssh rdev-exe" "recovery path via exe.dev gateway"
@@ -68,8 +66,7 @@ fi
 if [[ "$topic" == all || "$topic" == auth ]]; then
   _case_header "Auth/helper utilities"
   _case_row "gh" "wrap gh to auto-use exe.dev integration hosts from origin"
-  _case_row "ragentauth [host] [spec]" "copy Pi auth to the remote"
-  _case_row "rmcpauth [--host h] [all|server...]" "copy Pi MCP OAuth credentials to the remote"
-  _case_row "rghauth [host] [github-host]" "copy GitHub CLI auth to the remote"
+  _case_row "rauth [spec...]" "copy local auth bundle to the remote"
+  _case_row "ragentauth/rmcpauth/rghauth" "compatibility wrappers around rauth"
   _case_row "devhelp [topic]" "show this command reference"
 fi

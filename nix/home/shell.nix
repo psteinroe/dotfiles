@@ -83,6 +83,7 @@ in
       autoload -Uz rpushdev
       autoload -Uz rssh
       autoload -Uz rrebuild
+      autoload -Uz rauth
       autoload -Uz ragentauth
       autoload -Uz rmcpauth
       autoload -Uz rghauth

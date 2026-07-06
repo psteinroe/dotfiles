@@ -79,6 +79,7 @@ in
         ffmpeg
         imagemagick
         awscli2
+        google-cloud-sdk
         tailscale
         globalPnpm
         bun

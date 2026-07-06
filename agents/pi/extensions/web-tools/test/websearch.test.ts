@@ -122,12 +122,14 @@ test("normalizeExaDepth keeps compatible depths and downgrades deep to fast", ()
 	assert.equal(normalizeExaDepth("deep"), "fast");
 });
 
-test("ExaSearchProvider sends fast when deep is requested", async () => {
+test("ExaSearchProvider sends auth and fast when deep is requested", async () => {
 	const originalFetch = globalThis.fetch;
 	let requestBody = "";
+	let authorization = "";
 
 	globalThis.fetch = async (_input, init) => {
 		requestBody = String(init?.body ?? "");
+		authorization = new Headers(init?.headers).get("authorization") ?? "";
 		return new Response(
 			JSON.stringify({
 				result: {
@@ -142,9 +144,10 @@ test("ExaSearchProvider sends fast when deep is requested", async () => {
 	};
 
 	try {
-		const provider = new ExaSearchProvider("https://example.test/mcp");
+		const provider = new ExaSearchProvider("https://example.test/mcp", "test-key");
 		const results = await provider.search({ query: "example", maxResults: 5, depth: "deep" });
 		assert.equal(results.length, 2);
+		assert.equal(authorization, "Bearer test-key");
 		const payload = JSON.parse(requestBody) as { params?: { arguments?: { type?: string } } };
 		assert.equal(payload.params?.arguments?.type, "fast");
 	} finally {

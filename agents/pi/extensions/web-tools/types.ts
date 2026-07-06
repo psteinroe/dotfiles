@@ -18,6 +18,7 @@ export interface WebToolsSettings {
 		enabled: boolean;
 		provider: SearchProviderName;
 		endpoint: string;
+		apiKey?: string;
 		timeoutSeconds: number;
 		defaultMaxResults: number;
 		defaultDepth: SearchDepth;

@@ -33,6 +33,13 @@ remove_worktree = ""
 navigate_workspace_up = ["up", "k"]
 navigate_workspace_down = ["down", "j"]
 
+# Herdr 0.7.1 shows the workspace-selection bindings in navigate mode but the
+# production key path does not move the selection reliably. Bind the same keys
+# as previous/next workspace prefix actions too, so in navigate mode bare j/k or
+# arrows switch workspaces immediately instead of requiring Enter.
+previous_workspace = ["prefix+up", "prefix+k"]
+next_workspace = ["prefix+down", "prefix+j"]
+
 # vim-herdr-navigation: seamless movement across Neovim splits and Herdr panes.
 [[keys.command]]
 key = "ctrl+h"
@@ -57,6 +64,33 @@ key = "ctrl+l"
 type = "plugin_action"
 command = "vim-herdr-navigation.right"
 description = "navigate right (vim/herdr)"
+
+# Option/Alt variants are intercepted by Herdr before the focused pane sees
+# them. This keeps Pi from using Option+L for model selection when you meant
+# pane navigation.
+[[keys.command]]
+key = "alt+h"
+type = "plugin_action"
+command = "vim-herdr-navigation.left"
+description = "navigate left (vim/herdr, alt)"
+
+[[keys.command]]
+key = "alt+j"
+type = "plugin_action"
+command = "vim-herdr-navigation.down"
+description = "navigate down (vim/herdr, alt)"
+
+[[keys.command]]
+key = "alt+k"
+type = "plugin_action"
+command = "vim-herdr-navigation.up"
+description = "navigate up (vim/herdr, alt)"
+
+[[keys.command]]
+key = "alt+l"
+type = "plugin_action"
+command = "vim-herdr-navigation.right"
+description = "navigate right (vim/herdr, alt)"
 
 # psteinroe.worktree-sync: project-local worktree actions.
 [[keys.command]]

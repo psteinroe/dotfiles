@@ -58,8 +58,7 @@ Local and remote helpers intentionally mirror each other where possible:
 | `wtforceclean` | `rwtforceclean <repo>` | Select and force-remove worktrees |
 | `hwtcreate <branch\|pr>` | `rhwtcreate <repo> <branch\|pr>` | Ensure worktree and focus/open Herdr workspace |
 | `hsyncworktrees [--prune]` | `rhsyncworktrees <repo> [--prune]` | Sync Git worktrees into Herdr workspaces |
-| — | `ragentauth` | Copy local Pi auth to the remote |
-| — | `rghauth` | Copy local GitHub CLI auth to the remote |
+| — | `rauth [all\|gh\|pi\|mcp\|exa]` | Copy local GitHub/Pi/MCP/Exa auth to the remote |
 | — | `ssh rdev-exe` | Recovery path via exe.dev gateway |
 
 For the full command list, run `devhelp`.

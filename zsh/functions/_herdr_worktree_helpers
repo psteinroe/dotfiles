@@ -1,6 +1,11 @@
 # Shared helpers for Herdr + existing git worktree layout.
 # Internal; source from hsyncworktrees/hwtcreate.
 
+# Avoid zsh printing `name=value` for repeated `local name` declarations when
+# caller shells have TYPESET_SILENT unset. These helpers are often used in
+# command substitutions that must emit machine-readable rows only.
+setopt typesetsilent
+
 # Be robust in sparse remote/sudo shells.
 export PATH="$HOME/.local/bin:$HOME/.nix-profile/bin:/nix/var/nix/profiles/default/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}"
 

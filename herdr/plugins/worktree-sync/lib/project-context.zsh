@@ -1,5 +1,10 @@
 # Shared context helpers for psteinroe.worktree-sync.
 
+# Herdr plugin panes run zsh with user shell options. If TYPESET_SILENT is
+# unset, repeated `local name` declarations can print `name=value`, polluting
+# menu data captured via command substitution.
+setopt typesetsilent
+
 export PATH="$HOME/.local/bin:$HOME/.nix-profile/bin:/nix/var/nix/profiles/default/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}"
 
 _ws_dotfiles_dir() {
@@ -50,20 +55,42 @@ _ws_workspace_cwd() {
 }
 
 _ws_resolve_project_context() {
-  local cwd
+  local cwd repo_hint fallback_root fallback_cwd
   cwd="${HWS_PROJECT_CWD:-$(_ws_workspace_cwd)}"
-  if [[ -z "$cwd" || ! -e "$cwd" ]]; then
-    echo "Open this action from a project/worktree workspace." >&2
-    return 1
+
+  if [[ -n "$cwd" && -e "$cwd" ]]; then
+    if cd "$cwd" 2>/dev/null && _h_repo_context >/dev/null 2>&1; then
+      typeset -g WS_PROJECT_CWD="$cwd"
+      typeset -g WS_PROJECT_NAME="$H_REPO_NAME"
+      typeset -g WS_PROJECT_ROOT="$H_REPO_ROOT"
+      typeset -g WS_WORKTREE_ROOT="$H_WORKTREE_ROOT"
+      return 0
+    fi
   fi
 
-  cd "$cwd" || return
-  _h_repo_context || return
+  # If a pane has drifted to ~, plugin actions still run inside a named Herdr
+  # session. Recover the repo context from the session name and the standard
+  # ~/Developer/<repo>.git worktree root instead of silently doing nothing.
+  repo_hint="${HWS_PROJECT_NAME:-${HERDR_SESSION:-}}"
+  if [[ -n "$repo_hint" && "$repo_hint" != "default" ]]; then
+    fallback_root="$HOME/Developer/$repo_hint.git"
+    if [[ -d "$fallback_root" ]]; then
+      cd "$fallback_root" || return
+      fallback_cwd="$(_h_git_worktree_paths | head -n 1)"
+      [[ -n "$fallback_cwd" ]] || fallback_cwd="$fallback_root"
+      typeset -g H_REPO_ROOT="$fallback_root"
+      typeset -g H_REPO_NAME="$repo_hint"
+      typeset -g H_WORKTREE_ROOT="$fallback_root"
+      typeset -g WS_PROJECT_CWD="$fallback_cwd"
+      typeset -g WS_PROJECT_NAME="$repo_hint"
+      typeset -g WS_PROJECT_ROOT="$fallback_root"
+      typeset -g WS_WORKTREE_ROOT="$fallback_root"
+      return 0
+    fi
+  fi
 
-  typeset -g WS_PROJECT_CWD="$cwd"
-  typeset -g WS_PROJECT_NAME="$H_REPO_NAME"
-  typeset -g WS_PROJECT_ROOT="$H_REPO_ROOT"
-  typeset -g WS_WORKTREE_ROOT="$H_WORKTREE_ROOT"
+  echo "Open this action from a project/worktree workspace." >&2
+  return 1
 }
 
 _ws_workspace_id_for_path() {
@@ -80,15 +107,42 @@ _ws_workspace_id_for_path() {
   done < <(jq -r --arg cwd "$needle" '.workspaces[]? | select((.identity_cwd // "") == $cwd) | .id' "$session_json" 2>/dev/null)
 }
 
+_ws_workspace_has_pane_at_path() {
+  local id="$1"
+  local wt_path="$2"
+  command -v jq >/dev/null 2>&1 || return 1
+  herdr pane list --workspace "$id" 2>/dev/null \
+    | jq -e --arg cwd "$wt_path" '
+        .result.panes[]?
+        # Prefer the live/foreground cwd when Herdr has it. A pane that was
+        # originally created in a worktree but is now sitting in ~ should not
+        # count as "opened" for that worktree.
+        | select(
+            if ((.foreground_cwd // "") != "") then
+              .foreground_cwd == $cwd
+            else
+              (.cwd // "") == $cwd
+            end
+          )
+      ' >/dev/null 2>&1
+}
+
 _ws_focus_or_create_workspace() {
   local wt_path="$1"
   local label="$2"
   local id
   id="$(_ws_workspace_id_for_path "$wt_path")"
   if [[ -n "$id" ]]; then
-    herdr workspace focus "$id" >/dev/null
+    herdr workspace focus "$id" >/dev/null || return
+
+    # If this workspace was previously left in ~ or another directory, focusing
+    # it alone feels like the selector opened the wrong place. Ensure there is
+    # always a focused tab rooted at the selected Git worktree.
+    if ! _ws_workspace_has_pane_at_path "$id" "$wt_path"; then
+      herdr tab create --workspace "$id" --cwd "$wt_path" --label "$label" --focus >/dev/null || return
+    fi
   else
-    herdr workspace create --cwd "$wt_path" --label "$label" --focus >/dev/null
+    herdr workspace create --cwd "$wt_path" --label "$label" --focus >/dev/null || return
   fi
 }
 
@@ -101,7 +155,6 @@ _ws_open_manager() {
     --plugin psteinroe.worktree-sync
     --entrypoint manager
     --placement overlay
-    --cwd "$WS_PROJECT_CWD"
     --env "HWS_MODE=$mode"
     --env "HWS_PROJECT_CWD=$WS_PROJECT_CWD"
     --env "HWS_PROJECT_NAME=$WS_PROJECT_NAME"

@@ -1,9 +1,5 @@
-# From Mac: copy the local GitHub CLI token to the remote user.
+# Compatibility wrapper. Prefer: rauth [--host host] gh[:github-host]
 # Usage: rghauth [host] [github-host]
-#
-# Defaults to RDEV_HOST/rdev and github.com. This intentionally bypasses
-# exe.dev GitHub integration proxy hosts; use real github.com remotes after
-# running it, preferably HTTPS URLs so git can use `gh auth git-credential`.
 if [[ $# -gt 2 ]]; then
   echo "Usage: rghauth [host] [github-host]" >&2
   return 1
@@ -18,47 +14,5 @@ if [[ $# -gt 1 ]]; then
   gh_host="$2"
 fi
 
-local remote_user="${RDEV_REMOTE_USER:-psteinroe}"
-local remote_home="${RDEV_HOME:-/home/${remote_user}}"
-local remote_path="${remote_home}/.local/bin:${remote_home}/.nix-profile/bin:/nix/var/nix/profiles/default/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-
-if ! command -v gh >/dev/null 2>&1; then
-  echo "rghauth requires gh locally" >&2
-  return 1
-fi
-if ! gh auth status --hostname "$gh_host" >/dev/null 2>&1; then
-  echo "Local gh is not authenticated for $gh_host. Run: gh auth login --hostname $gh_host" >&2
-  return 1
-fi
-
-local remote_cmd='set -euo pipefail
-if ! command -v gh >/dev/null 2>&1; then
-  echo "rghauth requires gh on the remote; run rrebuild/bootstrap first" >&2
-  exit 1
-fi
-umask 077
-token=$(mktemp)
-trap '\''rm -f "$token"'\'' EXIT
-cd "$HOME"
-cat > "$token"
-if [ ! -s "$token" ]; then
-  echo "No GitHub token received on stdin" >&2
-  exit 1
-fi
-
-# Avoid env-token/proxy-host state shadowing the credential we are installing.
-unset GH_HOST GH_TOKEN GITHUB_TOKEN GH_ENTERPRISE_TOKEN GITHUB_ENTERPRISE_TOKEN
-
-gh auth login --hostname "$RGHAUTH_GH_HOST" --with-token < "$token"
-gh auth setup-git --hostname "$RGHAUTH_GH_HOST"
-gh auth status --hostname "$RGHAUTH_GH_HOST"
-'
-
-local encoded
-encoded=$(printf '%s' "$remote_cmd" | base64 | tr -d '\n') || return
-local runner="encoded=${(q)encoded}; cmd=\$(printf %s \"\$encoded\" | base64 -d); sudo -u ${(q)remote_user} HOME=${(q)remote_home} USER=${(q)remote_user} LOGNAME=${(q)remote_user} PATH=${(q)remote_path} RGHAUTH_GH_HOST=${(q)gh_host} bash -lc \"\$cmd\""
-
-gh auth token --hostname "$gh_host" | ssh "$host" "$runner" || return
-
-printf 'Copied local gh auth for %s to %s:%s:%s\n' "$gh_host" "$host" "$remote_user" "$remote_home"
-printf 'Use real GitHub remotes now, e.g. https://%s/OWNER/REPO.git, not *.int.exe.xyz proxy remotes.\n' "$gh_host"
+autoload -Uz rauth
+rauth --host "$host" "gh:$gh_host"
