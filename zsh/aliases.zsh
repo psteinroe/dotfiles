@@ -35,7 +35,19 @@ rtoolshed() { rdev toolshed "$@"; }
 
 # Nix
 alias ndc='nix develop -c'
-alias update='nix flake update --flake ~/Developer/dotfiles'
+update() {
+  local nix_config="${NIX_CONFIG:-}"
+
+  if command -v gh >/dev/null 2>&1; then
+    local github_token
+    github_token="$(gh auth token 2>/dev/null || true)"
+    if [[ -n "$github_token" ]]; then
+      nix_config="access-tokens = github.com=$github_token${nix_config:+$'\n'$nix_config}"
+    fi
+  fi
+
+  NIX_CONFIG="$nix_config" nix flake update --flake ~/Developer/dotfiles "$@"
+}
 
 # Tools
 alias j='just'

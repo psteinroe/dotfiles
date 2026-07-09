@@ -19,8 +19,8 @@
       repo = "mattpocock/skills";
     }
     {
-      name = "diagnose";
-      path = "${inputs.mattpocock-skills}/skills/engineering/diagnose";
+      name = "diagnosing-bugs";
+      path = "${inputs.mattpocock-skills}/skills/engineering/diagnosing-bugs";
       repo = "mattpocock/skills";
     }
     {
@@ -54,13 +54,13 @@
       repo = "mattpocock/skills";
     }
     {
-      name = "to-issues";
-      path = "${inputs.mattpocock-skills}/skills/engineering/to-issues";
+      name = "to-tickets";
+      path = "${inputs.mattpocock-skills}/skills/engineering/to-tickets";
       repo = "mattpocock/skills";
     }
     {
-      name = "to-prd";
-      path = "${inputs.mattpocock-skills}/skills/engineering/to-prd";
+      name = "to-spec";
+      path = "${inputs.mattpocock-skills}/skills/engineering/to-spec";
       repo = "mattpocock/skills";
     }
     {
@@ -69,13 +69,8 @@
       repo = "mattpocock/skills";
     }
     {
-      name = "write-a-skill";
-      path = "${inputs.mattpocock-skills}/skills/productivity/write-a-skill";
-      repo = "mattpocock/skills";
-    }
-    {
-      name = "zoom-out";
-      path = "${inputs.mattpocock-skills}/skills/engineering/zoom-out";
+      name = "writing-great-skills";
+      path = "${inputs.mattpocock-skills}/skills/productivity/writing-great-skills";
       repo = "mattpocock/skills";
     }
   ];
