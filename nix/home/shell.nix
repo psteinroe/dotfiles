@@ -84,9 +84,6 @@ in
       autoload -Uz rssh
       autoload -Uz rrebuild
       autoload -Uz rauth
-      autoload -Uz ragentauth
-      autoload -Uz rmcpauth
-      autoload -Uz rghauth
 
       if [[ $TERM != "dumb" ]]; then
         source ${starshipZshInit}

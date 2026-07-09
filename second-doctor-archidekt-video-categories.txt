@@ -1,0 +1,97 @@
+1 The Second Doctor `Commander`
+1 Clara Oswald `Commander`
+
+1 Howling Mine `Everyone Draws Cards`
+1 Fevered Visions `Everyone Draws Cards`
+1 Scrawling Crawler `Everyone Draws Cards`
+1 Temple Bell `Everyone Draws Cards`
+1 Otherworld Atlas `Everyone Draws Cards`
+1 Kwain, Itinerant Meddler `Everyone Draws Cards`
+1 Dakra Mystic `Everyone Draws Cards`
+1 Geier Reach Sanitarium `Everyone Draws Cards`
+1 Mikokoro, Center of the Sea `Everyone Draws Cards`
+1 Folio of Fancies `Everyone Draws Cards`
+1 Lore Broker `Everyone Draws Cards`
+1 Loran of the Third Path `Everyone Draws Cards`
+1 Forced Fruition `Everyone Draws Cards`
+1 Sokrates, Athenian Teacher `Everyone Draws Cards`
+1 Swans of Bryn Argoll `Everyone Draws Cards`
+
+1 Emrakul's Messenger `I Benefit From Drawing`
+1 Homunculus Horde `I Benefit From Drawing`
+1 Chasm Skulker `I Benefit From Drawing`
+1 Alandra, Sky Dreamer `I Benefit From Drawing`
+1 Minn, Wily Illusionist `I Benefit From Drawing`
+1 Irencrag Pyromancer `I Benefit From Drawing`
+1 Zurzoth, Chaos Rider `I Benefit From Drawing`
+1 Heliod, the Radiant Dawn // Heliod, the Warped Eclipse `I Benefit From Drawing`
+1 Moonlit Meditation `I Benefit From Drawing`
+
+1 Smuggler's Share `Draw on Opponents' Turns`
+1 Mangara, the Diplomat `Draw on Opponents' Turns`
+1 The Council of Four `Draw on Opponents' Turns`
+1 Faerie Mastermind `Draw on Opponents' Turns`
+1 Teferi's Ageless Insight `Draw on Opponents' Turns`
+
+1 Arcane Signet `Ramp / Artifact Untap`
+1 Fellwar Stone `Ramp / Artifact Untap`
+1 Mind Stone `Ramp / Artifact Untap`
+1 Sol Ring `Ramp / Artifact Untap`
+1 Talisman of Conviction `Ramp / Artifact Untap`
+1 Talisman of Creativity `Ramp / Artifact Untap`
+1 Talisman of Progress `Ramp / Artifact Untap`
+1 Thought Vessel `Ramp / Artifact Untap`
+1 Misleading Signpost `Ramp / Artifact Untap`
+1 Sonic Screwdriver `Ramp / Artifact Untap`
+1 Unwinding Clock `Ramp / Artifact Untap`
+1 Jeska's Will `Ramp / Artifact Untap`
+1 Monologue Tax `Ramp / Artifact Untap`
+1 Ancient Den `Ramp / Artifact Untap`
+1 Great Furnace `Ramp / Artifact Untap`
+1 Razortide Bridge `Ramp / Artifact Untap`
+1 Seat of the Synod `Ramp / Artifact Untap`
+1 Silverbluff Bridge `Ramp / Artifact Untap`
+
+1 Into the Roil `Interaction`
+1 Geistwave `Interaction`
+1 Divide by Zero `Interaction`
+1 Arcane Denial `Interaction`
+1 Artistic Refusal `Interaction`
+1 Reverse the Polarity `Interaction`
+1 Narset's Reversal `Interaction`
+1 Wrong Turn `Interaction`
+1 Island Sanctuary `Interaction`
+1 Mystic Reflection `Interaction`
+1 Mirrorweave `Interaction`
+1 Reins of Power `Interaction`
+1 Fractured Identity `Interaction`
+1 Comeuppance `Interaction`
+1 Gideon's Sacrifice `Interaction`
+1 Michiko Konda, Truth Seeker `Interaction`
+
+1 Emberwilde Captain `Hard Wincons`
+1 Unquenchable Fury `Hard Wincons`
+1 Runeflare Trap `Hard Wincons`
+1 Sword of War and Peace `Hard Wincons`
+
+1 Adarkar Wastes `Mana Base`
+1 Azorius Chancery `Mana Base`
+1 Command Tower `Mana Base`
+1 Evolving Wilds `Mana Base`
+1 Exotic Orchard `Mana Base`
+1 Glacial Fortress `Mana Base`
+1 Horizon of Progress `Mana Base`
+1 Irrigated Farmland `Mana Base`
+8 Island `Mana Base`
+1 Molten Tributary `Mana Base`
+2 Mountain `Mana Base`
+1 Mystic Monastery `Mana Base`
+1 Perilous Landscape `Mana Base`
+3 Plains `Mana Base`
+1 Port Town `Mana Base`
+1 Prairie Stream `Mana Base`
+1 Reliquary Tower `Mana Base`
+1 Seachrome Coast `Mana Base`
+1 Shivan Reef `Mana Base`
+1 Sulfur Falls `Mana Base`
+1 Terrain Generator `Mana Base`

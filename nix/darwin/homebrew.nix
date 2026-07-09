@@ -1,10 +1,6 @@
 { ... }:
 
 {
-  # Work around Homebrew API cask loader crashes on casks whose
-  # API JSON has an empty `depends_on.macos` object.
-  environment.variables.HOMEBREW_NO_INSTALL_FROM_API = "1";
-
   homebrew = {
     enable = true;
     # zsh/path.zsh already puts Homebrew on PATH. Avoid running
@@ -31,6 +27,7 @@
       "ausweisapp"
       "nikitabobko/tap/aerospace"
       "ghostty"
+      "codex-app"
       "logitech-options"
       "slack"
       "discord"
@@ -39,6 +36,7 @@
       "stats"
       "timing"
       "linear"
+      "wispr-flow"
       "notion"
       "orbstack"
       "spotify"

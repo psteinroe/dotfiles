@@ -96,7 +96,7 @@ _rauth_check_jq() {
 _rauth_copy_pi() {
   local provider_spec="$1"
   local local_pi_auth="${PI_AUTH_FILE:-$HOME/.pi/agent/auth.json}"
-  local default_pi_providers="${RAUTH_PI_PROVIDERS:-${RAGENTAUTH_PI_PROVIDERS:-${PI_AUTH_PROVIDERS:-${PI_CODEX_PROVIDER:-openai-codex}}}}"
+  local default_pi_providers="${RAUTH_PI_PROVIDERS:-${PI_AUTH_PROVIDERS:-${PI_CODEX_PROVIDER:-openai-codex}}}"
   local -a pi_providers
   local copy_pi_all=0
 

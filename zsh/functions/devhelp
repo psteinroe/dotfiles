@@ -67,6 +67,5 @@ if [[ "$topic" == all || "$topic" == auth ]]; then
   _case_header "Auth/helper utilities"
   _case_row "gh" "wrap gh to auto-use exe.dev integration hosts from origin"
   _case_row "rauth [spec...]" "copy local auth bundle to the remote"
-  _case_row "ragentauth/rmcpauth/rghauth" "compatibility wrappers around rauth"
   _case_row "devhelp [topic]" "show this command reference"
 fi

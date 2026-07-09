@@ -1,0 +1,388 @@
+1 The Second Doctor [Commander]
+1 Clara Oswald [Commander]
+
+1 Howling Mine [Everyone Draws Cards]
+1 Fevered Visions [Everyone Draws Cards]
+1 Scrawling Crawler [Everyone Draws Cards, I Benefit From Drawing]
+1 Temple Bell [Everyone Draws Cards]
+1 Otherworld Atlas [Everyone Draws Cards]
+1 Kwain, Itinerant Meddler [Everyone Draws Cards]
+1 Dakra Mystic [Everyone Draws Cards]
+1 Geier Reach Sanitarium [Everyone Draws Cards, Mana Base]
+1 Mikokoro, Center of the Sea [Everyone Draws Cards, Mana Base]
+1 Folio of Fancies [Everyone Draws Cards]
+1 Lore Broker [Everyone Draws Cards]
+1 Loran of the Third Path [Everyone Draws Cards, Bounce / Removal]
+1 Forced Fruition [Everyone Draws Cards]
+1 Sokrates, Athenian Teacher [Everyone Draws Cards, Protection / Pillowfort]
+1 Swans of Bryn Argoll [Everyone Draws Cards, Protection / Pillowfort]
+
+1 Emrakul's Messenger [I Benefit From Drawing]
+1 Homunculus Horde [I Benefit From Drawing]
+1 Chasm Skulker [I Benefit From Drawing]
+1 Alandra, Sky Dreamer [I Benefit From Drawing]
+1 Minn, Wily Illusionist [I Benefit From Drawing]
+1 Irencrag Pyromancer [I Benefit From Drawing, Bounce / Removal]
+1 Zurzoth, Chaos Rider [I Benefit From Drawing]
+1 Heliod, the Radiant Dawn // Heliod, the Warped Eclipse [I Benefit From Drawing]
+1 Moonlit Meditation [I Benefit From Drawing]
+
+1 Smuggler's Share [Draw on Opponents' Turns]
+1 Mangara, the Diplomat [Draw on Opponents' Turns, Protection / Pillowfort]
+1 The Council of Four [Draw on Opponents' Turns, I Benefit From Drawing]
+1 Faerie Mastermind [Draw on Opponents' Turns]
+1 Teferi's Ageless Insight [Draw on Opponents' Turns, I Benefit From Drawing]
+
+1 Arcane Signet [Ramp / Artifact Untap]
+1 Fellwar Stone [Ramp / Artifact Untap]
+1 Mind Stone [Ramp / Artifact Untap]
+1 Sol Ring [Ramp / Artifact Untap]
+1 Talisman of Conviction [Ramp / Artifact Untap]
+1 Talisman of Creativity [Ramp / Artifact Untap]
+1 Talisman of Progress [Ramp / Artifact Untap]
+1 Thought Vessel [Ramp / Artifact Untap]
+1 Misleading Signpost [Ramp / Artifact Untap, Protection / Pillowfort]
+1 Sonic Screwdriver [Ramp / Artifact Untap]
+1 Unwinding Clock [Ramp / Artifact Untap]
+1 Jeska's Will [Ramp / Artifact Untap]
+1 Monologue Tax [Ramp / Artifact Untap]
+1 Ancient Den [Mana Base]
+1 Great Furnace [Mana Base]
+1 Razortide Bridge [Mana Base]
+1 Seat of the Synod [Mana Base]
+1 Silverbluff Bridge [Mana Base]
+
+1 Into the Roil [Bounce / Removal]
+1 Geistwave [Bounce / Removal]
+1 Divide by Zero [Stack Interaction, Bounce / Removal]
+1 Arcane Denial [Stack Interaction]
+1 Artistic Refusal [Stack Interaction]
+1 Reverse the Polarity [Stack Interaction]
+1 Narset's Reversal [Stack Interaction, Copy / Chaos]
+1 Wrong Turn [Copy / Chaos]
+1 Island Sanctuary [Protection / Pillowfort]
+1 Mystic Reflection [Copy / Chaos]
+1 Mirrorweave [Copy / Chaos]
+1 Reins of Power [Copy / Chaos]
+1 Fractured Identity [Bounce / Removal, Copy / Chaos]
+1 Comeuppance [Protection / Pillowfort]
+1 Gideon's Sacrifice [Protection / Pillowfort]
+1 Michiko Konda, Truth Seeker [Protection / Pillowfort]
+
+1 Emberwilde Captain [Hard Wincons]
+1 Unquenchable Fury [Hard Wincons]
+1 Runeflare Trap [Hard Wincons]
+1 Sword of War and Peace [Hard Wincons]
+
+1 Adarkar Wastes [Mana Base]
+1 Azorius Chancery [Mana Base]
+1 Command Tower [Mana Base]
+1 Evolving Wilds [Mana Base]
+1 Exotic Orchard [Mana Base]
+1 Glacial Fortress [Mana Base]
+1 Horizon of Progress [Mana Base, Ramp / Artifact Untap]
+1 Irrigated Farmland [Mana Base]
+8 Island [Mana Base]
+1 Molten Tributary [Mana Base]
+2 Mountain [Mana Base]
+1 Mystic Monastery [Mana Base]
+1 Perilous Landscape [Mana Base]
+3 Plains [Mana Base]
+1 Port Town [Mana Base]
+1 Prairie Stream [Mana Base]
+1 Reliquary Tower [Mana Base]
+1 Seachrome Coast [Mana Base]
+1 Shivan Reef [Mana Base]
+1 Sulfur Falls [Mana Base]
+1 Terrain Generator [Mana Base, Ramp / Artifact Untap]
+# Maybeboard
+1 Idyllic Tutor
+1 Geth's Grimoire
+1 Patron of the Moon
+1 Heroic Charge
+1 Metropolis Reformer
+1 Step Between Worlds
+1 High Noon
+1 Chromatic Lantern
+1 Archon of Absolution
+1 Improbable Alliance
+1 The Magic Mirror
+1 Elixir of Immortality
+1 Energy Field
+1 Font of Mythos
+1 Whir of Invention
+1 Tormod's Crypt
+1 Unsubstantiate
+1 Rule of Law
+1 Mandate of Peace
+1 Pendant of Prosperity
+1 Sudden Substitution
+1 Oath of Lieges
+1 Morningtide
+1 Squelch
+1 Jace's Archivist
+1 Tempt with Reflections
+1 Call to Heel
+1 Game Plan
+1 Khorvath's Fury
+1 Seal of Cleansing
+1 Flameblade Angel
+1 Clear the Mind
+1 Emergency Powers
+1 Crook of Condemnation
+1 The Locust God
+1 Trinket Mage
+1 Venser's Journal
+1 True Believer
+1 Walking Archive
+1 Parallel Thoughts
+1 Ivory Mask
+1 Sudden Impact
+1 Honor the Fallen
+1 Saprazzan Bailiff
+1 Statecraft
+1 Viseling
+1 Interdict
+1 Iron Maiden
+1 Backfire
+1 Betrayal
+1 Jace, Wielder of Mysteries
+1 Tribute Mage
+1 Tidal Barracuda
+1 Fascination
+1 Split Decision
+1 Aegis of the Gods
+1 Sphere of Safety
+1 Act of Aggression
+1 Jin-Gitaxias, Core Augur
+1 Blue Sun's Zenith
+1 Vicious Shadows
+1 Ebony Owl Netsuke
+1 Gaze of Adamaro
+1 Inner Fire
+1 Kiyomaro, First to Stand
+1 Presence of the Wise
+1 Soramaro, First to Dream
+1 Alexi's Cloak
+1 Angelic Renewal
+1 Gerrard's Wisdom
+1 Faith Healer
+1 Worship
+1 Dream Trawler
+1 Treasure Mage
+1 Blessed Sanctuary
+1 Ominous Seas
+1 Mnemonic Nexus
+1 Gerrard Capashen
+1 Words of Wind
+1 Reminisce
+1 Magus of the Jar
+1 Spellbook
+1 Walking Atlas
+1 Farsight Mask
+1 Tamiyo, the Moon Sage
+1 Negate
+1 Plea for Guidance
+1 Cranial Archive
+1 Force Away
+1 Master the Way
+1 Benevolent Offering
+1 Oblation
+1 Well of Ideas
+1 Orbs of Warding
+1 Aeon Chronicler
+1 Zedruu the Greathearted
+1 Dramatic Reversal
+1 Saheeli's Artistry
+1 Horn of Greed
+1 Kami of the Crescent Moon
+1 Repulse
+1 Trophy Mage
+1 Silent Gravestone
+1 Sentinel Totem
+1 Gilded Lotus
+1 Izzet Boilerworks
+1 Supreme Verdict
+1 Clock of Omens
+1 Sturmgeist
+1 Witchbane Orb
+1 Dreamborn Muse
+1 Skyscribing
+1 Windfall
+1 Leonin Abunas
+1 Archmage Ascension
+1 Quest for Ancient Secrets
+1 Grip of Amnesia
+1 Laquatus's Creativity
+1 Thought Eater
+1 Thought Nibbler
+1 Thought Devourer
+1 Thran Foundry
+1 Prosperity
+1 Noble Benefactor
+1 Rebbec, Architect of Ascension
+1 Sakashima's Will
+1 Word of Seizing
+1 Weathered Runestone
+1 Starnheim Courser
+1 Tales of the Ancestors
+1 Lost Auramancers
+1 Darksteel Mutation
+1 Theoretical Duplication
+1 Tempting Contract
+1 Nils, Discipline Enforcer
+1 Victory Chimes
+1 Out of Time
+1 Solitary Confinement
+1 Flumph
+1 Oswald Fiddlebender
+1 Keen-Eared Sentry
+1 Curse of Obsession
+1 Curse of Surveillance
+1 Consuming Tide
+1 Lantern of the Lost
+1 Moonsnare Prototype
+1 Rune-Tail, Kitsune Ascendant // Rune-Tail's Essence
+1 The Wanderer
+1 Farewell
+1 Release to Memory
+1 Hanna, Ship's Navigator
+1 Ledger Shredder
+1 Sky Diamond
+1 Balor
+1 Stonespeaker Crystal
+1 Your Temple Is Under Attack
+1 Dream Fracture
+1 Marching Duodrone
+1 Decanter of Endless Water
+1 Curse of Verbosity
+1 Fountain Watch
+1 Mocking Doppelganger
+1 Flood Plain
+1 For the Emperor!
+1 Ivory Tower
+1 Howling Golem
+1 Mind's Eye
+1 Indomitable Archangel
+1 Padeem, Consul of Innovation
+1 Calamity's Wake
+1 Union of the Third Path
+1 Remorseful Cleric
+1 Crawlspace
+1 Windborn Muse
+1 Counterspell
+1 Helm of Awakening
+1 Soulless Jailer
+1 Zenith Chronicler
+1 Encroaching Mycosynth
+1 Jin-Gitaxias // The Great Synthesis
+1 Reprieve
+1 Syr Elenora, the Discerning
+1 Shared Fate
+1 Reckless Handling
+1 Prince Imrahil the Fair
+1 Stone of Erech
+1 Champions of Minas Tirith
+1 Devastation Tide
+1 Learn from the Past
+1 Braids, Conjurer Adept
+1 Magus of the Wheel
+1 Minds Aglow
+1 Generous Gift
+1 Oath of Scholars
+1 Teyo, Geometric Tactician
+1 Assault Suit
+1 Stroke of Midnight
+1 Discerning Financier
+1 Minas Tirith Garrison
+1 Ryan Sinclair
+1 Wedding Ring
+1 Grasp of Fate
+1 Kutzil's Flanker
+1 Rogue's Passage
+1 Commit // Memory
+1 Copy Enchantment
+1 Stunt Double
+1 Take the Bait
+1 Immortal Obligation
+1 Knowledge Is Power
+1 Azorius Signet
+1 Psychosis Crawler
+1 Deflecting Palm
+1 Keeper of the Accord
+1 Promise of Loyalty
+1 Struggle for Project Purity
+1 Red Death, Shipwrecker
+1 Elder Owyn Lyons
+1 Archangel of Tithes
+1 Commandeer
+1 Hindering Light
+1 Pariah
+1 Rousing Refrain
+1 Shadow of the Second Sun
+1 Thraben Charm
+1 Estrid's Invocation
+1 Replication Technique
+1 Rest in Peace
+1 Path to Exile
+1 Loyal Inventor
+1 Long River's Pull
+1 Terramorphic Expanse
+1 Baird, Steward of Argive
+1 Body of Knowledge
+1 Ghirapur Orrery
+1 Illusionist's Gambit
+1 Intellectual Offering
+1 Perplexing Test
+1 Perch Protection
+1 Twenty-Toed Toad
+1 Tenuous Truce
+1 Black Vise
+1 Leyline of Sanctity
+1 Jace Beleren
+1 Paradoxical Outcome
+1 Cryptic Command
+1 Fumble
+1 Ghostly Prison
+1 Orzhov Advokist
+1 Prismatic Lens
+1 Sigil of the New Dawn
+1 Razorkin Needlehead
+1 Valgavoth's Lair
+1 Mirror Room // Fractured Realm
+1 Abandoned Campground
+1 Fear of Impostors
+1 Inquisitive Glimmer
+1 Shardmage's Rescue
+1 Marina Vendrell's Grimoire
+1 Restricted Office // Lecture Hall
+1 Moon-Blessed Cleric
+1 Ondu Spiritdancer
+1 Hall of Heliod's Generosity
+1 Mirrormade
+1 Obscura Storefront
+1 Kefnet the Mindful
+1 Roaring Furnace // Steaming Sauna
+1 Imprisoned in the Moon
+1 Extravagant Replication
+1 Dictate of Kruphix
+1 Blink of an Eye
+1 Remand
+1 Starfield Mystic
+1 Soul-Guide Lantern
+1 Midnight Clock
+1 Cyclone Summoner
+1 Swords to Plowshares
+1 Izzet Signet
+1 Skycloud Expanse
+1 Boros Signet
+1 Stormbreath Dragon
+1 Tataru Taru
+1 Collective Effort
+1 Propaganda
+1 Relic of Legends
+1 Idyllic Beachfront
+1 Laboratory Maniac
+1 Fabricate
+1 Etherium Sculptor
+2 Ephara, God of the Polis

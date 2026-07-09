@@ -28,17 +28,18 @@ new_worktree = ""
 open_worktree = ""
 remove_worktree = ""
 
+# Direct, home-row Herdr object navigation. Ctrl+h/j/k/l is reserved for pane
+# navigation; Option+h/j/k/l cycles agents/workspaces directly.
+workspace_picker = "prefix+w"
+previous_workspace = "alt+k"
+next_workspace = "alt+j"
+previous_agent = "alt+h"
+next_agent = "alt+l"
+
 # In navigate mode (`prefix+w`), use both arrow keys and vim keys to move the
 # highlighted worktree/workspace in the sidebar.
 navigate_workspace_up = ["up", "k"]
 navigate_workspace_down = ["down", "j"]
-
-# Herdr 0.7.1 shows the workspace-selection bindings in navigate mode but the
-# production key path does not move the selection reliably. Bind the same keys
-# as previous/next workspace prefix actions too, so in navigate mode bare j/k or
-# arrows switch workspaces immediately instead of requiring Enter.
-previous_workspace = ["prefix+up", "prefix+k"]
-next_workspace = ["prefix+down", "prefix+j"]
 
 # vim-herdr-navigation: seamless movement across Neovim splits and Herdr panes.
 [[keys.command]]
@@ -64,33 +65,6 @@ key = "ctrl+l"
 type = "plugin_action"
 command = "vim-herdr-navigation.right"
 description = "navigate right (vim/herdr)"
-
-# Option/Alt variants are intercepted by Herdr before the focused pane sees
-# them. This keeps Pi from using Option+L for model selection when you meant
-# pane navigation.
-[[keys.command]]
-key = "alt+h"
-type = "plugin_action"
-command = "vim-herdr-navigation.left"
-description = "navigate left (vim/herdr, alt)"
-
-[[keys.command]]
-key = "alt+j"
-type = "plugin_action"
-command = "vim-herdr-navigation.down"
-description = "navigate down (vim/herdr, alt)"
-
-[[keys.command]]
-key = "alt+k"
-type = "plugin_action"
-command = "vim-herdr-navigation.up"
-description = "navigate up (vim/herdr, alt)"
-
-[[keys.command]]
-key = "alt+l"
-type = "plugin_action"
-command = "vim-herdr-navigation.right"
-description = "navigate right (vim/herdr, alt)"
 
 # psteinroe.worktree-sync: project-local worktree actions.
 [[keys.command]]
