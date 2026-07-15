@@ -52,7 +52,7 @@ in
         globalNode
         go
         lua
-        elixir
+        beamPackages.elixir
         # ruby  # conflicts with gotools (both have bin/bundle)
         (rust-bin.stable.latest.default.override {
           extensions = [

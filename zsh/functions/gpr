@@ -7,12 +7,12 @@
 #   gpr -d         = create a draft PR
 #   gpr -f <issue> = add "Fixes <issue>" to PR body
 # Env:
-#   GPR_PI_MODEL              = Pi model (default: openai-codex/gpt-5.4)
+#   GPR_PI_MODEL              = Pi model (default: openai-codex/gpt-5.6-sol)
 #   GPR_PI_THINKING           = Pi thinking level (default: low)
 #   GPR_AI_TIMEOUT_SECONDS    = generation timeout (default: 60)
 # AI env vars only apply when -e/--edit is not used.
 local ai_timeout="${GPR_AI_TIMEOUT_SECONDS:-60}"
-local pi_model="${GPR_PI_MODEL:-openai-codex/gpt-5.4}"
+local pi_model="${GPR_PI_MODEL:-openai-codex/gpt-5.6-sol}"
 local pi_thinking="${GPR_PI_THINKING:-low}"
 local add_all=false new_branch=false edit=false draft=false fixes=""
 local title="" body=""

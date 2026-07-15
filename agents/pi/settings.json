@@ -1,26 +1,25 @@
 {
-  "compaction": {
-    "enabled": true
-  },
-  "retry": {
-    "enabled": true,
-    "maxRetries": 50
-  },
-  "hideThinkingBlock": false,
-  "shellPath": "/bin/zsh",
-  "shellCommandPrefix": "fpath=($HOME/Developer/dotfiles/zsh/functions $fpath); autoload -Uz gpr coffee",
-  "packages": [
-    "git:github.com/default-anton/pi-librarian",
-    "git:github.com/default-anton/pi-finder",
-    "git:github.com/default-anton/pi-handoff",
-    "git:github.com/HazAT/pi-ghostty",
-    "git:github.com/nicobailon/pi-mcp-adapter@v2.8.0",
-    "git:github.com/davebcn87/pi-autoresearch",
-    "npm:pi-codex-goal"
-  ],
-  "lastChangelogVersion": "0.79.1",
-  "theme": "gruvbox-high-contrast",
-  "defaultProvider": "openai-codex",
-  "defaultModel": "gpt-5.5",
-  "defaultThinkingLevel": "high"
+    "compaction": {
+        "enabled": true
+    },
+    "retry": {
+        "enabled": true,
+        "maxRetries": 50
+    },
+    "hideThinkingBlock": false,
+    "shellPath": "/bin/zsh",
+    "shellCommandPrefix": "fpath=($HOME/Developer/dotfiles/zsh/functions $fpath); autoload -Uz gpr coffee",
+    "packages": [
+        "git:github.com/default-anton/pi-librarian",
+        "git:github.com/default-anton/pi-finder",
+        "git:github.com/default-anton/pi-handoff",
+        "git:github.com/HazAT/pi-ghostty",
+        "git:github.com/nicobailon/pi-mcp-adapter@v2.8.0",
+        "git:github.com/davebcn87/pi-autoresearch"
+    ],
+    "lastChangelogVersion": "0.80.6",
+    "theme": "gruvbox-high-contrast",
+    "defaultProvider": "openai-codex",
+    "defaultModel": "gpt-5.6-sol",
+    "defaultThinkingLevel": "high"
 }
