@@ -52,7 +52,7 @@ Local and remote helpers intentionally mirror each other where possible:
 
 | Local | Remote | Purpose |
 | --- | --- | --- |
-| `rebuild` | `rrebuild [host]` | Rebuild this machine / pull dotfiles and rebuild remote Home Manager |
+| `rebuild` | `rrebuild [host]` | Rebuild locally / force-sync the remote checkout to its upstream and rebuild Home Manager |
 | `hdev <repo> [branch\|pr]` | `rdev <repo> [branch\|pr]` | Open local/remote Herdr project session |
 | `wtclean` | `rwtclean <repo>` | Clean merged/closed worktrees |
 | `wtforceclean` | `rwtforceclean <repo>` | Select and force-remove worktrees |

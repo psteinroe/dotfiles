@@ -20,8 +20,8 @@ let
       "/home/${username}";
   herdrPackage = lib.attrByPath [
     pkgs.stdenv.hostPlatform.system
-    "default"
-  ] null inputs.herdr.packages;
+    "herdr"
+  ] null inputs.llm-agents.packages;
 in
 {
   home = {
@@ -51,6 +51,26 @@ in
         if [ -x ${herdrPackage}/bin/herdr ]; then
           ${herdrPackage}/bin/herdr plugin link ${inputs.vim-herdr-navigation} >/dev/null 2>&1 || true
           ${herdrPackage}/bin/herdr plugin link ${dotfilesPath}/herdr/plugins/worktree-sync >/dev/null 2>&1 || true
+        fi
+      ''
+    );
+
+    # Existing servers keep their in-memory configuration across Home Manager
+    # generations. Reload every running named session after deploying config.toml.
+    activation.herdrReloadConfig = lib.mkIf (herdrPackage != null) (
+      lib.hm.dag.entryAfter [ "herdrPluginLinks" ] ''
+        if [ -d "$HOME/.config/herdr/sessions" ]; then
+          for session_dir in "$HOME"/.config/herdr/sessions/*; do
+            [ -S "$session_dir/herdr.sock" ] || continue
+            session_name="''${session_dir##*/}"
+            $DRY_RUN_CMD ${pkgs.coreutils}/bin/env \
+              -u HERDR_CONFIG_PATH \
+              -u HERDR_ENV \
+              -u HERDR_PANE_ID \
+              -u HERDR_SOCKET_PATH \
+              HERDR_SESSION="$session_name" \
+              ${herdrPackage}/bin/herdr server reload-config >/dev/null 2>&1 || true
+          done
         fi
       ''
     );

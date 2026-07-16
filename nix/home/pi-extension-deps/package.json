@@ -1,0 +1,10 @@
+{
+  "name": "pi-extension-runtime-deps",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "acorn": "8.17.0",
+    "effect": "4.0.0-beta.98"
+  }
+}

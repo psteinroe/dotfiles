@@ -155,7 +155,7 @@ fi
 log "Cloning or updating dotfiles"
 as_dev 'mkdir -p "$(dirname "$DOTFILES_DIR")"'
 if as_dev '[ -d "$DOTFILES_DIR/.git" ]'; then
-  as_dev 'git -C "$DOTFILES_DIR" pull --ff-only'
+  as_dev 'git -C "$DOTFILES_DIR" fetch --prune origin && upstream=$(git -C "$DOTFILES_DIR" rev-parse --abbrev-ref --symbolic-full-name "@{upstream}" 2>/dev/null || printf "origin/main") && git -C "$DOTFILES_DIR" reset --hard "$upstream" && git -C "$DOTFILES_DIR" clean -fd'
 else
   if as_dev 'nix run nixpkgs#gh -- auth status >/dev/null 2>&1'; then
     as_dev 'git clone "$DOTFILES_REPO" "$DOTFILES_DIR"'

@@ -1,4 +1,4 @@
-# From Mac: pull latest dotfiles on the remote VM and run its Home Manager rebuild.
+# From Mac: force-sync dotfiles on the remote VM and run its Home Manager rebuild.
 # Usage: rrebuild [host]
 local host="${1:-${RDEV_HOST:-rdev}}"
 local remote_user="${RDEV_REMOTE_USER:-psteinroe}"
@@ -11,7 +11,9 @@ if [[ $# -gt 1 ]]; then
   return 1
 fi
 
-local remote_cmd="set -e; cd ${(q)dotfiles} || exit 1; git pull --ff-only; source ${(q)dotfiles}/zsh/functions/rebuild"
+# Treat the remote checkout as a deployment target: discard remote-only tracked
+# changes, unresolved merges, and untracked files before rebuilding.
+local remote_cmd="set -e; cd ${(q)dotfiles} || exit 1; git fetch --prune origin; upstream=\$(git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || printf 'origin/main'); git reset --hard \"\$upstream\"; git clean -fd; export DOTFILES_DIR=${(q)dotfiles}; source ${(q)dotfiles}/zsh/functions/rebuild"
 local encoded
 encoded=$(printf '%s' "$remote_cmd" | base64 | tr -d '\n') || return
 local runner="encoded=${(q)encoded}; cmd=\$(printf %s \"\$encoded\" | base64 -d); sudo -u ${(q)remote_user} HOME=${(q)remote_home} USER=${(q)remote_user} LOGNAME=${(q)remote_user} PATH=${(q)remote_path} ${(q)remote_home}/.nix-profile/bin/zsh -lc \"\$cmd\""

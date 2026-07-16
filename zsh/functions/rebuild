@@ -1,6 +1,6 @@
 # Rebuild platform configuration
 # Usage: rebuild [-u|--update]
-local dotfiles="$HOME/Developer/dotfiles"
+local dotfiles="${DOTFILES_DIR:-$HOME/Developer/dotfiles}"
 
 if [[ "$1" == "-u" || "$1" == "--update" ]]; then
   echo "Updating flake inputs..."
@@ -18,9 +18,9 @@ case "$(uname -s)" in
     # maxfiles limit (often 256). Flake evaluation then fails in root's
     # tarball cache with "Too many open files". Raise the limit inside the
     # privileged shell before invoking darwin-rebuild.
-    sudo HOME="$HOME" /bin/sh -c '
+    sudo HOME="$HOME" DOTFILES_DIR="$dotfiles" /bin/sh -c '
       ulimit -n 1048575 2>/dev/null || ulimit -n 65536 2>/dev/null || true
-      exec darwin-rebuild switch --flake "$HOME/Developer/dotfiles#psteinroe"
+      exec darwin-rebuild switch --flake "$DOTFILES_DIR#psteinroe"
     '
     ;;
   Linux)

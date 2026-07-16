@@ -16,27 +16,9 @@
 
     nix-homebrew.url = "github:zhaofengli/nix-homebrew";
 
-    # GUI apps as nix derivations
-    nix-casks = {
-      url = "github:atahanyorganci/nix-casks";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
     # Pi coding agent (from llm-agents.nix)
     llm-agents = {
       url = "github:numtide/llm-agents.nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
-    # Tuicr CLI
-    tuicr = {
-      url = "github:agavra/tuicr";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
-    # Herdr terminal workspace manager
-    herdr = {
-      url = "github:ogulcancelik/herdr";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
@@ -67,9 +49,6 @@
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-
-    # Ghostty config management (binary via Homebrew)
-    ghostty-hm-module.url = "github:clo4/ghostty-hm-module";
   };
 
   outputs =

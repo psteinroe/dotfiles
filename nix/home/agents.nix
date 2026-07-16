@@ -28,7 +28,7 @@ in
   home.activation.agentConfigs = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
         remove_path() {
           target="$1"
-          if [ -e "$target" ]; then
+          if [ -e "$target" ] || [ -L "$target" ]; then
             chmod -R u+w "$target" 2>/dev/null || true
             rm -rf "$target"
           fi
@@ -43,6 +43,23 @@ in
           else
             remove_path "$dst"
           fi
+        }
+
+        deploy_extension_dir() {
+          src_dir="$1"
+          dst="$2"
+
+          remove_path "$dst"
+          mkdir -p "$dst"
+
+          [ -d "$src_dir" ] || return 0
+
+          for extension in "$src_dir"/*; do
+            if [ ! -e "$extension" ] && [ ! -L "$extension" ]; then
+              continue
+            fi
+            ln -s "$extension" "$dst/$(basename "$extension")"
+          done
         }
 
         deploy_skill_bundle() {
@@ -94,7 +111,7 @@ in
         link_optional_path "${agentsDir}/pi/models.json" "$HOME/.pi/agent/models.json"
         link_optional_path "${agentsDir}/pi/mcp.json" "$HOME/.pi/agent/mcp.json"
         link_optional_path "${agentsDir}/pi/themes" "$HOME/.pi/agent/themes"
-        link_optional_path "${agentsDir}/pi/extensions" "$HOME/.pi/agent/extensions"
+        deploy_extension_dir "${agentsDir}/pi/extensions" "$HOME/.pi/agent/extensions"
 
         remove_path "$HOME/.pi/agent/skills"
         mkdir -p "$HOME/.pi/agent/skills"

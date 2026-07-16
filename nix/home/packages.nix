@@ -9,8 +9,8 @@
 
 let
   piAgent = lib.attrByPath [ system "pi" ] null inputs.llm-agents.packages;
-  tuicr = lib.attrByPath [ system "default" ] null inputs.tuicr.packages;
-  herdr = lib.attrByPath [ system "default" ] null inputs.herdr.packages;
+  tuicr = lib.attrByPath [ system "tuicr" ] null inputs.llm-agents.packages;
+  herdr = lib.attrByPath [ system "herdr" ] null inputs.llm-agents.packages;
   optionalPackage = pkg: lib.optional (pkg != null) pkg;
 
   # Keep pnpm's shebang pointed at the same runtime as the global Node install.
@@ -22,6 +22,23 @@ let
     version = "0.1.0";
     src = ../../agents/pi/extensions/web-tools;
     npmDepsHash = "sha256-U280AVJ/2b2gXgFv1vPAVGXOcynJkJ+vwfAU1NZ4c/Y=";
+    dontNpmBuild = true;
+    installPhase = ''
+      runHook preInstall
+      mkdir -p $out
+      cp -R node_modules $out/node_modules
+      runHook postInstall
+    '';
+  };
+
+  piExtensionNodeModules = pkgs.buildNpmPackage {
+    pname = "pi-extension-runtime-deps";
+    version = "0.1.0";
+    src = ./pi-extension-deps;
+    npmDepsHash = "sha256-IgvmnSdvwQj6zFT7tgfloNvKGN+VFkIxZYGICAnUnu0=";
+    npmDepsFetcherVersion = 2;
+    npmFlags = [ "--ignore-scripts" ];
+    makeCacheWritable = true;
     dontNpmBuild = true;
     installPhase = ''
       runHook preInstall
@@ -130,18 +147,25 @@ in
 
   }
   // lib.optionalAttrs (piAgent != null) {
-    # Expose pi-coding-agent's bundled node_modules to user-installed pi
-    # extensions in ~/.pi/agent/extensions/, which otherwise cannot resolve
-    # imports like `diff` or `@sinclair/typebox`.
-    activation.piExtensionDeps = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      $DRY_RUN_CMD mkdir -p $HOME/.pi/agent
-      $DRY_RUN_CMD ln -sfn ${piAgent}/lib/node_modules/@earendil-works/pi-coding-agent/node_modules \
-        $HOME/.pi/agent/node_modules
+    # Install third-party dependencies for local extensions. Pi's built-in
+    # extension imports are resolved by Pi itself.
+    activation.piExtensionDeps = lib.hm.dag.entryAfter [ "agentConfigs" ] ''
+      $DRY_RUN_CMD mkdir -p $HOME/.pi/agent/extensions
+      if [ -L "$HOME/.pi/agent/node_modules" ]; then
+        $DRY_RUN_CMD rm "$HOME/.pi/agent/node_modules"
+      fi
 
       if [ -d "$HOME/.pi/agent/extensions/web-tools" ]; then
         $DRY_RUN_CMD ln -sfn ${piWebToolsNodeModules}/node_modules \
           "$HOME/.pi/agent/extensions/web-tools/node_modules"
       fi
+
+      for extension in ask-user background-terminals subagents workflows; do
+        if [ -d "$HOME/.pi/agent/extensions/$extension" ]; then
+          $DRY_RUN_CMD ln -sfn ${piExtensionNodeModules}/node_modules \
+            "$HOME/.pi/agent/extensions/$extension/node_modules"
+        fi
+      done
     '';
   };
 }
