@@ -46,7 +46,7 @@ Remote defaults:
 - `rdev-exe` → exe.dev SSH fallback as `exedev`
 - Worktrees stay at `~/Developer/<repo>.git/<worktree>`
 
-Project shortcuts follow the same local/remote pattern: `dotfiles` / `rdotfiles`, `hellomateo` / `rhellomateo`, `sbch` / `rsbch`, `pgls` / `rpgls`, `pgconductor` / `rpgconductor`, and `toolshed` / `rtoolshed`.
+Project shortcuts follow the same local/remote pattern: `dotfiles` / `rdotfiles`, `hellomateo` / `rhellomateo`, `sbch` / `rsbch`, `pgls` / `rpgls`, `pgconductor` / `rpgconductor`, `pgstream` / `rpgstream`, `hpgstream` / `rhpgstream`, and `toolshed` / `rtoolshed`.
 
 Local and remote helpers intentionally mirror each other where possible:
 

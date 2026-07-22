@@ -5,9 +5,8 @@ The following extensions originated from [`davis7dotsh/my-pi-setup`](https://git
 - `ask-user`
 - `background-terminals`
 - `shared`
-- `subagents`
 - `workflows`
 
-Local changes make the code part of this dotfiles setup. In particular, `subagents` supports only in-process Pi sessions; the upstream Claude Code SDK and Codex CLI backends are not included.
+Local changes make the code part of this dotfiles setup.
 
 The upstream repository did not contain a license file when these sources were imported on 2026-07-15.

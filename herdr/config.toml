@@ -29,12 +29,12 @@ open_worktree = ""
 remove_worktree = ""
 
 # Direct, home-row Herdr object navigation. Ctrl+h/j/k/l is reserved for pane
-# navigation; Option+h/j/k/l cycles agents/workspaces directly.
+# navigation; Option+j/k cycles agents and Option+h/l cycles workspaces.
 workspace_picker = "prefix+w"
-previous_workspace = "alt+k"
-next_workspace = "alt+j"
-previous_agent = "alt+h"
-next_agent = "alt+l"
+previous_workspace = "alt+h"
+next_workspace = "alt+l"
+previous_agent = "alt+k"
+next_agent = "alt+j"
 
 # In navigate mode (`prefix+w`), use both arrow keys and vim keys to move the
 # highlighted worktree/workspace in the sidebar.

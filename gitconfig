@@ -43,7 +43,7 @@
   interactive = auto
   ui = 1
 [push]
-  default = upstream
+  default = simple
   followTags = true
   autoSetupRemote = true
 [status]

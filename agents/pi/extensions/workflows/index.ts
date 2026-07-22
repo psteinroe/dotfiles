@@ -270,7 +270,7 @@ export default function workflows(pi: ExtensionAPI) {
       }
       ui.setStatus(
         "workflows",
-        formatActivityStatus(ui.theme, "workflows", {
+        formatActivityStatus(ui.theme, {
           running,
           done: completedRuns,
           failed: failedRuns,

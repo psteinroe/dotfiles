@@ -31,6 +31,8 @@ if [[ "$topic" == all || "$topic" == remote || "$topic" == worktree ]]; then
   _case_row "sbch / rsbch" "supabase-cache-helpers local/remote session"
   _case_row "pgls / rpgls" "postgres-language-server local/remote session"
   _case_row "pgconductor / rpgconductor" "postgres-conductor local/remote session"
+  _case_row "pgstream / rpgstream" "psteinroe/postgres-stream local/remote session"
+  _case_row "hpgstream / rhpgstream" "getmateo/postgres-stream local/remote session"
   _case_row "toolshed / rtoolshed" "toolshed local/remote session"
   [[ "$topic" == all ]] && print
 

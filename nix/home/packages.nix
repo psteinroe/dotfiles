@@ -160,7 +160,7 @@ in
           "$HOME/.pi/agent/extensions/web-tools/node_modules"
       fi
 
-      for extension in ask-user background-terminals subagents workflows; do
+      for extension in ask-user background-terminals workflows; do
         if [ -d "$HOME/.pi/agent/extensions/$extension" ]; then
           $DRY_RUN_CMD ln -sfn ${piExtensionNodeModules}/node_modules \
             "$HOME/.pi/agent/extensions/$extension/node_modules"

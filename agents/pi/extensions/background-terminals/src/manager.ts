@@ -684,7 +684,7 @@ const makeManager = Effect.gen(function* () {
 
         // disposeAll may have swept the entries map while we were setting up;
         // an entry added after the sweep would never be torn down. Close our
-        // own scope (kills the child) and fail instead (subagents precedent).
+        // own scope (kills the child) and fail instead.
         if (disposed) {
           yield* closeEntryScope(entry);
           return yield* new SpawnError({
@@ -851,7 +851,7 @@ const makeManager = Effect.gen(function* () {
       const entry = entries.get(id);
       if (!entry) return;
       // UI-initiated kills are not "consumed": the killed result still flows
-      // back to the model as a follow-up message (subagents precedent).
+      // back to the model as a follow-up message.
       runCleanup(killEntry(entry).pipe(Effect.ignore));
     },
     setOnSettled: (hook) => {

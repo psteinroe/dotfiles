@@ -30,6 +30,12 @@ rpglsp() { rpgls "$@"; }
 pgconductor() { hdev postgres-conductor "$@"; }
 rpgconductor() { rdev postgres-conductor "$@"; }
 
+pgstream() { hdev postgres-stream "$@"; }
+rpgstream() { rdev postgres-stream "$@"; }
+
+hpgstream() { hdev postgres-steam-getmateo "$@"; }
+rhpgstream() { rdev postgres-steam-getmateo "$@"; }
+
 toolshed() { hdev toolshed "$@"; }
 rtoolshed() { rdev toolshed "$@"; }
 

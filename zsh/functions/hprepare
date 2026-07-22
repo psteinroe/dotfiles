@@ -66,6 +66,14 @@ fi
 
 cd "$target_path" 2>/dev/null || cd "$start_dir" || return
 
+# Herdr resolves plugins per named session. Install the registry before starting
+# a new server so plugin keybindings are available on its first launch.
+if [[ -f "$HOME/.config/herdr/plugins.json" ]]; then
+  local session_dir="$HOME/.config/herdr/sessions/$repo"
+  mkdir -p "$session_dir" || return
+  ln -sfn ../../plugins.json "$session_dir/plugins.json" || return
+fi
+
 if ! HERDR_SESSION="$repo" "$herdr_bin" workspace list >/dev/null 2>&1; then
   HERDR_SESSION="$repo" nohup "$herdr_bin" server >/tmp/herdr-${repo}.log 2>&1 &
   local i

@@ -10,11 +10,8 @@ interface ActivityCounts {
 
 const SQUARE = "■";
 
-export function formatActivityStatus(
-  theme: Theme,
-  label: "subagents" | "workflows",
-  counts: ActivityCounts,
-) {
+export function formatActivityStatus(theme: Theme, counts: ActivityCounts) {
+  const label = "workflows";
   const parts: string[] = [];
   if (counts.running > 0) {
     parts.push(theme.fg("warning", `${SQUARE} ${counts.running} running`));

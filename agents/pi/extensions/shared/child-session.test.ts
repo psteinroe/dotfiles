@@ -98,15 +98,7 @@ test("child denylist keeps extension and workflow structured tools available", a
 
     assert.deepEqual(
       [...CHILD_EXCLUDED_TOOL_NAMES],
-      [
-        "subagent_spawn",
-        "subagent_wait",
-        "subagent_cancel",
-        "subagent_check",
-        "subagent_list",
-        "workflow",
-        "ask_user",
-      ],
+      ["workflow", "ask_user"],
     );
     const allTools = new Set(session.getAllTools().map((tool) => tool.name));
     const activeTools = new Set(session.getActiveToolNames());
