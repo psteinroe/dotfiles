@@ -64,19 +64,22 @@ rm -f "$wt_file"
 # Check PR status in parallel (suppress job control noise)
 setopt local_options no_monitor no_notify
 local pids=()
+local status_files=()
 for entry in "${worktrees[@]}"; do
   local branch="${entry#*:}"
-  local safe_name="${branch//\//__}"
-  gh pr view "$branch" --json state -q '.state' > "$status_dir/$safe_name" 2>/dev/null &
+  local status_file="$status_dir/$(( ${#status_files[@]} + 1 ))"
+  gh pr view "$branch" --json state -q '.state' > "$status_file" 2>/dev/null &
   pids+=($!)
+  status_files+=("$status_file")
 done
 for pid in "${pids[@]}"; do wait "$pid" 2>/dev/null; done
 
+local status_index=1
 for entry in "${worktrees[@]}"; do
   local worktree_path="${entry%%:*}"
   local branch="${entry#*:}"
-  local safe_name="${branch//\//__}"
-  local pr_state=$(<"$status_dir/$safe_name")
+  local pr_state=$(<"${status_files[$status_index]}")
+  status_index=$((status_index + 1))
   case "$pr_state" in
     "MERGED") echo "Merged: $branch"; echo "$worktree_path:$branch" >> "$temp_file" ;;
     "CLOSED") echo "Closed: $branch"; echo "$worktree_path:$branch" >> "$temp_file" ;;
@@ -99,31 +102,62 @@ done < "$temp_file"
 
 echo -n "\nRemove these? (y/N): "
 read response
+local cleanup_status=0
 if [[ "$response" =~ ^[Yy]$ ]]; then
-  # Remove worktrees in parallel, then prune metadata once. Guard protected
-  # branches again here so a stale temp file can never remove main/default.
+  # Remove worktrees in parallel, then clean up only the tmux/Herdr workspaces
+  # whose Git removals succeeded. Guard protected branches again here so a
+  # stale temp file can never remove main/default.
+  local remove_pids=()
+  local remove_paths=()
+  local remove_branches=()
   while IFS=: read -r worktree_path branch; do
     if is_protected_branch "$branch"; then
       echo "Skipping protected branch: $branch"
       continue
     fi
     echo "Removing $branch..."
+    git worktree remove --force "$worktree_path" &
+    remove_pids+=($!)
+    remove_paths+=("$worktree_path")
+    remove_branches+=("$branch")
+  done < "$temp_file"
+
+  local failed_removals=0
+  local successful_indexes=()
+  local i
+  for (( i = 1; i <= ${#remove_pids[@]}; i++ )); do
+    if wait "${remove_pids[$i]}"; then
+      successful_indexes+=("$i")
+    else
+      echo "Failed to remove ${remove_branches[$i]} (${remove_paths[$i]})." >&2
+      failed_removals=$((failed_removals + 1))
+    fi
+  done
+
+  for i in "${successful_indexes[@]}"; do
+    worktree_path="${remove_paths[$i]}"
     if (( $+functions[_wt_kill_tmux_for_worktree] )); then
       _wt_kill_tmux_for_worktree "$session_repo_root" "$worktree_path"
     fi
     if (( $+functions[_h_close_workspace_for_path] )); then
       _h_close_workspace_for_path "$worktree_path" "$herdr_repo_name" || true
     fi
-    git worktree remove --force "$worktree_path" &
-  done < "$temp_file"
-  wait
+  done
+
   git worktree prune
   if (( $+functions[_h_prune_missing_workspaces] )) && [[ -n "$herdr_repo_name" ]]; then
     HERDR_SESSION="$herdr_repo_name" _h_prune_missing_workspaces || true
   fi
-  echo "\nDone."
+
+  if (( failed_removals > 0 )); then
+    echo "\nCleanup incomplete: $failed_removals worktree(s) could not be removed." >&2
+    cleanup_status=1
+  else
+    echo "\nDone."
+  fi
 else
   echo "Cancelled."
 fi
 
 rm -f "$temp_file"
+return "$cleanup_status"

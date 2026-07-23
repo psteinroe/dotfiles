@@ -87,10 +87,19 @@ _ws_sync_worktrees() {
 }
 
 _ws_clean_worktrees() {
-  cd "$WS_PROJECT_ROOT" || return
+  local cleanup_cwd="$WS_PROJECT_CWD"
+  local cleanup_status
+
+  # Match direct wtclean behavior by running from the workspace that opened the
+  # overlay. This keeps the hosting worktree out of the removal candidates and
+  # prevents cleanup from closing the workspace that owns its own pane.
+  [[ -d "$cleanup_cwd" ]] || cleanup_cwd="$WS_PROJECT_ROOT"
+  cd "$cleanup_cwd" || return
   source "$WS_DOTFILES/zsh/functions/wtclean"
+  cleanup_status=$?
   _ws_pause
   _ws_close_self
+  return "$cleanup_status"
 }
 
 _ws_bootstrap_workspace() {
@@ -142,7 +151,7 @@ while true; do
     s) _ws_sync_worktrees; _ws_pause ;;
     b) _ws_bootstrap_workspace ;;
     x) _ws_hide_workspace ;;
-    k) _ws_clean_worktrees ;;
+    k) _ws_clean_worktrees; exit $? ;;
     q|'') _ws_close_self; exit 0 ;;
   esac
 done
