@@ -43,7 +43,7 @@ command = ["zsh", "bootstrap.sh"]
 
 [[actions]]
 id = "clean"
-title = "Clean merged/closed worktrees"
+title = "Clean integrated/stale worktrees"
 contexts = ["workspace"]
 command = ["zsh", "clean.sh"]
 

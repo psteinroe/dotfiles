@@ -19,6 +19,9 @@ rdotfiles() { rdev dotfiles "$@"; }
 hellomateo() { hdev hellomateo "$@"; }
 rhellomateo() { rdev hellomateo "$@"; }
 
+radiomarl() { hdev radio-marl-app "$@"; }
+rradiomarl() { rdev radio-marl-app "$@"; }
+
 sbch() { hdev supabase-cache-helpers "$@"; }
 rsbch() { rdev supabase-cache-helpers "$@"; }
 

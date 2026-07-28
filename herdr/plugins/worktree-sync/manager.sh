@@ -140,7 +140,7 @@ while true; do
   echo "Actions:"
   echo "  o  open/focus worktree       c  create/ensure worktree"
   echo "  s  sync + prune stale        b  bootstrap panes"
-  echo "  x  hide current workspace    k  clean merged/closed worktrees"
+  echo "  x  hide current workspace    k  clean integrated/stale worktrees"
   echo "  q  quit"
   echo
   printf '> '

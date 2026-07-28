@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "check": "tsc --noEmit -p .",
+    "test": "bun test",
     "prepare": "effect-tsgo patch"
   },
   "dependencies": {

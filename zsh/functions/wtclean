@@ -1,4 +1,4 @@
-# Git worktree helper - lists worktrees and cleans up merged PRs
+# Git worktree helper - cleans integrated worktrees and confirmed stale local changes
 git worktree list
 
 if ! command -v gh >/dev/null 2>&1; then
@@ -43,6 +43,95 @@ is_protected_branch() {
   return 1
 }
 
+_wt_file_mtime() {
+  local file_path="$1"
+  local mtime
+  mtime=$(stat -c %Y -- "$file_path" 2>/dev/null) || mtime=$(stat -f %m -- "$file_path" 2>/dev/null) || return 1
+  print -r -- "$mtime"
+}
+
+_wt_latest_dirty_mtime() {
+  local worktree_path="$1"
+  local file mtime latest=0
+
+  # A deleted file has no filesystem timestamp that tells us when deletion
+  # happened. Treat such worktrees as unknown instead of guessing from Git or
+  # directory metadata.
+  if [[ -n "$(git -C "$worktree_path" diff --name-only --diff-filter=D -- 2>/dev/null)" ]] \
+    || [[ -n "$(git -C "$worktree_path" diff --cached --name-only --diff-filter=D -- 2>/dev/null)" ]]; then
+    return 2
+  fi
+
+  while IFS= read -r -d '' file; do
+    [[ -e "$worktree_path/$file" ]] || continue
+    mtime=$(_wt_file_mtime "$worktree_path/$file") || continue
+    (( mtime > latest )) && latest=$mtime
+  done < <(
+    git -C "$worktree_path" diff --name-only -z --diff-filter=ACMRTUXB -- 2>/dev/null
+    git -C "$worktree_path" diff --cached --name-only -z --diff-filter=ACMRTUXB -- 2>/dev/null
+    git -C "$worktree_path" ls-files --others --exclude-standard -z 2>/dev/null
+  )
+
+  (( latest > 0 )) || return 1
+  print -r -- "$latest"
+}
+
+_wt_has_live_agent() {
+  local worktree_path="$1"
+  local session_json workspace_id panes
+
+  command -v herdr >/dev/null 2>&1 || return 1
+  command -v jq >/dev/null 2>&1 || return 1
+
+  if [[ -n "${HERDR_SOCKET_PATH:-}" ]] || [[ -n "${HERDR_SESSION:-}" ]]; then
+    session_json=$(_h_session_json 2>/dev/null) || return 1
+    workspace_id=$(jq -r --arg cwd "$worktree_path" \
+      '.workspaces[]? | select((.identity_cwd // "") == $cwd) | .id' \
+      "$session_json" 2>/dev/null | head -n 1)
+    [[ -n "$workspace_id" ]] || return 1
+    panes=$(herdr pane list --workspace "$workspace_id" 2>/dev/null) || return 1
+  elif [[ -n "$herdr_repo_name" ]]; then
+    session_json="${XDG_CONFIG_HOME:-$HOME/.config}/herdr/sessions/$herdr_repo_name/session.json"
+    [[ -r "$session_json" ]] || return 1
+    workspace_id=$(jq -r --arg cwd "$worktree_path" \
+      '.workspaces[]? | select((.identity_cwd // "") == $cwd) | .id' \
+      "$session_json" 2>/dev/null | head -n 1)
+    [[ -n "$workspace_id" ]] || return 1
+    panes=$(HERDR_SESSION="$herdr_repo_name" herdr pane list --workspace "$workspace_id" 2>/dev/null) || return 1
+  else
+    return 1
+  fi
+
+  print -r -- "$panes" | jq -e '
+    .result.panes[]?
+    | select(((.agent // "") != "") or (.agent_session != null))
+  ' >/dev/null 2>&1
+}
+
+if git remote get-url origin >/dev/null 2>&1; then
+  if ! git fetch --quiet origin "+refs/heads/${default_branch}:refs/remotes/origin/${default_branch}"; then
+    echo "Could not refresh origin/$default_branch; cleanup classification aborted." >&2
+    rm -f "$temp_file" "$wt_file"
+    rm -rf "$status_dir"
+    return 1
+  fi
+fi
+
+local integration_ref="refs/remotes/origin/$default_branch"
+if ! git show-ref --verify --quiet "$integration_ref"; then
+  integration_ref="refs/heads/$default_branch"
+fi
+if ! git show-ref --verify --quiet "$integration_ref"; then
+  echo "Could not resolve the default branch for integration checks: $default_branch" >&2
+  rm -f "$temp_file" "$wt_file"
+  rm -rf "$status_dir"
+  return 1
+fi
+
+local stale_days="${WTCLEAN_STALE_DAYS:-7}"
+[[ "$stale_days" == <-> ]] || stale_days=7
+local stale_before=$(( $(date +%s) - stale_days * 24 * 60 * 60 ))
+
 # Collect worktrees (avoid piped while-read subshell)
 git worktree list --porcelain | grep '^worktree' | cut -d' ' -f2- > "$wt_file"
 
@@ -75,32 +164,79 @@ done
 for pid in "${pids[@]}"; do wait "$pid" 2>/dev/null; done
 
 local status_index=1
+local has_stale_candidates=0
 for entry in "${worktrees[@]}"; do
   local worktree_path="${entry%%:*}"
   local branch="${entry#*:}"
   local pr_state=$(<"${status_files[$status_index]}")
+  local candidate_source=""
   status_index=$((status_index + 1))
+
   case "$pr_state" in
-    "MERGED") echo "Merged: $branch"; echo "$worktree_path:$branch" >> "$temp_file" ;;
-    "CLOSED") echo "Closed: $branch"; echo "$worktree_path:$branch" >> "$temp_file" ;;
-    "OPEN") echo "Active: $branch" ;;
-    "") echo "No PR: $branch" ;;
+    "MERGED") candidate_source="merged PR" ;;
+    "CLOSED") echo "Closed without merge (review): $branch"; continue ;;
+    "OPEN") echo "Active: $branch"; continue ;;
+    "")
+      if git -C "$worktree_path" merge-base --is-ancestor HEAD "$integration_ref" 2>/dev/null; then
+        candidate_source="integrated into $default_branch"
+      else
+        echo "No PR, not integrated: $branch"
+        continue
+      fi
+      ;;
+    *) echo "Unknown PR state '$pr_state': $branch"; continue ;;
   esac
+
+  local dirty_status=$(git -C "$worktree_path" status --porcelain=v1 2>/dev/null)
+  if [[ -z "$dirty_status" ]]; then
+    if _wt_has_live_agent "$worktree_path"; then
+      echo "Integrated but active agent session (review): $branch"
+      continue
+    fi
+    echo "Removable ($candidate_source): $branch"
+    printf '%s\t%s\t%s\t%s\n' "$worktree_path" "$branch" safe "" >> "$temp_file"
+    continue
+  fi
+
+  local latest_mtime
+  latest_mtime=$(_wt_latest_dirty_mtime "$worktree_path")
+  local mtime_status=$?
+  if (( mtime_status != 0 )); then
+    echo "Local changes with unknown age (review): $branch"
+    continue
+  fi
+
+  local age_days=$(( ($(date +%s) - latest_mtime) / (24 * 60 * 60) ))
+  if (( latest_mtime <= stale_before )); then
+    echo "Stale local changes (${age_days}d, $candidate_source): $branch"
+    printf '%s\t%s\t%s\t%s\n' "$worktree_path" "$branch" stale-dirty "$age_days" >> "$temp_file"
+    has_stale_candidates=1
+  else
+    echo "Recent local changes (${age_days}d, review): $branch"
+  fi
 done
 rm -rf "$status_dir"
 
 if [ ! -s "$temp_file" ]; then
-  echo "\nNo merged/closed PRs found."
+  echo "\nNo safely removable worktrees found."
   rm -f "$temp_file"
   return 0
 fi
 
 echo "\nRemovable worktrees:"
-while IFS=: read -r worktree_path branch; do
-  echo "  $branch"
+while IFS=$'\t' read -r worktree_path branch candidate_kind age_days; do
+  if [[ "$candidate_kind" == stale-dirty ]]; then
+    echo "  $branch [DESTRUCTIVE: stale local changes, ${age_days}d old]"
+  else
+    echo "  $branch [safe]"
+  fi
 done < "$temp_file"
 
-echo -n "\nRemove these? (y/N): "
+if (( has_stale_candidates )); then
+  echo -n "\nRemove these? WARNING: listed stale local changes will be permanently lost. (y/N): "
+else
+  echo -n "\nRemove these? (y/N): "
+fi
 read response
 local cleanup_status=0
 if [[ "$response" =~ ^[Yy]$ ]]; then
@@ -110,7 +246,7 @@ if [[ "$response" =~ ^[Yy]$ ]]; then
   local remove_pids=()
   local remove_paths=()
   local remove_branches=()
-  while IFS=: read -r worktree_path branch; do
+  while IFS=$'\t' read -r worktree_path branch candidate_kind age_days; do
     if is_protected_branch "$branch"; then
       echo "Skipping protected branch: $branch"
       continue

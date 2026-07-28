@@ -1,4 +1,4 @@
-# From Mac: run wtclean on a remote repo to clean merged/closed remote worktrees.
+# From Mac: run wtclean on a remote repo to clean integrated/stale remote worktrees.
 # Usage: rwtclean <repo>
 if [[ $# -lt 1 ]]; then
   echo "Usage: rwtclean <repo>" >&2

@@ -3,7 +3,7 @@ set -euo pipefail
 
 repo_root=${0:A:h:h:h}
 test_root=$(mktemp -d)
-trap 'rm -rf "$test_root"' EXIT
+trap 'if [[ "${KEEP_WTCLEAN_FIXTURE:-0}" == 1 ]]; then print -u2 -- "kept fixture: $test_root"; else rm -rf "$test_root"; fi' EXIT
 
 failures=0
 fail() {
@@ -49,6 +49,13 @@ printf '%s\n' "$*" >> "$HERDR_TRACE"
 case "$1 $2" in
   "workspace list") printf '{"result":{"workspaces":[]}}\n' ;;
   "workspace get") printf '{"result":{}}\n' ;;
+  "pane list")
+    if [ "$4" = "ws-agent" ]; then
+      printf '{"result":{"panes":[{"agent":"pi","agent_status":"idle"}]}}\n'
+    else
+      printf '{"result":{"panes":[]}}\n'
+    fi
+    ;;
 esac
 exit 0
 EOF
@@ -151,6 +158,72 @@ printf 'y\n' | env \
 
 [[ ! -d "$collision_fixture/repo.git/feature-foo" ]] || fail "merged colliding branch was not removed"
 [[ -d "$collision_fixture/repo.git/feature__foo" ]] || fail "open colliding branch was removed"
+
+# No-PR worktrees already contained in the default branch are removable. Dirty
+# ones join the confirmation only when their newest local change is at least
+# seven days old; recent local work must remain untouched.
+stale_fixture="$test_root/stale"
+make_fixture "$stale_fixture"
+git --git-dir="$stale_fixture/repo.git" branch stale-dirty main
+git --git-dir="$stale_fixture/repo.git" branch recent-dirty main
+git --git-dir="$stale_fixture/repo.git" branch integrated-clean main
+git --git-dir="$stale_fixture/repo.git" branch integrated-agent main
+git --git-dir="$stale_fixture/repo.git" worktree add -q "$stale_fixture/repo.git/stale-dirty" stale-dirty
+git --git-dir="$stale_fixture/repo.git" worktree add -q "$stale_fixture/repo.git/recent-dirty" recent-dirty
+git --git-dir="$stale_fixture/repo.git" worktree add -q "$stale_fixture/repo.git/integrated-clean" integrated-clean
+git --git-dir="$stale_fixture/repo.git" worktree add -q "$stale_fixture/repo.git/integrated-agent" integrated-agent
+python3 - "$stale_fixture/session/session.json" "$stale_fixture/repo.git/integrated-agent" <<'PY'
+import json
+import os
+import sys
+
+session_path, worktree_path = sys.argv[1], os.path.realpath(sys.argv[2])
+with open(session_path) as file:
+    session = json.load(file)
+session["workspaces"].append({
+    "id": "ws-agent",
+    "identity_cwd": worktree_path,
+    "custom_name": "integrated-agent",
+    "tabs": [{"panes": {"1": {"agent_session": {"agent": "pi"}}}}],
+})
+with open(session_path, "w") as file:
+    json.dump(session, file)
+PY
+print -r -- stale >> "$stale_fixture/repo.git/stale-dirty/file"
+print -r -- recent >> "$stale_fixture/repo.git/recent-dirty/file"
+python3 - "$stale_fixture/repo.git/stale-dirty/file" <<'PY'
+import os
+import sys
+import time
+
+stale = time.time() - 8 * 24 * 60 * 60
+os.utime(sys.argv[1], (stale, stale))
+PY
+cat > "$stale_fixture/bin/gh" <<'EOF'
+#!/bin/sh
+case "$1 $2" in
+  "repo view") printf 'main\n' ;;
+  "pr view") exit 1 ;;
+  *) exit 1 ;;
+esac
+EOF
+chmod +x "$stale_fixture/bin/gh"
+: > "$stale_fixture/herdr.trace"
+printf 'y\n' | env \
+  HOME="$stale_fixture/home" \
+  PATH="$stale_fixture/bin:$PATH" \
+  RDEV_DOTFILES="$repo_root" \
+  HERDR_SOCKET_PATH="$stale_fixture/session/herdr.sock" \
+  HERDR_TRACE="$stale_fixture/herdr.trace" \
+  zsh -c 'cd "$1" && source "$2/zsh/functions/wtclean"' \
+  zsh "$stale_fixture/repo.git/main" "$repo_root" \
+  > "$stale_fixture/output" 2>&1
+
+[[ ! -d "$stale_fixture/repo.git/integrated-clean" ]] || fail "clean integrated worktree was not removed"
+[[ -d "$stale_fixture/repo.git/integrated-agent" ]] || fail "integrated worktree with a live agent was removed"
+[[ ! -d "$stale_fixture/repo.git/stale-dirty" ]] || fail "stale dirty integrated worktree was not removed"
+[[ -d "$stale_fixture/repo.git/recent-dirty" ]] || fail "recent dirty integrated worktree was removed"
+grep -q 'stale local changes' "$stale_fixture/output" || fail "stale dirty candidate was not labeled"
 
 if (( failures > 0 )); then
   print -u2 -- "$failures wtclean Herdr cleanup test(s) failed"

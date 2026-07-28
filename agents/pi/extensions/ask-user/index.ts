@@ -329,10 +329,20 @@ export default function askUser(pi: ExtensionAPI) {
           };
         });
 
-      const uiExit = await Effect.runPromiseExit(
-        Effect.tryPromise(showQuestion),
-        signal ? { signal } : undefined,
-      );
+      const uiExit = await (async () => {
+        pi.events.emit("herdr:blocked", {
+          active: true,
+          label: params.question,
+        });
+        try {
+          return await Effect.runPromiseExit(
+            Effect.tryPromise(showQuestion),
+            signal ? { signal } : undefined,
+          );
+        } finally {
+          pi.events.emit("herdr:blocked", { active: false });
+        }
+      })();
 
       if (Exit.isFailure(uiExit)) {
         if (Cause.hasInterruptsOnly(uiExit.cause)) {

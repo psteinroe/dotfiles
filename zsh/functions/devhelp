@@ -27,6 +27,7 @@ esac
 if [[ "$topic" == all || "$topic" == remote || "$topic" == worktree ]]; then
   _case_header "Project shortcuts"
   _case_row "hellomateo / rhellomateo" "open local/remote Herdr project session"
+  _case_row "radiomarl / rradiomarl" "radio-marl-app local/remote session"
   _case_row "dotfiles / rdotfiles" "open local/remote Herdr project session"
   _case_row "sbch / rsbch" "supabase-cache-helpers local/remote session"
   _case_row "pgls / rpgls" "postgres-language-server local/remote session"
@@ -39,7 +40,7 @@ if [[ "$topic" == all || "$topic" == remote || "$topic" == worktree ]]; then
   _case_header "Local / remote pairs"
   _case_row "rebuild / rrebuild [host]" "rebuild local or remote Home Manager"
   _case_row "hdev / rdev <repo> [branch|pr]" "open Herdr project session"
-  _case_row "wtclean / rwtclean <repo>" "clean merged/closed worktrees"
+  _case_row "wtclean / rwtclean <repo>" "clean integrated/stale worktrees"
   _case_row "wtforceclean / rwtforceclean <repo>" "select and force-remove worktrees"
   _case_row "hwtcreate / rhwtcreate" "ensure worktree and focus/open Herdr workspace"
   _case_row "hsyncworktrees / rhsyncworktrees" "sync Git worktrees into Herdr workspaces"

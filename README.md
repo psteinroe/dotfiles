@@ -46,7 +46,7 @@ Remote defaults:
 - `rdev-exe` → exe.dev SSH fallback as `exedev`
 - Worktrees stay at `~/Developer/<repo>.git/<worktree>`
 
-Project shortcuts follow the same local/remote pattern: `dotfiles` / `rdotfiles`, `hellomateo` / `rhellomateo`, `sbch` / `rsbch`, `pgls` / `rpgls`, `pgconductor` / `rpgconductor`, `pgstream` / `rpgstream`, `hpgstream` / `rhpgstream`, and `toolshed` / `rtoolshed`.
+Project shortcuts follow the same local/remote pattern: `dotfiles` / `rdotfiles`, `hellomateo` / `rhellomateo`, `radiomarl` / `rradiomarl`, `sbch` / `rsbch`, `pgls` / `rpgls`, `pgconductor` / `rpgconductor`, `pgstream` / `rpgstream`, `hpgstream` / `rhpgstream`, and `toolshed` / `rtoolshed`.
 
 Local and remote helpers intentionally mirror each other where possible:
 
@@ -54,7 +54,7 @@ Local and remote helpers intentionally mirror each other where possible:
 | --- | --- | --- |
 | `rebuild` | `rrebuild [host]` | Rebuild locally / force-sync the remote checkout to its upstream and rebuild Home Manager |
 | `hdev <repo> [branch\|pr]` | `rdev <repo> [branch\|pr]` | Open local/remote Herdr project session |
-| `wtclean` | `rwtclean <repo>` | Clean merged/closed worktrees |
+| `wtclean` | `rwtclean <repo>` | Clean integrated/stale worktrees |
 | `wtforceclean` | `rwtforceclean <repo>` | Select and force-remove worktrees |
 | `hwtcreate <branch\|pr>` | `rhwtcreate <repo> <branch\|pr>` | Ensure worktree and focus/open Herdr workspace |
 | `hsyncworktrees [--prune]` | `rhsyncworktrees <repo> [--prune]` | Sync Git worktrees into Herdr workspaces |
