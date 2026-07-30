@@ -144,6 +144,17 @@ else
   git -C "$DOTFILES" pull
 fi
 
+# Configure the trusted Numtide cache before the first build. nix-darwin keeps
+# this file managed afterward through nix/darwin/default.nix.
+echo "Configuring Nix binary caches..."
+sudo tee /etc/nix/nix.custom.conf >/dev/null <<'EOF'
+# Managed by psteinroe/dotfiles.
+extra-substituters = https://cache.numtide.com
+extra-trusted-substituters = https://cache.numtide.com
+extra-trusted-public-keys = niks3.numtide.com-1:DTx8wZduET09hRmMtKdQDxNNthLQETkc/yaX7M4qK0g=
+EOF
+sudo chmod 0644 /etc/nix/nix.custom.conf
+
 # First run of nix-darwin
 echo "Building system configuration..."
 sudo HOME="$HOME" nix run nix-darwin -- switch --flake "$DOTFILES#psteinroe"

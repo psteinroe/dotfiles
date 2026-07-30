@@ -164,6 +164,17 @@ else
   fi
 fi
 
+log "Configuring Nix binary caches"
+cache_config=$(mktemp)
+cat >"$cache_config" <<'EOF'
+# Managed by psteinroe/dotfiles.
+extra-substituters = https://cache.numtide.com
+extra-trusted-substituters = https://cache.numtide.com
+extra-trusted-public-keys = niks3.numtide.com-1:DTx8wZduET09hRmMtKdQDxNNthLQETkc/yaX7M4qK0g=
+EOF
+as_root install -m 0644 "$cache_config" /etc/nix/nix.custom.conf
+rm -f "$cache_config"
+
 if [ "$RUN_HOME_MANAGER" = "1" ]; then
   log "Applying Home Manager: ${HM_FLAKE_ATTR}"
   if as_dev 'cd "$DOTFILES_DIR" && nix run nixpkgs#home-manager -- switch --flake "$DOTFILES_DIR#$HM_FLAKE_ATTR"'; then

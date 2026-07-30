@@ -20,19 +20,66 @@ _h_ensure_workspace() { return 0; }
 EOF
 cat > "$fixture/herdr" <<'EOF'
 #!/bin/sh
-exit 0
+printf '%s\n' "$*" >> "$HERDR_TEST_COMMANDS"
+state=$(cat "$HERDR_TEST_STATE" 2>/dev/null || true)
+
+case "$*" in
+  "status server --json")
+    if [ "$state" = incompatible ]; then
+      printf '%s\n' '{"status":"running","running":true,"compatible":false,"restart_needed":true}'
+    else
+      printf '%s\n' '{"status":"running","running":true,"compatible":true,"restart_needed":false}'
+    fi
+    ;;
+  "session stop example")
+    printf '%s\n' stopped > "$HERDR_TEST_STATE"
+    ;;
+  server)
+    [ "$state" = stopped ] || exit 1
+    printf '%s\n' running > "$HERDR_TEST_STATE"
+    ;;
+  "workspace list")
+    [ -z "$state" ] || [ "$state" = running ]
+    ;;
+esac
 EOF
 chmod +x "$fixture/herdr"
+
+: > "$fixture/herdr-commands"
+export HERDR_TEST_COMMANDS="$fixture/herdr-commands"
+export HERDR_TEST_STATE="$fixture/herdr-state"
+run_hprepare() {
+  source "$repo_root/zsh/functions/hprepare" "$@"
+}
 
 HOME="$fixture/home" \
 USER=test \
 HERDR_BIN="$fixture/herdr" \
+HERDR_TEST_COMMANDS="$fixture/herdr-commands" \
+HERDR_TEST_STATE="$fixture/herdr-state" \
 RDEV_DOTFILES="$fixture/dotfiles" \
-  source "$repo_root/zsh/functions/hprepare" example
+  run_hprepare example
 
 session_plugins="$fixture/home/.config/herdr/sessions/example/plugins.json"
 [[ -L "$session_plugins" ]]
 [[ $(readlink "$session_plugins") == ../../plugins.json ]]
 [[ $(<"$session_plugins") == '[]' ]]
 
-print 'hprepare named-session plugin registry test passed'
+print incompatible > "$fixture/herdr-state"
+: > "$fixture/herdr-commands"
+HOME="$fixture/home" \
+USER=test \
+HERDR_BIN="$fixture/herdr" \
+HERDR_TEST_COMMANDS="$fixture/herdr-commands" \
+HERDR_TEST_STATE="$fixture/herdr-state" \
+HPREPARE_RESTART_INCOMPATIBLE=1 \
+RDEV_DOTFILES="$fixture/dotfiles" \
+  run_hprepare example
+
+stop_line=$(grep -n '^session stop example$' "$fixture/herdr-commands" | cut -d: -f1)
+start_line=$(grep -n '^server$' "$fixture/herdr-commands" | cut -d: -f1)
+[[ -n "$stop_line" && -n "$start_line" ]]
+(( stop_line < start_line ))
+[[ $(<"$fixture/herdr-state") == running ]]
+
+print 'hprepare tests passed'

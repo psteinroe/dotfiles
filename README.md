@@ -29,6 +29,11 @@ nix run nix-darwin -- switch --flake ~/Developer/dotfiles#psteinroe
 nix run nixpkgs#home-manager -- switch --flake ~/Developer/dotfiles#psteinroe@linux-x86_64
 ```
 
+The bootstrap and nix-darwin configuration manage Determinate Nix's
+`/etc/nix/nix.custom.conf`. It trusts Numtide's binary cache for prebuilt
+`llm-agents.nix` packages such as Pi, tuicr, and Herdr while leaving arbitrary
+flake configuration untrusted.
+
 ## Daily project workflow
 
 One project/repo maps to one Herdr named session. One Git worktree maps to one Herdr workspace.

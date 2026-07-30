@@ -74,13 +74,48 @@ if [[ -f "$HOME/.config/herdr/plugins.json" ]]; then
   ln -sfn ../../plugins.json "$session_dir/plugins.json" || return
 fi
 
-if ! HERDR_SESSION="$repo" "$herdr_bin" workspace list >/dev/null 2>&1; then
-  HERDR_SESSION="$repo" nohup "$herdr_bin" server >/tmp/herdr-${repo}.log 2>&1 &
+local server_status compact_status
+server_status=$(HERDR_SESSION="$repo" "$herdr_bin" status server --json 2>/dev/null || true)
+compact_status="${server_status//[[:space:]]/}"
+
+if [[ "$compact_status" == *'"running":true'* ]] &&
+   [[ "$compact_status" == *'"compatible":false'* || "$compact_status" == *'"restart_needed":true'* ]]; then
+  if [[ "${HPREPARE_RESTART_INCOMPATIBLE:-0}" != 1 ]]; then
+    if [[ -t 0 && -t 1 ]]; then
+      local reply
+      echo "Herdr session '$repo' must restart after the client upgrade." >&2
+      echo "Restarting exits all pane processes in that session." >&2
+      read "reply?Restart '$repo' now? [y/N] "
+      [[ "$reply" == [yY] ]] || return 1
+    else
+      echo "Herdr session '$repo' uses an incompatible server." >&2
+      echo "Run: herdr session stop $repo" >&2
+      return 1
+    fi
+  fi
+
+  echo "Restarting incompatible Herdr session '$repo'..." >&2
+  "$herdr_bin" session stop "$repo" >/dev/null || return
+fi
+
+local server_ready=0
+if HERDR_SESSION="$repo" "$herdr_bin" workspace list >/dev/null 2>&1; then
+  server_ready=1
+else
+  HERDR_SESSION="$repo" nohup "$herdr_bin" server >/tmp/herdr-${repo}.log 2>&1 &!
   local i
   for i in {1..30}; do
-    HERDR_SESSION="$repo" "$herdr_bin" workspace list >/dev/null 2>&1 && break
+    if HERDR_SESSION="$repo" "$herdr_bin" workspace list >/dev/null 2>&1; then
+      server_ready=1
+      break
+    fi
     sleep 0.1
   done
+fi
+
+if (( ! server_ready )); then
+  echo "Herdr session '$repo' failed to start; see /tmp/herdr-${repo}.log" >&2
+  return 1
 fi
 
 export HERDR_SESSION="$repo"
