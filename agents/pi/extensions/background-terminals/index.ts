@@ -26,9 +26,14 @@ import type {
   ExtensionUIContext,
 } from "@earendil-works/pi-coding-agent";
 import { getMarkdownTheme } from "@earendil-works/pi-coding-agent";
-import { Markdown, Text } from "@earendil-works/pi-tui";
+import {
+  Markdown,
+  Text,
+  truncateToWidth,
+} from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import type { TerminalSnapshot } from "./src/domain.ts";
+import { createHerdrBackgroundHold } from "./src/herdr.ts";
 import { TerminalManager, type TerminalManagerShape } from "./src/manager.ts";
 import {
   BG_KILL_PARAMETER_DESCRIPTIONS,
@@ -54,6 +59,7 @@ import {
 } from "./src/runtime.ts";
 import { sanitizeText } from "./src/ui/output-view.ts";
 import { openTerminalPicker } from "./src/ui/ps.ts";
+import { renderBackgroundWidgetLine } from "./src/ui/widget.ts";
 
 const WIDGET_KEY = "background-terminals";
 
@@ -64,6 +70,9 @@ export default function (pi: ExtensionAPI) {
   let ui: ExtensionUIContext | undefined;
   let unsubStatus: (() => void) | undefined;
   const resultDelivery = createDeferredResultDelivery<TerminalSnapshot>();
+  const herdrHold = createHerdrBackgroundHold((event) => {
+    pi.events.emit("herdr:blocked", event);
+  });
 
   const getRuntime = () => (runtime ??= createTerminalRuntime());
 
@@ -88,29 +97,28 @@ export default function (pi: ExtensionAPI) {
    * component creation for no visible difference. */
   let widgetRunning = 0;
   const updateWidget = (manager: TerminalManagerShape) => {
-    if (!ui) return;
+    const running = manager.view
+      .list()
+      .filter((snap) => snap.status === "running").length;
+
+    // Pi itself becomes idle after the fire-and-forget bg_start tool returns.
+    // When no foreground turn is active, hold Herdr in its cooperative blocked
+    // state until every detached process settles instead of appearing Done.
+    herdrHold.updateRunning(running);
+
+    if (!ui || running === widgetRunning) return;
     try {
-      const running = manager.view
-        .list()
-        .filter((snap) => snap.status === "running").length;
-      if (running === widgetRunning) return;
       widgetRunning = running;
       if (running === 0) {
         ui.setWidget(WIDGET_KEY, undefined);
         return;
       }
-      ui.setWidget(WIDGET_KEY, (_tui, theme) => {
-        const line =
-          theme.fg("warning", "■ ") +
-          theme.fg(
-            "text",
-            `${running} background terminal${running === 1 ? "" : "s"} running`,
-          ) +
-          theme.fg("dim", " • ") +
-          theme.fg("accent", "/ps") +
-          theme.fg("dim", " to view");
-        return { render: () => [line], invalidate: () => {} };
-      });
+      ui.setWidget(WIDGET_KEY, (_tui, theme) => ({
+        render: (width: number) => [
+          renderBackgroundWidgetLine(running, width, theme, truncateToWidth),
+        ],
+        invalidate: () => {},
+      }));
     } catch {
       // UI may be unavailable (print/RPC modes or teardown).
     }
@@ -172,6 +180,14 @@ export default function (pi: ExtensionAPI) {
     sessionContext = ctx;
     if (ctx.hasUI) ui = ctx.ui;
   });
+
+  // Herdr's own integration owns foreground Working/Idle reports. Acquire the
+  // background hold only after that foreground work ends. Waiting until
+  // turn_start to release it guarantees Herdr has already observed agent_start,
+  // avoiding a transient Idle report between the two extensions.
+  pi.on("turn_start", () => herdrHold.setForegroundActive(true));
+  pi.on("agent_end", () => herdrHold.setForegroundActive(false));
+  pi.on("agent_settled", () => herdrHold.setForegroundActive(false));
 
   // Drain deferred results when the agent settles: together with the
   // isIdle() fast path above and the Map-keyed delivery (drain clears),

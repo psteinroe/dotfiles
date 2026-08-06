@@ -9,7 +9,7 @@ mock.module("@earendil-works/pi-tui", () => ({
   Key: {},
   matchesKey: () => false,
   Text: class {},
-  truncateToWidth: (text: string) => text,
+  truncateToWidth: (text: string, width: number) => text.slice(0, width),
 }));
 mock.module("typebox", () => ({
   Type: {
@@ -62,6 +62,38 @@ const params = {
     { label: "Production" },
   ],
 };
+
+test("re-renders cached question lines after a narrow terminal resize", async () => {
+  const { tool } = createHarness();
+  const narrowWidth = 43;
+  let narrowLines: string[] = [];
+
+  await tool.execute("call-resize", params, undefined, undefined, {
+    mode: "tui",
+    ui: {
+      custom(factory: (...args: any[]) => any) {
+        return new Promise((resolve) => {
+          const component = factory(
+            { requestRender() {} },
+            {
+              fg: (_color: string, text: string) => text,
+              bold: (text: string) => text,
+            },
+            {},
+            resolve,
+          );
+          component.render(80);
+          narrowLines = component.render(narrowWidth);
+          resolve(null);
+        });
+      },
+    },
+  });
+
+  expect(Math.max(...narrowLines.map((line) => line.length))).toBeLessThanOrEqual(
+    narrowWidth,
+  );
+});
 
 test("reports blocked to Herdr only while waiting for user input", async () => {
   const { events, tool } = createHarness();

@@ -108,6 +108,12 @@ if [ "$PASSWORDLESS_SUDO" = "1" ] && [ "$(id -u)" -eq 0 ]; then
   rm -f /tmp/dotfiles-bootstrap-sudoers
 fi
 
+# Keep the managed user's systemd services running without an active SSH
+# login. This is required by long-lived remote services such as moshi-hook.
+if [ -d /exe.dev ] && command -v loginctl >/dev/null 2>&1; then
+  as_root loginctl enable-linger "$DEV_USER"
+fi
+
 log "Installing Determinate Nix"
 if ! command -v nix >/dev/null 2>&1 && [ ! -x /nix/var/nix/profiles/default/bin/nix ]; then
   install_args=(install linux --no-confirm)

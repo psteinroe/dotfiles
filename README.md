@@ -51,6 +51,40 @@ Remote defaults:
 - `rdev-exe` → exe.dev SSH fallback as `exedev`
 - Worktrees stay at `~/Developer/<repo>.git/<worktree>`
 
+### Moshi mobile access
+
+Home Manager installs Mosh and a pinned `moshi-hook`, runs the hook as a
+persistent systemd user service, and exposes the managed Herdr sessions to
+Moshi. For the primary mobile connection, install Tailscale on the phone and
+use:
+
+- Host: `psteinroe-dev.tail6aabd2.ts.net`
+- Port: `22`
+- User: `psteinroe`
+- Connection type: **Mosh** or **Auto**
+
+As `psteinroe`, run the following and scan its Easy Pair QR in Moshi:
+
+```bash
+moshi-hook host setup \
+  --host psteinroe-dev.tail6aabd2.ts.net \
+  --user psteinroe
+```
+
+The exe.dev SSH configuration accepts the generated key from
+`~/.ssh/authorized_keys`, and the Mosh server is exposed on the non-interactive
+SSH path. Agent notification pairing remains a one-time secret-bearing step:
+
+```bash
+moshi-hook pair --token <token-from-Moshi> --store file
+systemctl --user restart moshi-hook
+```
+
+The public exe.dev route remains an SSH-only fallback: connect to
+`psteinroe-dev.exe.xyz` as `exedev` and force **SSH** because the gateway does
+not proxy Mosh UDP traffic. Global Herdr and `moshi-hook` bridges transparently
+run those integrations as `psteinroe` on that fallback connection.
+
 Project shortcuts follow the same local/remote pattern: `dotfiles` / `rdotfiles`, `hellomateo` / `rhellomateo`, `radiomarl` / `rradiomarl`, `sbch` / `rsbch`, `pgls` / `rpgls`, `pgconductor` / `rpgconductor`, `pgstream` / `rpgstream`, `hpgstream` / `rhpgstream`, and `toolshed` / `rtoolshed`.
 
 Local and remote helpers intentionally mirror each other where possible:
