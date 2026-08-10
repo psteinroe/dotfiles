@@ -11,7 +11,9 @@ local requested="${2:-}"
 local remote_user="${RDEV_REMOTE_USER:-psteinroe}"
 local remote_home="${RDEV_HOME:-/home/${remote_user}}"
 local remote_path="${remote_home}/.local/bin:${remote_home}/.nix-profile/bin:/nix/var/nix/profiles/default/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-local dotfiles="${RDEV_DOTFILES:-${remote_home}/Developer/dotfiles}"
+# RDEV_DOTFILES belongs to commands executing on the target. Keep the local
+# override separate so a local hprepare invocation cannot leak a Mac path here.
+local dotfiles="${RDEV_REMOTE_DOTFILES:-${remote_home}/Developer/dotfiles}"
 
 local local_dotfiles="${LOCAL_DOTFILES:-$HOME/Developer/dotfiles}"
 source "$local_dotfiles/zsh/functions/_herdr_binary" || return

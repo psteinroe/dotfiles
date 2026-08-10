@@ -69,8 +69,8 @@
       repo = "mattpocock/skills";
     }
     {
-      name = "writing-great-skills";
-      path = "${inputs.mattpocock-skills}/skills/productivity/writing-great-skills";
+      name = "writing-for-agents";
+      path = "${inputs.mattpocock-skills}/skills/productivity/writing-for-agents";
       repo = "mattpocock/skills";
     }
   ];

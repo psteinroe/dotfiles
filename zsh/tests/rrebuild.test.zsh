@@ -46,7 +46,7 @@ fpath=("$repo_root/zsh/functions" $fpath)
 autoload -Uz rrebuild
 RDEV_REMOTE_USER=test \
   RDEV_HOME="$fixture/home" \
-  RDEV_DOTFILES="$fixture/remote" \
+  RDEV_REMOTE_DOTFILES="$fixture/remote" \
   rrebuild fixture-host
 
 [[ -z $(git -C "$fixture/remote" diff --name-only --diff-filter=U) ]]

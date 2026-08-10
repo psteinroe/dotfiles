@@ -10,6 +10,7 @@ mkdir -p \
   "$fixture/home/.config/herdr" \
   "$fixture/dotfiles/zsh/functions"
 git -C "$fixture/home/Developer/example" init -q
+ln -s "$fixture/dotfiles" "$fixture/home/Developer/dotfiles"
 print -r -- '[]' > "$fixture/home/.config/herdr/plugins.json"
 
 cp "$repo_root/zsh/functions/_herdr_binary" "$fixture/dotfiles/zsh/functions/_herdr_binary"
@@ -81,5 +82,16 @@ start_line=$(grep -n '^server$' "$fixture/herdr-commands" | cut -d: -f1)
 [[ -n "$stop_line" && -n "$start_line" ]]
 (( stop_line < start_line ))
 [[ $(<"$fixture/herdr-state") == running ]]
+
+# hprepare needs the dotfiles path in nested helpers and child processes, but it
+# must not leave that local-only path exported in the calling shell.
+unset RDEV_DOTFILES
+HOME="$fixture/home" \
+USER=test \
+HERDR_BIN="$fixture/herdr" \
+HERDR_TEST_COMMANDS="$fixture/herdr-commands" \
+HERDR_TEST_STATE="$fixture/herdr-state" \
+  run_hprepare example
+(( ! ${+RDEV_DOTFILES} ))
 
 print 'hprepare tests passed'

@@ -19,7 +19,7 @@ local remote_path="${remote_home}/.local/bin:${remote_home}/.nix-profile/bin:/ni
 local remote_term="${RDEV_TERM:-xterm-256color}"
 local remote_colorterm="${RDEV_COLORTERM:-truecolor}"
 local dev_dir="${remote_home}/Developer"
-local dotfiles="${RDEV_DOTFILES:-${remote_home}/Developer/dotfiles}"
+local dotfiles="${RDEV_REMOTE_DOTFILES:-${remote_home}/Developer/dotfiles}"
 local repo_dir="${dev_dir}/${repo}.git"
 local plain_repo_dir="${dev_dir}/${repo}"
 
@@ -35,7 +35,7 @@ fi
 
 local inner_cmd
 if [[ -n "$requested" ]]; then
-  inner_cmd="export PATH=${(q)remote_path}; cd ${(q)repo_dir} || { echo Remote repo not found: ${(q)repo_dir} >&2; exit 1; }; WTENSURE_PRINT_PATH=1; remote_cwd=\$(source ${(q)dotfiles}/zsh/functions/wtensure ${(q)requested} | awk 'substr(\$0, 1, 1) == \"/\" { line=\$0 } END { print line }'); [[ -n \$remote_cwd && -d \$remote_cwd ]] || { echo Could not resolve remote worktree for ${(q)repo} ${(q)requested} >&2; exit 1; }; cd \$remote_cwd || exit 1; session_dir=${remote_home}/.config/herdr/sessions/${repo}; mkdir -p \$session_dir; if [[ -f ${remote_home}/.config/herdr/plugins.json ]]; then ln -sfn ../../plugins.json \$session_dir/plugins.json; fi; exec herdr --session ${(q)repo}"
+  inner_cmd="export PATH=${(q)remote_path}; export RDEV_DOTFILES=${(q)dotfiles}; cd ${(q)repo_dir} || { echo Remote repo not found: ${(q)repo_dir} >&2; exit 1; }; WTENSURE_PRINT_PATH=1; remote_cwd=\$(source ${(q)dotfiles}/zsh/functions/wtensure ${(q)requested} | awk 'substr(\$0, 1, 1) == \"/\" { line=\$0 } END { print line }'); [[ -n \$remote_cwd && -d \$remote_cwd ]] || { echo Could not resolve remote worktree for ${(q)repo} ${(q)requested} >&2; exit 1; }; cd \$remote_cwd || exit 1; session_dir=${remote_home}/.config/herdr/sessions/${repo}; mkdir -p \$session_dir; if [[ -f ${remote_home}/.config/herdr/plugins.json ]]; then ln -sfn ../../plugins.json \$session_dir/plugins.json; fi; exec herdr --session ${(q)repo}"
 else
   inner_cmd="export PATH=${(q)remote_path}; if [[ -d ${(q)plain_repo_dir} ]]; then cd ${(q)plain_repo_dir}; elif [[ -d ${(q)repo_dir} ]]; then cd ${(q)repo_dir}; else echo Remote repo not found: ${(q)plain_repo_dir} or ${(q)repo_dir} >&2; exit 1; fi; session_dir=${remote_home}/.config/herdr/sessions/${repo}; mkdir -p \$session_dir; if [[ -f ${remote_home}/.config/herdr/plugins.json ]]; then ln -sfn ../../plugins.json \$session_dir/plugins.json; fi; exec herdr --session ${(q)repo}"
 fi

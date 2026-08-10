@@ -19,8 +19,14 @@ rdotfiles() { rdev dotfiles "$@"; }
 hellomateo() { hdev hellomateo "$@"; }
 rhellomateo() { rdev hellomateo "$@"; }
 
+ceplatform() { hdev ce-platform "$@"; }
+rceplatform() { rdev ce-platform "$@"; }
+
 radiomarl() { hdev radio-marl-app "$@"; }
 rradiomarl() { rdev radio-marl-app "$@"; }
+
+ninjascale() { hdev ninjascale "$@"; }
+rninjascale() { rdev ninjascale "$@"; }
 
 sbch() { hdev supabase-cache-helpers "$@"; }
 rsbch() { rdev supabase-cache-helpers "$@"; }

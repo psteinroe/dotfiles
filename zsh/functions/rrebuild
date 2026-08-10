@@ -4,7 +4,7 @@ local host="${1:-${RDEV_HOST:-rdev}}"
 local remote_user="${RDEV_REMOTE_USER:-psteinroe}"
 local remote_home="${RDEV_HOME:-/home/${remote_user}}"
 local remote_path="${remote_home}/.local/bin:${remote_home}/.nix-profile/bin:/nix/var/nix/profiles/default/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-local dotfiles="${RDEV_DOTFILES:-${remote_home}/Developer/dotfiles}"
+local dotfiles="${RDEV_REMOTE_DOTFILES:-${remote_home}/Developer/dotfiles}"
 
 if [[ $# -gt 1 ]]; then
   echo "Usage: rrebuild [host]" >&2

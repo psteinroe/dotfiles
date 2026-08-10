@@ -85,7 +85,7 @@ The public exe.dev route remains an SSH-only fallback: connect to
 not proxy Mosh UDP traffic. Global Herdr and `moshi-hook` bridges transparently
 run those integrations as `psteinroe` on that fallback connection.
 
-Project shortcuts follow the same local/remote pattern: `dotfiles` / `rdotfiles`, `hellomateo` / `rhellomateo`, `radiomarl` / `rradiomarl`, `sbch` / `rsbch`, `pgls` / `rpgls`, `pgconductor` / `rpgconductor`, `pgstream` / `rpgstream`, `hpgstream` / `rhpgstream`, and `toolshed` / `rtoolshed`.
+Project shortcuts follow the same local/remote pattern: `dotfiles` / `rdotfiles`, `hellomateo` / `rhellomateo`, `ceplatform` / `rceplatform`, `radiomarl` / `rradiomarl`, `ninjascale` / `rninjascale`, `sbch` / `rsbch`, `pgls` / `rpgls`, `pgconductor` / `rpgconductor`, `pgstream` / `rpgstream`, `hpgstream` / `rhpgstream`, and `toolshed` / `rtoolshed`.
 
 Local and remote helpers intentionally mirror each other where possible:
 

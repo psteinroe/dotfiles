@@ -27,7 +27,9 @@ esac
 if [[ "$topic" == all || "$topic" == remote || "$topic" == worktree ]]; then
   _case_header "Project shortcuts"
   _case_row "hellomateo / rhellomateo" "open local/remote Herdr project session"
+  _case_row "ceplatform / rceplatform" "ce-platform local/remote session"
   _case_row "radiomarl / rradiomarl" "radio-marl-app local/remote session"
+  _case_row "ninjascale / rninjascale" "ninjascale local/remote session"
   _case_row "dotfiles / rdotfiles" "open local/remote Herdr project session"
   _case_row "sbch / rsbch" "supabase-cache-helpers local/remote session"
   _case_row "pgls / rpgls" "postgres-language-server local/remote session"

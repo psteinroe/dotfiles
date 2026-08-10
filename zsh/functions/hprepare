@@ -10,6 +10,9 @@ export PATH="$HOME/.local/bin:$HOME/.nix-profile/bin:/nix/var/nix/profiles/defau
 local repo="${1%.git}"
 local requested="${2:-}"
 local dotfiles="${RDEV_DOTFILES:-$HOME/Developer/dotfiles}"
+# Nested helpers and child processes need this path, but it must not leak into
+# the calling shell where remote wrappers could mistake it for a remote path.
+local -x RDEV_DOTFILES="$dotfiles"
 source "$dotfiles/zsh/functions/_herdr_binary" || return
 local herdr_bin
 herdr_bin="$(_herdr_binary)" || return
@@ -119,7 +122,6 @@ if (( ! server_ready )); then
 fi
 
 export HERDR_SESSION="$repo"
-export RDEV_DOTFILES="$dotfiles"
 source "$dotfiles/zsh/functions/hsyncworktrees" --prune >/dev/null 2>&1 || true
 source "$dotfiles/zsh/functions/_herdr_worktree_helpers" || return
 _h_repo_context || return
