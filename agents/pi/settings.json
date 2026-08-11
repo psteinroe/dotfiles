@@ -15,7 +15,7 @@
     "git:github.com/nicobailon/pi-mcp-adapter@v2.8.0",
     "git:github.com/davebcn87/pi-autoresearch"
   ],
-  "lastChangelogVersion": "0.82.1",
+  "lastChangelogVersion": "0.83.0",
   "theme": "gruvbox-high-contrast",
   "defaultProvider": "openai-codex",
   "defaultModel": "gpt-5.6-sol",

@@ -76,7 +76,7 @@ _wt_latest_dirty_mtime() {
   print -r -- "$latest"
 }
 
-_wt_has_live_agent() {
+_wt_has_active_agent() {
   local worktree_path="$1"
   local session_json workspace_id panes
 
@@ -104,7 +104,11 @@ _wt_has_live_agent() {
 
   print -r -- "$panes" | jq -e '
     .result.panes[]?
-    | select(((.agent // "") != "") or (.agent_session != null))
+    | select(
+        ((.agent // "") != "")
+        and ((.agent_status // "unknown") as $status
+          | $status != "idle" and $status != "done")
+      )
   ' >/dev/null 2>&1
 }
 
@@ -189,7 +193,7 @@ for entry in "${worktrees[@]}"; do
 
   local dirty_status=$(git -C "$worktree_path" status --porcelain=v1 2>/dev/null)
   if [[ -z "$dirty_status" ]]; then
-    if _wt_has_live_agent "$worktree_path"; then
+    if _wt_has_active_agent "$worktree_path"; then
       echo "Integrated but active agent session (review): $branch"
       continue
     fi

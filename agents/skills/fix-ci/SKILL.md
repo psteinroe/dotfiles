@@ -16,13 +16,13 @@ This skill helps fix failing CI checks in GitHub repositories.
    - This context is critical - CI failures often relate directly to the changes made
 
 2. **Check CI Status**
-   - Run `gh pr checks` or `gh run list` to see current CI status
-   - If no PR exists, check the latest workflow runs on the current branch
+   - Query compact fields: `gh pr checks --json name,state,bucket,link,workflow`
+   - If no PR exists, query the current commit with `gh run list --commit "$(git rev-parse HEAD)" --json databaseId,status,conclusion,workflowName,url`
 
 3. **Analyze Failures**
-   - For each failing check, run `gh run view <run-id> --log-failed` to get failure logs
-   - Cross-reference failures with the changes from step 1
-   - Identify the root cause of each failure
+   - Resolve the failed run ID, then run `scripts/failed-run-summary.sh <run-id>` from this skill directory
+   - The script keeps the complete failed log in a temporary file and returns only bounded diagnostic excerpts
+   - Cross-reference failures with the changes from step 1 and identify each root cause
 
 4. **Fix Issues**
    - If the fix is straightforward (linting, formatting, type errors, test fixes):
@@ -34,25 +34,28 @@ This skill helps fix failing CI checks in GitHub repositories.
      - Present options if multiple approaches exist
      - Ask for permission before proceeding
 
-5. **Wait and Verify**
-   - After pushing, use `gh run watch --exit-status` to monitor the CI run
-   - Exit status 0 means CI passed - report success
-   - Non-zero exit status means CI failed - repeat from step 3
+5. **Wait and Verify Quietly**
+   - After pushing, run `scripts/wait-for-pr-checks.sh` from this skill directory with a Bash-tool timeout above its one-hour default deadline
+   - For a branch without a PR, resolve the run ID and use `scripts/wait-for-run.sh <run-id>` instead
+   - These scripts poll silently and emit one compact final result; keep working only when useful work remains, otherwise wait for that single result
+   - Success means CI passed. Failure means repeat from step 3
 
 ## Commands Reference
 
 ```bash
-# Check PR status
-gh pr checks
+# Check PR status without a live-refresh table
+gh pr checks --json name,state,bucket,link,workflow
 
-# List recent workflow runs
-gh run list --branch $(git branch --show-current)
+# List runs for the exact pushed commit
+gh run list --commit "$(git rev-parse HEAD)" \
+  --json databaseId,status,conclusion,workflowName,url
 
-# View failed run logs
-gh run view <run-id> --log-failed
+# Print bounded diagnostics and retain the complete failed log in /tmp
+scripts/failed-run-summary.sh <run-id>
 
-# Watch a run in progress (exits non-zero if run fails)
-gh run watch <run-id> --exit-status
+# Wait without streaming refresh snapshots into model context
+scripts/wait-for-pr-checks.sh
+scripts/wait-for-run.sh <run-id>
 
 # Re-run failed jobs
 gh run rerun <run-id> --failed
@@ -61,7 +64,7 @@ gh run rerun <run-id> --failed
 ## Guidelines
 
 - **Always understand the diff first** - don't blindly fix errors without knowing what changed
-- Always read error logs carefully before making changes
+- Read bounded failure diagnostics first; inspect the retained full log only when the excerpt is insufficient
 - Prefer minimal, targeted fixes over large refactors
 - If a test is flaky, mention it to the user rather than silently retrying
 - Never skip tests or disable CI checks without explicit user approval

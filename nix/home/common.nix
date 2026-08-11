@@ -55,14 +55,51 @@ in
       ''
     );
 
-    # Existing servers keep their in-memory configuration across Home Manager
-    # generations. Reload every running named session after deploying config.toml.
+    # Existing servers keep their binary and in-memory configuration across Home
+    # Manager generations. Live-handoff incompatible servers to the newly
+    # installed binary without terminating pane processes, then reload config.
     activation.herdrReloadConfig = lib.mkIf (herdrPackage != null) (
       lib.hm.dag.entryAfter [ "herdrPluginLinks" ] ''
+        herdr_for_session() {
+          ${pkgs.coreutils}/bin/env \
+            -u HERDR_CONFIG_PATH \
+            -u HERDR_ENV \
+            -u HERDR_PANE_ID \
+            -u HERDR_SOCKET_PATH \
+            HERDR_SESSION="$session_name" \
+            ${herdrPackage}/bin/herdr "$@"
+        }
+
         if [ -d "$HOME/.config/herdr/sessions" ]; then
           for session_dir in "$HOME"/.config/herdr/sessions/*; do
             [ -S "$session_dir/herdr.sock" ] || continue
             session_name="''${session_dir##*/}"
+            server_status="$(herdr_for_session status server --json 2>/dev/null || true)"
+
+            if [[ "$server_status" == *'"running":true'* \
+              && "$server_status" == *'"compatible":false'* \
+              && "$server_status" == *'"live_handoff":true'* ]]; then
+              if [ -n "$DRY_RUN_CMD" ]; then
+                $DRY_RUN_CMD ${pkgs.coreutils}/bin/env \
+                  HERDR_SESSION="$session_name" \
+                  ${herdrPackage}/bin/herdr server live-handoff \
+                  --import-exe ${herdrPackage}/bin/herdr
+              elif ! herdr_for_session server live-handoff \
+                --import-exe ${herdrPackage}/bin/herdr >/dev/null 2>&1; then
+                echo "Warning: Herdr live handoff failed for session '$session_name'." >&2
+              else
+                # Wait briefly for the replacement server to bind the session
+                # socket before asking it to reload the new configuration.
+                i=0
+                while [ "$i" -lt 50 ]; do
+                  server_status="$(herdr_for_session status server --json 2>/dev/null || true)"
+                  [[ "$server_status" == *'"compatible":true'* ]] && break
+                  i=$((i + 1))
+                  sleep 0.1
+                done
+              fi
+            fi
+
             $DRY_RUN_CMD ${pkgs.coreutils}/bin/env \
               -u HERDR_CONFIG_PATH \
               -u HERDR_ENV \

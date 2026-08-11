@@ -50,11 +50,29 @@ case "$1 $2" in
   "workspace list") printf '{"result":{"workspaces":[]}}\n' ;;
   "workspace get") printf '{"result":{}}\n' ;;
   "pane list")
-    if [ "$4" = "ws-agent" ]; then
-      printf '{"result":{"panes":[{"agent":"pi","agent_status":"idle"}]}}\n'
-    else
-      printf '{"result":{"panes":[]}}\n'
-    fi
+    case "$4" in
+      ws-idle)
+        printf '{"result":{"panes":[{"agent":"pi","agent_status":"idle","agent_session":{"agent":"pi"}}]}}\n'
+        ;;
+      ws-done)
+        printf '{"result":{"panes":[{"agent":"pi","agent_status":"done","agent_session":{"agent":"pi"}}]}}\n'
+        ;;
+      ws-working)
+        printf '{"result":{"panes":[{"agent":"pi","agent_status":"working","agent_session":{"agent":"pi"}}]}}\n'
+        ;;
+      ws-blocked)
+        printf '{"result":{"panes":[{"agent":"pi","agent_status":"blocked","agent_session":{"agent":"pi"}}]}}\n'
+        ;;
+      ws-unknown)
+        printf '{"result":{"panes":[{"agent":"pi","agent_status":"unknown","agent_session":{"agent":"pi"}}]}}\n'
+        ;;
+      ws-persisted)
+        printf '{"result":{"panes":[{"agent_status":"unknown","agent_session":{"agent":"pi"}}]}}\n'
+        ;;
+      *)
+        printf '{"result":{"panes":[]}}\n'
+        ;;
+    esac
     ;;
 esac
 exit 0
@@ -159,33 +177,40 @@ printf 'y\n' | env \
 [[ ! -d "$collision_fixture/repo.git/feature-foo" ]] || fail "merged colliding branch was not removed"
 [[ -d "$collision_fixture/repo.git/feature__foo" ]] || fail "open colliding branch was removed"
 
-# No-PR worktrees already contained in the default branch are removable. Dirty
-# ones join the confirmation only when their newest local change is at least
-# seven days old; recent local work must remain untouched.
+# No-PR worktrees already contained in the default branch are removable. Idle
+# and done agents do not make their workspace active, and persisted agent
+# metadata alone is not a live agent. Working, blocked, and unknown live agents
+# remain protected. Dirty worktrees join the confirmation only when their newest
+# local change is at least seven days old; recent local work must remain untouched.
 stale_fixture="$test_root/stale"
 make_fixture "$stale_fixture"
 git --git-dir="$stale_fixture/repo.git" branch stale-dirty main
 git --git-dir="$stale_fixture/repo.git" branch recent-dirty main
 git --git-dir="$stale_fixture/repo.git" branch integrated-clean main
-git --git-dir="$stale_fixture/repo.git" branch integrated-agent main
+for state in idle done working blocked unknown persisted; do
+  git --git-dir="$stale_fixture/repo.git" branch "integrated-$state" main
+  git --git-dir="$stale_fixture/repo.git" worktree add -q \
+    "$stale_fixture/repo.git/integrated-$state" "integrated-$state"
+done
 git --git-dir="$stale_fixture/repo.git" worktree add -q "$stale_fixture/repo.git/stale-dirty" stale-dirty
 git --git-dir="$stale_fixture/repo.git" worktree add -q "$stale_fixture/repo.git/recent-dirty" recent-dirty
 git --git-dir="$stale_fixture/repo.git" worktree add -q "$stale_fixture/repo.git/integrated-clean" integrated-clean
-git --git-dir="$stale_fixture/repo.git" worktree add -q "$stale_fixture/repo.git/integrated-agent" integrated-agent
-python3 - "$stale_fixture/session/session.json" "$stale_fixture/repo.git/integrated-agent" <<'PY'
+python3 - "$stale_fixture/session/session.json" "$stale_fixture/repo.git" <<'PY'
 import json
 import os
 import sys
 
-session_path, worktree_path = sys.argv[1], os.path.realpath(sys.argv[2])
+session_path, worktree_root = sys.argv[1:]
 with open(session_path) as file:
     session = json.load(file)
-session["workspaces"].append({
-    "id": "ws-agent",
-    "identity_cwd": worktree_path,
-    "custom_name": "integrated-agent",
-    "tabs": [{"panes": {"1": {"agent_session": {"agent": "pi"}}}}],
-})
+for state in ("idle", "done", "working", "blocked", "unknown", "persisted"):
+    worktree_path = os.path.realpath(os.path.join(worktree_root, f"integrated-{state}"))
+    session["workspaces"].append({
+        "id": f"ws-{state}",
+        "identity_cwd": worktree_path,
+        "custom_name": f"integrated-{state}",
+        "tabs": [{"panes": {"1": {"agent_session": {"agent": "pi"}}}}],
+    })
 with open(session_path, "w") as file:
     json.dump(session, file)
 PY
@@ -220,7 +245,12 @@ printf 'y\n' | env \
   > "$stale_fixture/output" 2>&1
 
 [[ ! -d "$stale_fixture/repo.git/integrated-clean" ]] || fail "clean integrated worktree was not removed"
-[[ -d "$stale_fixture/repo.git/integrated-agent" ]] || fail "integrated worktree with a live agent was removed"
+[[ ! -d "$stale_fixture/repo.git/integrated-idle" ]] || fail "idle agent incorrectly protected an integrated worktree"
+[[ ! -d "$stale_fixture/repo.git/integrated-done" ]] || fail "done agent incorrectly protected an integrated worktree"
+[[ ! -d "$stale_fixture/repo.git/integrated-persisted" ]] || fail "persisted agent metadata incorrectly protected an integrated worktree"
+for state in working blocked unknown; do
+  [[ -d "$stale_fixture/repo.git/integrated-$state" ]] || fail "$state agent did not protect its integrated worktree"
+done
 [[ ! -d "$stale_fixture/repo.git/stale-dirty" ]] || fail "stale dirty integrated worktree was not removed"
 [[ -d "$stale_fixture/repo.git/recent-dirty" ]] || fail "recent dirty integrated worktree was removed"
 grep -q 'stale local changes' "$stale_fixture/output" || fail "stale dirty candidate was not labeled"
