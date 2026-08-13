@@ -1,7 +1,13 @@
-# Create/ensure a Git worktree and focus/open it as a Herdr workspace.
-# Usage: hwtcreate <branch|pr-number>
+# Create/ensure a Git worktree and open it as a Herdr workspace.
+# Usage: hwtcreate [--focus|--no-focus] <branch|pr-number>
+local focus=1
+case "${1:-}" in
+  --focus) shift ;;
+  --no-focus) focus=0; shift ;;
+esac
+
 if [[ $# -ne 1 ]]; then
-  echo "Usage: hwtcreate <branch|pr-number>" >&2
+  echo "Usage: hwtcreate [--focus|--no-focus] <branch|pr-number>" >&2
   return 1
 fi
 
@@ -27,4 +33,4 @@ fi
 local label="${WTENSURE_WORKTREE_NAME:-$(_h_worktree_label "$PWD")}"
 local wt_path="${WTENSURE_WORKTREE_PATH:-$PWD}"
 
-_h_ensure_workspace "$wt_path" "$label" 1
+_h_ensure_workspace "$wt_path" "$label" "$focus"

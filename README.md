@@ -102,6 +102,12 @@ Local and remote helpers intentionally mirror each other where possible:
 
 For the full command list, run `devhelp`.
 
+Pi also receives the `worktree-agents` skill on local and remote machines. When
+asked to delegate work into another branch, PR, or worktree, it routes creation
+through `hwtcreate`/`wtensure` and starts the agent in the matching Herdr
+workspace instead of using Herdr's default worktree layout. Agent launches keep
+the current workspace focused unless explicitly asked to switch.
+
 ## Git worktrees
 
 ```bash
