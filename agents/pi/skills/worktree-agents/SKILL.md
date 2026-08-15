@@ -35,23 +35,39 @@ Use this helper as the only worktree/workspace creation path for project work. R
 
 This is background-safe by default. Add `--focus` only when the user asked to switch to it.
 
-### Launch an agent there
+### Launch a worker there
 
-For a short prompt:
+The coordinating main agent is the review gate. Before delegation, verify it is GPT-5.6 Sol at high thinking:
+
+```bash
+test "${PI_PROVIDER:-}" = openai-codex
+test "${PI_MODEL:-}" = gpt-5.6-sol
+test "${PI_REASONING_LEVEL:-}" = high
+```
+
+Ask the user to switch the main session when this gate fails. Launch the worker with a self-contained task and checkable acceptance criteria:
 
 ```bash
 <skill-dir>/scripts/worktree-agent.zsh launch <branch-or-pr> \
   --name <short-agent-name> \
-  --prompt '<self-contained task>'
+  --prompt '<self-contained task and acceptance criteria>'
 ```
 
-For multiline or quote-heavy prompts, write a temporary file and use `--prompt-file <path>`. The default agent kind is `pi`; pass `--kind <kind>` only when the user requests another supported agent. Add `--focus` only when requested.
+Pi workers default to GPT-5.6 Terra at high thinking. Use `--model <provider/model>` only for deliberate routing. For multiline or quote-heavy prompts, write a temporary file and use `--prompt-file <path>`. Pass `--kind <kind>` only when the user requests another supported agent. Add `--focus` only when requested.
 
-The launcher opens a fresh tab when the target workspace already exists, so it never takes over an occupied pane. It submits the prompt without waiting, allowing work to continue in parallel.
+The launcher keeps one live agent per worktree. It reuses an idle or done worker only when its Pi model and thinking level match the request, and refuses a second launch while that worktree's agent is working, blocked, or unknown. Independent worktrees can continue in parallel.
 
-## Coordinate
+## Review loop
 
-Treat the launcher's JSON as the source of truth for the worktree path, workspace ID, pane ID, and unique agent name. Use that returned agent name with current Herdr commands:
+Treat the launcher's JSON as the source of truth for the worktree path, workspace ID, pane ID, agent name, model, and review requirement.
+
+1. Wait for the worker to settle. A wait timeout means inspect and wait again, not that the task is complete.
+2. Read the worker output for orientation. Treat its claims as unverified.
+3. Independently inspect all committed, staged, unstaged, and untracked changes from the returned worktree path. Run the relevant tests, type checks, lint, build, or other project validation there.
+4. If review finds defects or unverified requirements, call `launch` again for the same target with a focused correction prompt. The launcher reuses the settled worker. Wait and repeat the independent review.
+5. Report completion only after the main agent finds no actionable defects and has fresh validation evidence for every acceptance criterion.
+
+Use current Herdr commands to coordinate:
 
 ```bash
 herdr agent get <name>
@@ -59,4 +75,4 @@ herdr agent read <name> --source recent-unwrapped --lines 120
 herdr agent wait <name> --timeout 120000
 ```
 
-Run `herdr --skill` when broader Herdr control or current CLI details are needed. Report the launched branch/PR, worktree path, workspace, and agent name to the user.
+Run `herdr --skill` when broader Herdr control or current CLI details are needed. Delegation is not complete when the worker stops; it is complete only after the main-agent review gate passes. Report the branch/PR, worktree path, worker model, review rounds, findings resolved, and final validation evidence.

@@ -48,7 +48,12 @@ EOF
 printf '%s\n' "$*" >> "$HERDR_TRACE"
 case "$1 $2" in
   "workspace list") printf '{"result":{"workspaces":[]}}\n' ;;
-  "workspace get") printf '{"result":{}}\n' ;;
+  "workspace get")
+    if grep -Fqx "workspace close $3" "$HERDR_TRACE"; then
+      exit 1
+    fi
+    printf '{"result":{}}\n'
+    ;;
   "pane list")
     case "$4" in
       ws-idle)
@@ -79,11 +84,12 @@ exit 0
 EOF
   chmod +x "$fixture/bin/herdr"
 
+  local real_fixture="${fixture:A}"
   cat > "$fixture/session/session.json" <<EOF
 {"workspaces":[
-  {"id":"ws-main","identity_cwd":"$fixture/repo.git/main","custom_name":"main"},
-  {"id":"ws-a","identity_cwd":"$fixture/repo.git/a","custom_name":"a"},
-  {"id":"ws-b","identity_cwd":"$fixture/repo.git/b","custom_name":"b"}
+  {"id":"ws-main","identity_cwd":"$real_fixture/repo.git/main","custom_name":"main"},
+  {"id":"ws-a","identity_cwd":"$real_fixture/repo.git/a","custom_name":"a"},
+  {"id":"ws-b","identity_cwd":"$real_fixture/repo.git/b","custom_name":"b"}
 ]}
 EOF
 }
@@ -113,6 +119,8 @@ manager_renders=$(grep -c 'Worktree Manager —' "$manager_fixture/output" || tr
 [[ "$manager_renders" == 1 ]] || fail "manager rendered $manager_renders times after one cleanup"
 pane_closes=$(grep -c '^pane close manager-overlay$' "$manager_fixture/herdr.trace" || true)
 [[ "$pane_closes" == 1 ]] || fail "manager requested pane close $pane_closes times"
+workspace_closes=$(grep -c '^workspace close ws-b$' "$manager_fixture/herdr.trace" || true)
+[[ "$workspace_closes" == 1 ]] || fail "manager requested workspace close $workspace_closes times for one removed worktree"
 
 # A failed parallel removal must make the command fail and must not claim that
 # every candidate was removed. A locked worktree deterministically exercises
@@ -176,6 +184,38 @@ printf 'y\n' | env \
 
 [[ ! -d "$collision_fixture/repo.git/feature-foo" ]] || fail "merged colliding branch was not removed"
 [[ -d "$collision_fixture/repo.git/feature__foo" ]] || fail "open colliding branch was removed"
+
+# A clean checkout for a closed PR can be hibernated without losing the local
+# branch. Reopening it later goes back through wtensure/hwtcreate.
+closed_fixture="$test_root/closed"
+make_fixture "$closed_fixture"
+git --git-dir="$closed_fixture/repo.git" branch closed-pr main
+git --git-dir="$closed_fixture/repo.git" worktree add -q "$closed_fixture/repo.git/closed-pr" closed-pr
+cat > "$closed_fixture/bin/gh" <<'EOF'
+#!/bin/sh
+case "$1 $2" in
+  "repo view") printf 'main\n' ;;
+  "pr view")
+    if [ "$3" = closed-pr ]; then printf 'CLOSED\n'; else printf 'OPEN\n'; fi
+    ;;
+  *) exit 1 ;;
+esac
+EOF
+chmod +x "$closed_fixture/bin/gh"
+: > "$closed_fixture/herdr.trace"
+printf 'y\n' | env \
+  HOME="$closed_fixture/home" \
+  PATH="$closed_fixture/bin:$PATH" \
+  RDEV_DOTFILES="$repo_root" \
+  HERDR_SOCKET_PATH="$closed_fixture/session/herdr.sock" \
+  HERDR_TRACE="$closed_fixture/herdr.trace" \
+  zsh -c 'cd "$1" && source "$2/zsh/functions/wtclean"' \
+  zsh "$closed_fixture/repo.git/main" "$repo_root" \
+  > "$closed_fixture/output" 2>&1
+
+[[ ! -d "$closed_fixture/repo.git/closed-pr" ]] || fail "clean closed-PR worktree was not removed"
+git --git-dir="$closed_fixture/repo.git" show-ref --verify --quiet refs/heads/closed-pr \
+  || fail "closed-PR cleanup deleted the local branch"
 
 # No-PR worktrees already contained in the default branch are removable. Idle
 # and done agents do not make their workspace active, and persisted agent

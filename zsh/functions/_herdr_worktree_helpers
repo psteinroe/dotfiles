@@ -200,8 +200,13 @@ _h_prune_missing_workspaces() {
     [[ "$cwd" == "$H_WORKTREE_ROOT/"* ]] || continue
 
     if [[ ! -d "$cwd" ]] || ! print -r -- "$registered_paths" | grep -Fxq -- "$cwd"; then
-      echo "Closing stale Herdr workspace: ${custom:-$id} ($cwd)"
-      herdr workspace close "$id" >/dev/null || true
+      # session.json is persisted asynchronously. A workspace closed earlier in
+      # this cleanup pass can still appear here briefly, so verify it is live
+      # before logging or issuing a duplicate close.
+      if herdr workspace get "$id" >/dev/null 2>&1; then
+        echo "Closing stale Herdr workspace: ${custom:-$id} ($cwd)"
+        herdr workspace close "$id" >/dev/null 2>&1 || true
+      fi
     fi
   done < <(_h_workspace_rows 2>/dev/null) || {
     echo "Could not parse Herdr session.json; skipping prune." >&2

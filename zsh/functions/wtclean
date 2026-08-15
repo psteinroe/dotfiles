@@ -178,7 +178,9 @@ for entry in "${worktrees[@]}"; do
 
   case "$pr_state" in
     "MERGED") candidate_source="merged PR" ;;
-    "CLOSED") echo "Closed without merge (review): $branch"; continue ;;
+    # Removing a clean checkout does not delete its branch, so a closed PR can
+    # be hibernated safely and recreated later through wtensure/hwtcreate.
+    "CLOSED") candidate_source="closed PR" ;;
     "OPEN") echo "Active: $branch"; continue ;;
     "")
       if git -C "$worktree_path" merge-base --is-ancestor HEAD "$integration_ref" 2>/dev/null; then

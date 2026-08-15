@@ -9,7 +9,7 @@ usage() {
 Usage:
   worktree-agent.zsh ensure <branch|pr-number> [--focus]
   worktree-agent.zsh launch <branch|pr-number> [--name <name>] [--kind <kind>]
-      (--prompt <text> | --prompt-file <path>) [--focus]
+      [--model <provider/model>] (--prompt <text> | --prompt-file <path>) [--focus]
 EOF
 }
 
@@ -35,6 +35,7 @@ shift 2
 
 typeset agent_name=""
 typeset kind="pi"
+typeset model=""
 typeset prompt=""
 typeset prompt_file=""
 typeset focus=0
@@ -49,6 +50,11 @@ while (( $# > 0 )); do
     --kind)
       (( $# >= 2 )) || fail "--kind requires a value."
       kind="$2"
+      shift 2
+      ;;
+    --model)
+      (( $# >= 2 )) || fail "--model requires a provider/model value."
+      model="$2"
       shift 2
       ;;
     --prompt)
@@ -75,7 +81,7 @@ while (( $# > 0 )); do
   esac
 done
 
-if [[ "$mode" == ensure && ( -n "$agent_name" || "$kind" != pi || -n "$prompt" || -n "$prompt_file" ) ]]; then
+if [[ "$mode" == ensure && ( -n "$agent_name" || "$kind" != pi || -n "$model" || -n "$prompt" || -n "$prompt_file" ) ]]; then
   fail "Agent options are only valid with the launch command."
 fi
 
@@ -88,6 +94,11 @@ if [[ "$mode" == launch ]]; then
     prompt="$(<"$prompt_file")"
   fi
   [[ -n "$prompt" ]] || fail "launch requires --prompt or --prompt-file."
+  if [[ "$kind" == pi ]]; then
+    [[ -n "$model" ]] || model="openai-codex/gpt-5.6-terra"
+  elif [[ -n "$model" ]]; then
+    fail "--model is only supported for Pi agents."
+  fi
 fi
 
 [[ "${HERDR_ENV:-}" == 1 ]] || fail "This launcher must run inside a Herdr-managed pane (HERDR_ENV=1)."
@@ -119,6 +130,8 @@ created_workspace=true
 if print -r -- "$before_workspace_ids" | grep -Fxq -- "$target_workspace_id"; then
   created_workspace=false
 fi
+
+workspace_panes_json="$(herdr pane list --workspace "$target_workspace_id")"
 
 if [[ "$mode" == ensure ]]; then
   if (( focus )); then
@@ -167,6 +180,75 @@ fi
 [[ -n "$agent_name" ]] || agent_name="$(normalize_agent_name "wt-$worktree_label")"
 agent_name="$(unique_agent_name "$agent_name")"
 
+typeset existing_agent existing_agent_status existing_agent_pane existing_agent_name existing_agent_kind
+typeset existing_session runtime_events existing_model existing_thinking
+existing_agent="$(
+  print -r -- "$workspace_panes_json" \
+    | jq -c '
+        [.result.panes[]? | select((.agent // "") != "")] as $agents
+        | ([$agents[] | select((.agent_status // "unknown") != "idle" and (.agent_status // "unknown") != "done")] | sort_by(.state_change_seq // 0) | last)
+          // ($agents | sort_by(.state_change_seq // 0) | last)
+          // empty
+      '
+)"
+
+if [[ -n "$existing_agent" ]]; then
+  existing_agent_status="$(print -r -- "$existing_agent" | jq -r '.agent_status // "unknown"')"
+  existing_agent_pane="$(print -r -- "$existing_agent" | jq -r '.pane_id // empty')"
+  existing_agent_name="$(print -r -- "$existing_agent" | jq -r '.name // .agent_name // empty')"
+  existing_agent_kind="$(print -r -- "$existing_agent" | jq -r '.agent // empty')"
+  [[ -n "$existing_agent_pane" ]] || fail "Existing worktree agent has no pane ID."
+  if [[ -n "$existing_agent_kind" && "$existing_agent_kind" != "$kind" ]]; then
+    fail "Worktree already has a ${existing_agent_kind} agent; requested ${kind}. Coordinate the existing agent before launching more work."
+  fi
+
+  case "$existing_agent_status" in
+    idle|done)
+      if [[ "$kind" == pi ]]; then
+        existing_session="$(print -r -- "$existing_agent" | jq -r '.agent_session.value // empty')"
+        [[ -r "$existing_session" ]] || fail "Cannot verify the existing Pi agent's model and thinking level."
+        runtime_events="$(
+          jq -Rr '
+            fromjson?
+            | if .type == "model_change" then
+                ["model", (.provider + "/" + .modelId)] | @tsv
+              elif .type == "thinking_level_change" then
+                ["thinking", .thinkingLevel] | @tsv
+              elif .type == "message" and .message.role == "assistant" then
+                ["model", (.message.provider + "/" + .message.model)] | @tsv
+              else empty end
+          ' "$existing_session"
+        )"
+        existing_model="$(print -r -- "$runtime_events" | awk -F $'\t' '$1 == "model" { value = $2 } END { print value }')"
+        existing_thinking="$(print -r -- "$runtime_events" | awk -F $'\t' '$1 == "thinking" { value = $2 } END { print value }')"
+        [[ "$existing_model" == "$model" ]] || fail "Existing Pi agent uses ${existing_model:-an unknown model}; requested ${model}. Exit it before changing worker models."
+        [[ "$existing_thinking" == high ]] || fail "Existing Pi agent uses ${existing_thinking:-an unknown thinking level}; delegated workers require high."
+      fi
+
+      herdr agent prompt "$existing_agent_pane" "$prompt" >/dev/null
+      if (( focus )); then
+        herdr agent focus "$existing_agent_pane" >/dev/null
+      fi
+      jq -n \
+        --arg mode "$mode" \
+        --arg target "$target" \
+        --arg worktree_path "$worktree_path" \
+        --arg worktree_label "$worktree_label" \
+        --arg workspace_id "$target_workspace_id" \
+        --arg pane_id "$existing_agent_pane" \
+        --arg agent_name "$existing_agent_name" \
+        --arg kind "$kind" \
+        --arg model "$model" \
+        --argjson created_workspace "$created_workspace" \
+        '{mode: $mode, target: $target, worktree_path: $worktree_path, worktree_label: $worktree_label, workspace_id: $workspace_id, tab_id: null, pane_id: $pane_id, agent_name: (if $agent_name == "" then null else $agent_name end), kind: $kind, model: (if $model == "" then null else $model end), thinking_level: (if $kind == "pi" then "high" else null end), created_workspace: $created_workspace, reused_agent: true, review_required: true}'
+      exit 0
+      ;;
+    *)
+      fail "Worktree already has a ${existing_agent_status} agent (${existing_agent_name:-$existing_agent_pane}). Coordinate it before launching more work."
+      ;;
+  esac
+fi
+
 typeset pane_id=""
 typeset tab_id=""
 typeset agent_started=0
@@ -182,7 +264,7 @@ trap cleanup_failed_tab EXIT
 
 if [[ "$created_workspace" == true ]]; then
   pane_id="$(
-    herdr pane list --workspace "$target_workspace_id" \
+    print -r -- "$workspace_panes_json" \
       | jq -r --arg cwd "$worktree_path" '
           first(
             .result.panes[]?
@@ -205,7 +287,11 @@ fi
 
 [[ -n "$pane_id" ]] || fail "Could not find an available shell pane in workspace $target_workspace_id"
 
-herdr agent start "$agent_name" --kind "$kind" --pane "$pane_id" >/dev/null
+if [[ "$kind" == pi ]]; then
+  herdr agent start "$agent_name" --kind "$kind" --pane "$pane_id" -- --model "$model" --thinking high >/dev/null
+else
+  herdr agent start "$agent_name" --kind "$kind" --pane "$pane_id" >/dev/null
+fi
 agent_started=1
 herdr agent prompt "$agent_name" "$prompt" >/dev/null
 
@@ -224,5 +310,6 @@ jq -n \
   --arg pane_id "$pane_id" \
   --arg agent_name "$agent_name" \
   --arg kind "$kind" \
+  --arg model "$model" \
   --argjson created_workspace "$created_workspace" \
-  '{mode: $mode, target: $target, worktree_path: $worktree_path, worktree_label: $worktree_label, workspace_id: $workspace_id, tab_id: (if $tab_id == "" then null else $tab_id end), pane_id: $pane_id, agent_name: $agent_name, kind: $kind, created_workspace: $created_workspace}'
+  '{mode: $mode, target: $target, worktree_path: $worktree_path, worktree_label: $worktree_label, workspace_id: $workspace_id, tab_id: (if $tab_id == "" then null else $tab_id end), pane_id: $pane_id, agent_name: $agent_name, kind: $kind, model: (if $model == "" then null else $model end), thinking_level: (if $kind == "pi" then "high" else null end), created_workspace: $created_workspace, reused_agent: false, review_required: true}'
