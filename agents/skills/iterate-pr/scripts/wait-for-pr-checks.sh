@@ -2,10 +2,19 @@
 set -u
 
 pr_selector="${1:-}"
-if [[ ! "$pr_selector" =~ ^https://[^/]+/[^/]+/[^/]+/pull/[0-9]+$ ]]; then
-  printf 'usage: %s <full PR URL>\n' "${0##*/}" >&2
+repo_selector="${2:-}"
+if [[ $# -gt 2 ]] \
+  || [[ ! "$pr_selector" =~ ^[0-9]+$ && ! "$pr_selector" =~ ^https://[^/]+/[^/]+/[^/]+/pull/[0-9]+$ ]] \
+  || [[ -n "$repo_selector" && ! "$repo_selector" =~ ^[^/]+/[^/]+$ ]]; then
+  printf 'usage: %s <PR number or URL> [owner/repo]\n' "${0##*/}" >&2
   exit 64
 fi
+
+args=(pr checks "$pr_selector")
+if [[ -n "$repo_selector" ]]; then
+  args+=(--repo "$repo_selector")
+fi
+args+=(--json name,state,bucket,link,workflow)
 
 interval="${CI_WAIT_INTERVAL_SECONDS:-30}"
 timeout="${CI_WAIT_TIMEOUT_SECONDS:-3600}"
@@ -16,8 +25,6 @@ gh_error_file="$(mktemp "${TMPDIR:-/tmp}/wait-for-pr-checks.XXXXXX")"
 trap 'rm -f "$gh_error_file"' EXIT
 
 while ((SECONDS < deadline)); do
-  args=(pr checks "$pr_selector" --json name,state,bucket,link,workflow)
-
   : >"$gh_error_file"
   checks="$(gh "${args[@]}" 2>"$gh_error_file")"
   command_status=$?

@@ -24,7 +24,7 @@ Drive one pull request to the next human gate or a clean state. Use at most thre
 3. **Choose one action**
    - Failed checks: resolve the failed run ID and run `scripts/failed-run-summary.sh <run-id>`.
    - Actionable review feedback: include the relevant thread, path, and requested behavior.
-   - Pending automated checks with no actionable failure: start the quiet wait script explicitly with `bg_start`, pass the full PR URL as its required argument, title it `Wait for PR checks`, and use this skill directory as `working_dir`. Do not poll with `bg_status`; its completion will resume the main agent.
+   - Pending automated checks with no actionable failure: start the quiet wait script explicitly with `bg_start`, title it `Wait for PR checks`, and use the pull request worktree as `working_dir`. Pass either the PR URL or its number; a number defaults to the repository at `working_dir`, or accepts an explicit `owner/repo` second argument. Do not poll with `bg_status`; its completion will resume the main agent.
    - No failures, actionable feedback, or automated checks pending: report completion.
 
 4. **Delegate a bounded fix**
@@ -36,7 +36,7 @@ Drive one pull request to the next human gate or a clean state. Use at most thre
 5. **Publish and wait**
    - Run the relevant local check, create one focused commit, and push.
    - Increment the pushed-attempt count.
-   - Start `scripts/wait-for-pr-checks.sh <full-pr-url>` with `bg_start` as described above.
+   - Start `<skill-dir>/scripts/wait-for-pr-checks.sh <pr-number-or-url> [owner/repo]` with `bg_start` as described above.
    - When it completes, return to step 2 for the new HEAD.
 
 ## Stop conditions
@@ -55,4 +55,4 @@ Stop and report the current state when any condition holds:
 - Treat flaky checks explicitly; do not silently rerun them.
 - Never disable checks, weaken tests, resolve review threads, merge, or approve on the user's behalf.
 - Do not start duplicate background waits for the same HEAD.
-- Never start the wait script without an explicit PR URL; its working directory is not the pull request repository.
+- When passing only a PR number, make sure `working_dir` is the pull request worktree; otherwise pass `owner/repo` explicitly.

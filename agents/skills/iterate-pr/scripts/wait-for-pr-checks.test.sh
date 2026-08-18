@@ -33,12 +33,28 @@ if [[ $missing_status -ne 64 ]]; then
 fi
 
 set +e
-CI_WAIT_INTERVAL_SECONDS=0.05 CI_WAIT_TIMEOUT_SECONDS=1 \
-  "$wait_script" 123 >"$tmp_dir/number.out" 2>"$tmp_dir/number.err"
+GH_MOCK_MODE=completed "$wait_script" 123 >"$tmp_dir/number.out"
 number_status=$?
 set -e
-if [[ $number_status -ne 64 ]]; then
-  printf 'expected a context-dependent PR number to exit 64 immediately, got %s\n' "$number_status" >&2
+if [[ $number_status -ne 1 ]]; then
+  printf 'expected a PR number to use the current repository and exit 1, got %s\n' "$number_status" >&2
+  exit 1
+fi
+if ! grep -Fxq "pr checks 123 --json name,state,bucket,link,workflow" "$GH_ARGS_LOG"; then
+  printf 'numeric selector did not default to the current repository: %s\n' "$(cat "$GH_ARGS_LOG")" >&2
+  exit 1
+fi
+
+set +e
+GH_MOCK_MODE=completed "$wait_script" 123 example/project >"$tmp_dir/number-repo.out"
+number_repo_status=$?
+set -e
+if [[ $number_repo_status -ne 1 ]]; then
+  printf 'expected a PR number with an explicit repository to exit 1, got %s\n' "$number_repo_status" >&2
+  exit 1
+fi
+if ! grep -Fxq "pr checks 123 --repo example/project --json name,state,bucket,link,workflow" "$GH_ARGS_LOG"; then
+  printf 'explicit repository was not forwarded to gh: %s\n' "$(cat "$GH_ARGS_LOG")" >&2
   exit 1
 fi
 
