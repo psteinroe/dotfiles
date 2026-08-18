@@ -54,34 +54,21 @@ while ((SECONDS < deadline)); do
     continue
   fi
 
-  jq_filter='def human_gate:
-    ([.name, .workflow, .state] | map(. // "") | join(" "))
-    | test("approval|required review|review required|manual approval|merge queue"; "i");'
-
-  failed="$(jq "$jq_filter [.[] | select(.bucket == \"fail\" or .bucket == \"cancel\")] | length" <<<"$checks")"
+  failed="$(jq '[.[] | select(.bucket == "fail" or .bucket == "cancel")] | length' <<<"$checks")"
   if [[ "$failed" -gt 0 ]]; then
-    jq -c "$jq_filter {
-      status: \"failed\",
-      passed: [.[] | select(.bucket == \"pass\")] | length,
-      failed: [.[] | select(.bucket == \"fail\" or .bucket == \"cancel\") | {name, workflow, state, link}],
-      pending: [.[] | select(.bucket == \"pending\") | {name, workflow, state, link}]
-    }" <<<"$checks"
+    jq -c '{
+      status: "failed",
+      passed: [.[] | select(.bucket == "pass")] | length,
+      failed: [.[] | select(.bucket == "fail" or .bucket == "cancel") | {name, workflow, state, link}],
+      pending: [.[] | select(.bucket == "pending") | {name, workflow, state, link}]
+    }' <<<"$checks"
     exit 1
   fi
 
-  actionable_pending="$(jq "$jq_filter [.[] | select(.bucket == \"pending\" and (human_gate | not))] | length" <<<"$checks")"
-  if [[ "$actionable_pending" -gt 0 ]]; then
+  pending="$(jq '[.[] | select(.bucket == "pending")] | length' <<<"$checks")"
+  if [[ "$pending" -gt 0 ]]; then
     sleep "$interval"
     continue
-  fi
-
-  human_pending="$(jq "$jq_filter [.[] | select(.bucket == \"pending\" and human_gate)] | length" <<<"$checks")"
-  if [[ "$human_pending" -gt 0 ]]; then
-    jq -c "$jq_filter {
-      status: \"human_gate\",
-      pending: [.[] | select(.bucket == \"pending\" and human_gate) | {name, workflow, state, link}]
-    }" <<<"$checks"
-    exit 3
   fi
 
   jq -c '{

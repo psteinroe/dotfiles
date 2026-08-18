@@ -14,6 +14,10 @@ if [[ "${GH_MOCK_MODE:-error}" == "completed" ]]; then
   printf '%s\n' '[{"bucket":"pass","link":"pass-url","name":"Lint","state":"SUCCESS","workflow":"CI"},{"bucket":"fail","link":"fail-url","name":"Test","state":"FAILURE","workflow":"CI"}]'
   exit 1
 fi
+if [[ "${GH_MOCK_MODE:-error}" == "pending-review-named-check" ]]; then
+  printf '%s\n' '[{"bucket":"pending","link":"pending-url","name":"Required review","state":"PENDING","workflow":"CI"}]'
+  exit 8
+fi
 printf 'mock authentication failure\n' >&2
 exit 4
 MOCK
@@ -70,6 +74,17 @@ if [[ $error_status -ne 2 ]]; then
 fi
 jq -e '.status == "error" and .commandStatus == 4 and (.message | contains("authentication"))' \
   "$tmp_dir/error.out" >/dev/null
+
+set +e
+GH_MOCK_MODE=pending-review-named-check CI_WAIT_INTERVAL_SECONDS=0.05 CI_WAIT_TIMEOUT_SECONDS=1 \
+  "$wait_script" "$pr_url" >"$tmp_dir/pending.out"
+pending_status=$?
+set -e
+if [[ $pending_status -ne 124 ]]; then
+  printf 'expected every pending check to keep the watcher running, got %s\n' "$pending_status" >&2
+  exit 1
+fi
+jq -e '.status == "timeout"' "$tmp_dir/pending.out" >/dev/null
 
 set +e
 GH_MOCK_MODE=completed "$wait_script" "$pr_url" >"$tmp_dir/completed.out"
