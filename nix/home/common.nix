@@ -49,8 +49,18 @@ in
     activation.herdrPluginLinks = lib.mkIf (herdrPackage != null) (
       lib.hm.dag.entryAfter [ "herdrNamedSessionPlugins" ] ''
         if [ -x ${herdrPackage}/bin/herdr ]; then
-          ${herdrPackage}/bin/herdr plugin link ${inputs.vim-herdr-navigation} >/dev/null 2>&1 || true
-          ${herdrPackage}/bin/herdr plugin link ${dotfilesPath}/herdr/plugins/worktree-sync >/dev/null 2>&1 || true
+          herdr_global() {
+            ${pkgs.coreutils}/bin/env \
+              -u HERDR_CONFIG_PATH \
+              -u HERDR_ENV \
+              -u HERDR_PANE_ID \
+              -u HERDR_SOCKET_PATH \
+              -u HERDR_SESSION \
+              ${herdrPackage}/bin/herdr "$@"
+          }
+          herdr_global plugin link ${inputs.vim-herdr-navigation} >/dev/null 2>&1 || true
+          herdr_global plugin link ${dotfilesPath}/herdr/plugins/worktree-sync >/dev/null 2>&1 || true
+          herdr_global plugin link ${dotfilesPath}/herdr/plugins/pi-reload >/dev/null 2>&1 || true
         fi
       ''
     );

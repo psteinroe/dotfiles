@@ -31,3 +31,8 @@ case "$(uname -s)" in
     return 1
     ;;
 esac
+
+if [[ -r "$dotfiles/zsh/functions/pireload" ]] && command -v herdr >/dev/null 2>&1; then
+  echo "Reloading idle Pi agents..."
+  (set --; source "$dotfiles/zsh/functions/pireload") || echo "Warning: safe Pi reload failed." >&2
+fi

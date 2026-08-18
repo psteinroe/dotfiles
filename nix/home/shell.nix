@@ -53,6 +53,7 @@ in
       autoload -Uz set-keychain-environment-variable
       autoload -Uz video_to_gif
       autoload -Uz rebuild
+      autoload -Uz pireload
       autoload -Uz devhelp
       autoload -Uz coffee
       autoload -Uz wtclone

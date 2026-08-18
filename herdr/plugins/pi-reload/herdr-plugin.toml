@@ -1,0 +1,12 @@
+id = "psteinroe.pi-reload"
+name = "Safe Pi Reload"
+version = "0.1.0"
+min_herdr_version = "0.7.0"
+description = "Reload resources in idle Pi agents without interrupting active work."
+platforms = ["linux", "macos"]
+
+[[actions]]
+id = "reload-idle"
+title = "Reload idle Pi agents"
+contexts = ["global"]
+command = ["zsh", "reload.sh"]

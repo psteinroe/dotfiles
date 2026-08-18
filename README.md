@@ -91,7 +91,7 @@ Local and remote helpers intentionally mirror each other where possible:
 
 | Local | Remote | Purpose |
 | --- | --- | --- |
-| `rebuild` | `rrebuild [host]` | Rebuild locally / force-sync the remote checkout to its upstream and rebuild Home Manager |
+| `rebuild` | `rrebuild [host]` | Rebuild locally/remotely, then reload resources in idle Pi agents |
 | `hdev <repo> [branch\|pr]` | `rdev <repo> [branch\|pr]` | Open local/remote Herdr project session |
 | `wtclean` | `rwtclean <repo>` | Clean integrated/stale worktrees |
 | `wtforceclean` | `rwtforceclean <repo>` | Select and force-remove worktrees |
@@ -100,7 +100,7 @@ Local and remote helpers intentionally mirror each other where possible:
 | — | `rauth [all\|gh\|pi\|mcp\|exa]` | Copy local GitHub/Pi/MCP/Exa auth to the remote |
 | — | `ssh rdev-exe` | Recovery path via exe.dev gateway |
 
-For the full command list, run `devhelp`.
+For the full command list, run `devhelp`. Rebuilds invoke `pireload`, which reloads only idle Pi agents with no child processes. Working, blocked, and background-task sessions are reported and left untouched; retry from the `Safe Pi Reload` Herdr action or run `pireload` later.
 
 Pi also receives the `worktree-agents` skill on local and remote machines. When
 asked to delegate work into another branch, PR, or worktree, it routes creation

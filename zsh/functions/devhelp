@@ -40,7 +40,8 @@ if [[ "$topic" == all || "$topic" == remote || "$topic" == worktree ]]; then
   [[ "$topic" == all ]] && print
 
   _case_header "Local / remote pairs"
-  _case_row "rebuild / rrebuild [host]" "rebuild local or remote Home Manager"
+  _case_row "rebuild / rrebuild [host]" "rebuild and safely reload idle Pi agents"
+  _case_row "pireload" "reload resources in currently idle Herdr Pi agents"
   _case_row "hdev / rdev <repo> [branch|pr]" "open Herdr project session"
   _case_row "wtclean / rwtclean <repo>" "clean integrated/stale worktrees"
   _case_row "wtforceclean / rwtforceclean <repo>" "select and force-remove worktrees"

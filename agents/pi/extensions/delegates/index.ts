@@ -6,12 +6,15 @@ import {
   DefaultResourceLoader,
   defineTool,
   getAgentDir,
+  getMarkdownTheme,
   SessionManager,
   SettingsManager,
   type AgentSession,
+  type AgentToolUpdateCallback,
   type ExtensionAPI,
   type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
+import { Container, Markdown, Spacer, Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import {
   bindChildSessionExtensions,
@@ -26,6 +29,13 @@ import {
   type DelegateName,
   type GitDiffTarget,
 } from "./policy.ts";
+import {
+  formatToolCall,
+  MAX_TOOL_CALLS_TO_KEEP,
+  shorten,
+  type DelegateDetails,
+  type DelegateRunDetails,
+} from "./progress.ts";
 
 const execFileAsync = promisify(execFile);
 const GIT_OUTPUT_LIMIT = 64_000;
@@ -131,6 +141,96 @@ async function createIsolatedSession(options: {
   return session;
 }
 
+// Rendering follows the progress UI used by pi-finder and pi-librarian.
+function createDelegateRenderers(name: DelegateName) {
+  const activity = name === "oracle" ? "Consulting Oracle…" : "Working in the repository…";
+
+  return {
+    renderCall(args: unknown, theme: any) {
+      const task = typeof (args as { task?: unknown })?.task === "string"
+        ? (args as { task: string }).task.trim()
+        : "";
+      return new Text(theme.fg("muted", shorten(task.replace(/\s+/g, " "), 70)), 0, 0);
+    },
+
+    renderResult(result: any, { expanded, isPartial }: any, theme: any) {
+      const details = result.details as DelegateDetails | undefined;
+      if (!details) {
+        const content = result.content[0];
+        return new Text(content?.type === "text" ? content.text : "(no output)", 0, 0);
+      }
+
+      const status = isPartial ? "running" : details.status;
+      const icon = status === "done"
+        ? theme.fg("success", "✓")
+        : status === "error"
+          ? theme.fg("error", "✗")
+          : status === "aborted"
+            ? theme.fg("warning", "◼")
+            : theme.fg("warning", "⏳");
+      const run = details.run;
+      const totalToolCalls = run.toolCalls.length;
+      const header = icon + " "
+        + theme.fg("toolTitle", theme.bold(`${name} `))
+        + theme.fg(
+          "dim",
+          `${details.model}:${details.thinking} • ${run.turns}/${run.maxTurns} turns • ${totalToolCalls} tool call${totalToolCalls === 1 ? "" : "s"}`,
+        );
+      const workspaceLine = `${theme.fg("muted", "workspace: ")}${theme.fg("toolOutput", details.workspace)}`;
+
+      let toolsText = "";
+      if (run.toolCalls.length > 0) {
+        const calls = expanded ? run.toolCalls : run.toolCalls.slice(-6);
+        const lines: string[] = [theme.fg("muted", "Tools:")];
+        for (const call of calls) {
+          const callIcon = call.isError
+            ? theme.fg("error", "✗")
+            : call.endedAt
+              ? theme.fg("success", "✓")
+              : theme.fg("warning", "→");
+          lines.push(`${callIcon} ${theme.fg("toolOutput", formatToolCall(call))}`);
+        }
+        if (!expanded && run.toolCalls.length > 6) {
+          lines.push(theme.fg("muted", "(Ctrl+O to expand)"));
+        }
+        toolsText = lines.join("\n");
+      }
+
+      if (status === "running") {
+        let text = `${header}\n${workspaceLine}`;
+        if (toolsText) text += `\n\n${toolsText}`;
+        text += `\n\n${theme.fg("muted", activity)}`;
+        return new Text(text, 0, 0);
+      }
+
+      const combined = (
+        result.content[0]?.type === "text"
+          ? result.content[0].text
+          : run.summaryText ?? "(no output)"
+      ).trim() || "(no output)";
+
+      if (!expanded) {
+        const lines = combined.split("\n");
+        let text = `${header}\n${workspaceLine}\n\n${theme.fg("toolOutput", lines.slice(0, 18).join("\n"))}`;
+        if (lines.length > 18) text += `\n${theme.fg("muted", "(Ctrl+O to expand)")}`;
+        if (toolsText) text += `\n\n${toolsText}`;
+        return new Text(text, 0, 0);
+      }
+
+      const container = new Container();
+      container.addChild(new Text(header, 0, 0));
+      container.addChild(new Text(workspaceLine, 0, 0));
+      if (toolsText) {
+        container.addChild(new Spacer(1));
+        container.addChild(new Text(toolsText, 0, 0));
+      }
+      container.addChild(new Spacer(1));
+      container.addChild(new Markdown(combined, 0, 0, getMarkdownTheme()));
+      return container;
+    },
+  };
+}
+
 export default function delegatesExtension(pi: ExtensionAPI) {
   const activeSessions = new Set<AgentSession>();
   const capacity: Record<DelegateName, DelegateCapacity> = {
@@ -142,13 +242,45 @@ export default function delegatesExtension(pi: ExtensionAPI) {
     name: DelegateName;
     task: string;
     signal?: AbortSignal;
+    onUpdate?: AgentToolUpdateCallback<DelegateDetails>;
     ctx: ExtensionContext;
   }) {
     const releaseCapacity = capacity[options.name].acquire();
     const policy = DELEGATE_POLICIES[options.name];
+    const model = `openai-codex/${policy.model}`;
+    const run: DelegateRunDetails = {
+      status: "running",
+      task: options.task,
+      turns: 0,
+      maxTurns: policy.maxTurns,
+      toolCalls: [],
+      startedAt: Date.now(),
+    };
     let session: AgentSession | undefined;
     let unsubscribe: (() => void) | undefined;
     let abort: (() => void) | undefined;
+    let lastUpdate = 0;
+
+    const buildDetails = (): DelegateDetails => ({
+      status: run.status,
+      delegate: options.name,
+      workspace: options.ctx.cwd,
+      model,
+      thinking: policy.thinking,
+      run,
+    });
+    const emitUpdate = (force = false) => {
+      const now = Date.now();
+      if (!force && now - lastUpdate < 120) return;
+      lastUpdate = now;
+      const text = run.summaryText ?? `${options.name} is working…`;
+      options.onUpdate?.({
+        content: [{ type: "text", text }],
+        details: buildDetails(),
+      });
+    };
+
+    emitUpdate(true);
 
     try {
       const child = await createIsolatedSession({
@@ -158,20 +290,46 @@ export default function delegatesExtension(pi: ExtensionAPI) {
       session = child;
       activeSessions.add(child);
 
-      let turns = 0;
       let wrapRequested = false;
       let hardAbortRequested = false;
       unsubscribe = child.subscribe((event) => {
-        if (event.type !== "turn_end") return;
-        turns++;
-        if (turns >= policy.maxTurns && !wrapRequested) {
-          wrapRequested = true;
-          void child
-            .steer("Wrap up now. Return your best concise final result without more exploration.")
-            .catch(() => undefined);
-        } else if (turns >= policy.maxTurns + 2 && !hardAbortRequested) {
-          hardAbortRequested = true;
-          void child.abort().catch(() => undefined);
+        switch (event.type) {
+          case "turn_end": {
+            run.turns++;
+            if (run.turns >= policy.maxTurns && !wrapRequested) {
+              wrapRequested = true;
+              void child
+                .steer("Wrap up now. Return your best concise final result without more exploration.")
+                .catch(() => undefined);
+            } else if (run.turns >= policy.maxTurns + 2 && !hardAbortRequested) {
+              hardAbortRequested = true;
+              void child.abort().catch(() => undefined);
+            }
+            emitUpdate();
+            break;
+          }
+          case "tool_execution_start": {
+            run.toolCalls.push({
+              id: event.toolCallId,
+              name: event.toolName,
+              args: event.args,
+              startedAt: Date.now(),
+            });
+            if (run.toolCalls.length > MAX_TOOL_CALLS_TO_KEEP) {
+              run.toolCalls.splice(0, run.toolCalls.length - MAX_TOOL_CALLS_TO_KEEP);
+            }
+            emitUpdate(true);
+            break;
+          }
+          case "tool_execution_end": {
+            const call = run.toolCalls.find((candidate) => candidate.id === event.toolCallId);
+            if (call) {
+              call.endedAt = Date.now();
+              call.isError = event.isError;
+            }
+            emitUpdate(true);
+            break;
+          }
         }
       });
 
@@ -181,26 +339,35 @@ export default function delegatesExtension(pi: ExtensionAPI) {
       options.signal?.addEventListener("abort", abort, { once: true });
       if (options.signal?.aborted) throw new Error(`${options.name} was aborted.`);
 
-      await child.prompt(options.task);
+      await child.prompt(options.task, { expandPromptTemplates: false });
       if (options.signal?.aborted) throw new Error(`${options.name} was aborted.`);
 
       const output = assistantText(child);
       if (!output) throw new Error(`${options.name} returned no final answer.`);
       const result = truncateDelegateOutput(output);
       const stats = child.getSessionStats();
+      run.status = "done";
+      run.summaryText = result.text;
+      run.endedAt = Date.now();
+      emitUpdate(true);
+
       return {
         text: result.text,
         details: {
-          delegate: options.name,
-          model: `openai-codex/${policy.model}`,
-          thinking: policy.thinking,
-          turns,
-          toolCalls: stats.toolCalls,
+          ...buildDetails(),
           tokens: stats.tokens,
           cost: stats.cost,
           truncated: result.truncated,
-        },
+        } satisfies DelegateDetails,
       };
+    } catch (error) {
+      const aborted = options.signal?.aborted ?? false;
+      run.status = aborted ? "aborted" : "error";
+      run.error = aborted ? undefined : error instanceof Error ? error.message : String(error);
+      run.summaryText = aborted ? "Aborted" : run.error;
+      run.endedAt = Date.now();
+      emitUpdate(true);
+      throw error;
     } finally {
       if (abort) options.signal?.removeEventListener("abort", abort);
       unsubscribe?.();
@@ -223,17 +390,19 @@ export default function delegatesExtension(pi: ExtensionAPI) {
       "Run at most one oracle at a time; it may run alongside independent workers.",
     ],
     executionMode: "parallel",
+    ...createDelegateRenderers("oracle"),
     parameters: Type.Object({
       task: Type.String({
         description:
           "Self-contained question, including relevant paths, constraints, and the decision or review needed",
       }),
     }),
-    async execute(_toolCallId, params, signal, _onUpdate, ctx) {
+    async execute(_toolCallId, params, signal, onUpdate, ctx) {
       const result = await runDelegate({
         name: "oracle",
         task: params.task,
         signal,
+        onUpdate,
         ctx,
       });
       return {
@@ -255,17 +424,19 @@ export default function delegatesExtension(pi: ExtensionAPI) {
       "Review worker changes and test evidence before committing or pushing.",
     ],
     executionMode: "parallel",
+    ...createDelegateRenderers("worker"),
     parameters: Type.Object({
       task: Type.String({
         description:
           "Self-contained task with relevant paths, constraints, and the expected validation or result",
       }),
     }),
-    async execute(_toolCallId, params, signal, _onUpdate, ctx) {
+    async execute(_toolCallId, params, signal, onUpdate, ctx) {
       const result = await runDelegate({
         name: "worker",
         task: params.task,
         signal,
+        onUpdate,
         ctx,
       });
       return {

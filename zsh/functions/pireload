@@ -1,0 +1,157 @@
+# Reload Pi resources in idle Herdr agents without interrupting active work.
+# Usage: pireload [--session NAME ...]
+
+local config_root="${XDG_CONFIG_HOME:-$HOME/.config}/herdr"
+local -a sessions
+local session_dir session_name
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --session)
+      if [[ -z "${2:-}" ]]; then
+        echo "pireload: --session requires a name" >&2
+        return 2
+      fi
+      sessions+=("$2")
+      shift 2
+      ;;
+    -h|--help)
+      echo "Usage: pireload [--session NAME ...]"
+      return 0
+      ;;
+    *)
+      echo "pireload: unknown argument: $1" >&2
+      return 2
+      ;;
+  esac
+done
+
+if (( ${#sessions} == 0 )); then
+  [[ -S "$config_root/herdr.sock" ]] && sessions+=(default)
+  for session_dir in "$config_root"/sessions/*(N/); do
+    [[ -S "$session_dir/herdr.sock" ]] || continue
+    sessions+=("${session_dir:t}")
+  done
+fi
+
+if (( ${#sessions} == 0 )); then
+  echo "Pi reload: no running Herdr sessions."
+  return 0
+fi
+
+local herdr_bin
+herdr_bin="$(command -v herdr 2>/dev/null)"
+if [[ -z "$herdr_bin" ]]; then
+  echo "pireload: herdr is not available" >&2
+  return 1
+fi
+if ! command -v jq >/dev/null 2>&1; then
+  echo "pireload: jq is not available" >&2
+  return 1
+fi
+
+_pi_reload_herdr() {
+  local target_session="$1"
+  shift
+  env \
+    -u HERDR_CONFIG_PATH \
+    -u HERDR_ENV \
+    -u HERDR_PANE_ID \
+    -u HERDR_SOCKET_PATH \
+    HERDR_SESSION="$target_session" \
+    "$herdr_bin" "$@"
+}
+
+_pi_reload_has_child_process() {
+  local pid="$1"
+  ps -axo pid=,ppid= 2>/dev/null | awk -v parent="$pid" '$2 == parent { found = 1; exit } END { exit !found }'
+}
+
+local reloaded=0
+local working=0
+local blocked=0
+local background=0
+local done=0
+local unknown=0
+local failed=0
+local agents_json rows pane_id agent_status pi_pid process_json current_json current_status
+
+for session_name in "${sessions[@]}"; do
+  agents_json="$(_pi_reload_herdr "$session_name" agent list 2>/dev/null)"
+  if [[ $? -ne 0 ]] || ! print -r -- "$agents_json" | jq -e '.result.agents | type == "array"' >/dev/null 2>&1; then
+    echo "[$session_name] unavailable; skipped."
+    failed=$((failed + 1))
+    continue
+  fi
+
+  rows="$(print -r -- "$agents_json" | jq -r '.result.agents[]? | select(.agent == "pi") | [.pane_id, .agent_status] | @tsv')"
+  if [[ -z "$rows" ]]; then
+    continue
+  fi
+
+  while IFS=$'\t' read -r pane_id agent_status; do
+    [[ -n "$pane_id" ]] || continue
+    case "$agent_status" in
+      idle)
+        process_json="$(_pi_reload_herdr "$session_name" pane process-info --pane "$pane_id" 2>/dev/null)"
+        pi_pid="$(print -r -- "$process_json" | jq -r '
+          .result.process_info.foreground_processes[]?
+          | select(.name == "pi" or .argv0 == "pi")
+          | .pid
+        ' 2>/dev/null | head -n 1)"
+        if [[ -z "$pi_pid" || "$pi_pid" == "null" ]]; then
+          echo "[$session_name] $pane_id: Pi process unavailable; skipped."
+          unknown=$((unknown + 1))
+          continue
+        fi
+        if _pi_reload_has_child_process "$pi_pid"; then
+          echo "[$session_name] $pane_id: background child process active; skipped."
+          background=$((background + 1))
+          continue
+        fi
+
+        # Close the gap between the inventory and submission as much as Herdr's
+        # API allows. A newly working or blocked agent must not receive reload.
+        current_json="$(_pi_reload_herdr "$session_name" agent get "$pane_id" 2>/dev/null)"
+        current_status="$(print -r -- "$current_json" | jq -r '.result.agent.agent_status // "unknown"' 2>/dev/null)"
+        if [[ "$current_status" != idle ]]; then
+          echo "[$session_name] $pane_id: changed to $current_status; skipped."
+          case "$current_status" in
+            working) working=$((working + 1)) ;;
+            blocked) blocked=$((blocked + 1)) ;;
+            done) done=$((done + 1)) ;;
+            *) unknown=$((unknown + 1)) ;;
+          esac
+          continue
+        fi
+
+        if _pi_reload_herdr "$session_name" agent prompt "$pane_id" /reload >/dev/null 2>&1; then
+          echo "[$session_name] $pane_id: reloaded."
+          reloaded=$((reloaded + 1))
+        else
+          echo "[$session_name] $pane_id: reload submission failed."
+          failed=$((failed + 1))
+        fi
+        ;;
+      working)
+        echo "[$session_name] $pane_id: working; skipped."
+        working=$((working + 1))
+        ;;
+      blocked)
+        echo "[$session_name] $pane_id: blocked; skipped."
+        blocked=$((blocked + 1))
+        ;;
+      done)
+        done=$((done + 1))
+        ;;
+      *)
+        echo "[$session_name] $pane_id: status ${agent_status:-unknown}; skipped."
+        unknown=$((unknown + 1))
+        ;;
+    esac
+  done <<< "$rows"
+done
+
+local skipped=$((working + blocked + background + unknown + failed))
+echo "Pi reload: $reloaded reloaded, $skipped skipped, $done already done (working=$working blocked=$blocked background=$background unknown=$unknown failed=$failed)."
+return 0
