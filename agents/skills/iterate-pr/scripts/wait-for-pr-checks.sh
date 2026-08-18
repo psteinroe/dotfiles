@@ -2,25 +2,47 @@
 set -u
 
 pr_selector="${1:-}"
+if [[ ! "$pr_selector" =~ ^https://[^/]+/[^/]+/[^/]+/pull/[0-9]+$ ]]; then
+  printf 'usage: %s <full PR URL>\n' "${0##*/}" >&2
+  exit 64
+fi
+
 interval="${CI_WAIT_INTERVAL_SECONDS:-30}"
 timeout="${CI_WAIT_TIMEOUT_SECONDS:-3600}"
+max_errors="${CI_WAIT_MAX_ERRORS:-3}"
 deadline=$((SECONDS + timeout))
+consecutive_errors=0
+gh_error_file="$(mktemp "${TMPDIR:-/tmp}/wait-for-pr-checks.XXXXXX")"
+trap 'rm -f "$gh_error_file"' EXIT
 
 while ((SECONDS < deadline)); do
-  args=(pr checks)
-  if [[ -n "$pr_selector" ]]; then
-    args+=("$pr_selector")
-  fi
-  args+=(--json name,state,bucket,link,workflow)
+  args=(pr checks "$pr_selector" --json name,state,bucket,link,workflow)
 
-  checks="$(gh "${args[@]}" 2>/dev/null)"
+  : >"$gh_error_file"
+  checks="$(gh "${args[@]}" 2>"$gh_error_file")"
   command_status=$?
-  if [[ $command_status -ne 0 && $command_status -ne 1 && $command_status -ne 8 ]]; then
+  command_error="$(<"$gh_error_file")"
+  valid_json=false
+  if jq -e 'type == "array"' <<<"$checks" >/dev/null 2>&1; then
+    valid_json=true
+  fi
+
+  if [[ $command_status -ne 0 && $command_status -ne 1 && $command_status -ne 8 ]] || [[ $valid_json == false ]]; then
+    consecutive_errors=$((consecutive_errors + 1))
+    if ((consecutive_errors >= max_errors)); then
+      message="${command_error:-gh pr checks returned invalid output}"
+      jq -cn \
+        --arg message "$message" \
+        --argjson command_status "$command_status" \
+        '{status:"error", commandStatus:$command_status, message:$message}'
+      exit 2
+    fi
     sleep "$interval"
     continue
   fi
+  consecutive_errors=0
 
-  if ! jq -e 'type == "array" and length > 0' <<<"$checks" >/dev/null 2>&1; then
+  if ! jq -e 'length > 0' <<<"$checks" >/dev/null 2>&1; then
     sleep "$interval"
     continue
   fi
