@@ -1,13 +1,5 @@
-import { expect, mock, test } from "bun:test";
-
-mock.module("typebox", () => ({
-  Type: {
-    Array: (items: unknown, options: unknown) => ({ items, options }),
-    Object: (properties: unknown, options?: unknown) => ({ properties, options }),
-    Optional: (schema: unknown) => schema,
-    String: (options: unknown) => ({ options }),
-  },
-}));
+import assert from "node:assert/strict";
+import test from "node:test";
 
 const { default: installBackgroundTerminals } = await import("./index.ts");
 
@@ -42,7 +34,7 @@ async function waitFor(predicate: () => boolean) {
   const deadline = Date.now() + 1_000;
   while (!predicate()) {
     if (Date.now() >= deadline) throw new Error("Timed out waiting for background terminal delivery");
-    await Bun.sleep(1);
+    await new Promise((resolve) => setTimeout(resolve, 1));
   }
 }
 
@@ -66,8 +58,8 @@ test("delivers a terminal that settles after an already-idle agent", async () =>
     );
 
     await waitFor(() => messages.length > 0);
-    expect(messages).toHaveLength(1);
-    expect(messages[0]?.options).toEqual({ deliverAs: "followUp", triggerTurn: true });
+    assert.equal(messages.length, 1);
+    assert.deepEqual(messages[0]?.options, { deliverAs: "followUp", triggerTurn: true });
   } finally {
     await emit(handlers, "session_shutdown", {}, context);
   }

@@ -1,4 +1,5 @@
-import { expect, test } from "bun:test";
+import assert from "node:assert/strict";
+import test from "node:test";
 import { BackgroundTerminalDelivery } from "./delivery.ts";
 import type { TerminalSnapshot } from "./manager.ts";
 
@@ -21,7 +22,7 @@ async function waitFor(predicate: () => boolean) {
   const deadline = Date.now() + 500;
   while (!predicate()) {
     if (Date.now() >= deadline) throw new Error("Timed out waiting for delivery");
-    await Bun.sleep(1);
+    await new Promise((resolve) => setTimeout(resolve, 1));
   }
 }
 
@@ -34,14 +35,14 @@ test("delivers only after an idle transition and never duplicates an id", async 
 
   delivery.setBusy();
   delivery.enqueue(snapshot("busy"));
-  await Bun.sleep(15);
-  expect(delivered).toEqual([]);
+  await new Promise((resolve) => setTimeout(resolve, 15));
+  assert.deepEqual(delivered, []);
 
   delivery.setIdle();
   delivery.enqueue(snapshot("duplicate"));
   delivery.enqueue(snapshot("duplicate"));
   await waitFor(() => delivered.length === 2);
-  expect(delivered).toEqual(["busy", "duplicate"]);
+  assert.deepEqual(delivered, ["busy", "duplicate"]);
   delivery.shutdown();
 });
 
@@ -53,8 +54,8 @@ test("consumption suppresses a queued result", async () => {
   );
   delivery.enqueue(snapshot("consumed"));
   delivery.consume("consumed");
-  await Bun.sleep(15);
-  expect(delivered).toEqual([]);
+  await new Promise((resolve) => setTimeout(resolve, 15));
+  assert.deepEqual(delivered, []);
   delivery.shutdown();
 });
 
@@ -70,7 +71,7 @@ test("retries a transient send failure while idle", async () => {
 
   delivery.enqueue(snapshot("retry"));
   await waitFor(() => attempts.length === 2);
-  expect(attempts).toEqual(["retry", "retry"]);
+  assert.deepEqual(attempts, ["retry", "retry"]);
   delivery.shutdown();
 });
 
@@ -82,6 +83,6 @@ test("shutdown cancels queued delivery", async () => {
   );
   delivery.enqueue(snapshot("stale"));
   delivery.shutdown();
-  await Bun.sleep(15);
-  expect(delivered).toEqual([]);
+  await new Promise((resolve) => setTimeout(resolve, 15));
+  assert.deepEqual(delivered, []);
 });

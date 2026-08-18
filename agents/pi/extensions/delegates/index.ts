@@ -1,12 +1,10 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import type { AssistantMessage } from "@earendil-works/pi-ai";
 import {
   createAgentSession,
   DefaultResourceLoader,
   defineTool,
   getAgentDir,
-  getMarkdownTheme,
   SessionManager,
   SettingsManager,
   type AgentSession,
@@ -14,12 +12,15 @@ import {
   type ExtensionAPI,
   type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
-import { Container, Markdown, Spacer, Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import {
-  bindChildSessionExtensions,
+  bindAndPrepareChildSession,
+  bindAbortSignal,
+  createActiveSubagentSessionRegistry,
+  extractAssistantText,
   shutdownAndDisposeChildSession,
-} from "../shared/child-session.ts";
+  trackSubagentEvents,
+} from "../shared/subagent-runtime.ts";
 import {
   DelegateCapacity,
   DELEGATE_CONCURRENCY,
@@ -29,10 +30,8 @@ import {
   type DelegateName,
   type GitDiffTarget,
 } from "./policy.ts";
+import { createSubagentRenderers } from "../shared/subagent-progress.ts";
 import {
-  formatToolCall,
-  MAX_TOOL_CALLS_TO_KEEP,
-  shorten,
   type DelegateDetails,
   type DelegateRunDetails,
 } from "./progress.ts";
@@ -47,20 +46,6 @@ Inspect the relevant code before answering. Focus on architecture, correctness, 
 const WORKER_SYSTEM_PROMPT = `You are an implementation worker operating in the current working tree.
 
 Complete only the bounded task you receive. Read the relevant code, make focused changes, and run the most relevant checks. Leave commits, pushes, pull requests, and product decisions to the coordinator. Return a concise summary of changed files, validation results, and unresolved decisions.`;
-
-function assistantText(session: AgentSession) {
-  for (let index = session.messages.length - 1; index >= 0; index--) {
-    const message = session.messages[index];
-    if ((message as { role?: string }).role !== "assistant") continue;
-    const text = (message as AssistantMessage).content
-      .filter((part) => part.type === "text")
-      .map((part) => part.text)
-      .join("\n")
-      .trim();
-    if (text) return text;
-  }
-  return "";
-}
 
 function createGitDiffTool(cwd: string) {
   return defineTool({
@@ -131,108 +116,18 @@ async function createIsolatedSession(options: {
     customTools: name === "oracle" ? [createGitDiffTool(ctx.cwd)] : [],
   });
 
-  try {
-    await bindChildSessionExtensions(session);
-  } catch (error) {
-    await shutdownAndDisposeChildSession(session);
-    throw error;
-  }
-
-  return session;
+  return bindAndPrepareChildSession(session);
 }
 
-// Rendering follows the progress UI used by pi-finder and pi-librarian.
 function createDelegateRenderers(name: DelegateName) {
-  const activity = name === "oracle" ? "Consulting Oracle…" : "Working in the repository…";
-
-  return {
-    renderCall(args: unknown, theme: any) {
-      const task = typeof (args as { task?: unknown })?.task === "string"
-        ? (args as { task: string }).task.trim()
-        : "";
-      return new Text(theme.fg("muted", shorten(task.replace(/\s+/g, " "), 70)), 0, 0);
-    },
-
-    renderResult(result: any, { expanded, isPartial }: any, theme: any) {
-      const details = result.details as DelegateDetails | undefined;
-      if (!details) {
-        const content = result.content[0];
-        return new Text(content?.type === "text" ? content.text : "(no output)", 0, 0);
-      }
-
-      const status = isPartial ? "running" : details.status;
-      const icon = status === "done"
-        ? theme.fg("success", "✓")
-        : status === "error"
-          ? theme.fg("error", "✗")
-          : status === "aborted"
-            ? theme.fg("warning", "◼")
-            : theme.fg("warning", "⏳");
-      const run = details.run;
-      const totalToolCalls = run.toolCalls.length;
-      const header = icon + " "
-        + theme.fg("toolTitle", theme.bold(`${name} `))
-        + theme.fg(
-          "dim",
-          `${details.model}:${details.thinking} • ${run.turns}/${run.maxTurns} turns • ${totalToolCalls} tool call${totalToolCalls === 1 ? "" : "s"}`,
-        );
-      const workspaceLine = `${theme.fg("muted", "workspace: ")}${theme.fg("toolOutput", details.workspace)}`;
-
-      let toolsText = "";
-      if (run.toolCalls.length > 0) {
-        const calls = expanded ? run.toolCalls : run.toolCalls.slice(-6);
-        const lines: string[] = [theme.fg("muted", "Tools:")];
-        for (const call of calls) {
-          const callIcon = call.isError
-            ? theme.fg("error", "✗")
-            : call.endedAt
-              ? theme.fg("success", "✓")
-              : theme.fg("warning", "→");
-          lines.push(`${callIcon} ${theme.fg("toolOutput", formatToolCall(call))}`);
-        }
-        if (!expanded && run.toolCalls.length > 6) {
-          lines.push(theme.fg("muted", "(Ctrl+O to expand)"));
-        }
-        toolsText = lines.join("\n");
-      }
-
-      if (status === "running") {
-        let text = `${header}\n${workspaceLine}`;
-        if (toolsText) text += `\n\n${toolsText}`;
-        text += `\n\n${theme.fg("muted", activity)}`;
-        return new Text(text, 0, 0);
-      }
-
-      const combined = (
-        result.content[0]?.type === "text"
-          ? result.content[0].text
-          : run.summaryText ?? "(no output)"
-      ).trim() || "(no output)";
-
-      if (!expanded) {
-        const lines = combined.split("\n");
-        let text = `${header}\n${workspaceLine}\n\n${theme.fg("toolOutput", lines.slice(0, 18).join("\n"))}`;
-        if (lines.length > 18) text += `\n${theme.fg("muted", "(Ctrl+O to expand)")}`;
-        if (toolsText) text += `\n\n${toolsText}`;
-        return new Text(text, 0, 0);
-      }
-
-      const container = new Container();
-      container.addChild(new Text(header, 0, 0));
-      container.addChild(new Text(workspaceLine, 0, 0));
-      if (toolsText) {
-        container.addChild(new Spacer(1));
-        container.addChild(new Text(toolsText, 0, 0));
-      }
-      container.addChild(new Spacer(1));
-      container.addChild(new Markdown(combined, 0, 0, getMarkdownTheme()));
-      return container;
-    },
-  };
+  return createSubagentRenderers<DelegateDetails>({
+    agentLabel: name,
+    activity: name === "oracle" ? "Consulting Oracle…" : "Working in the repository…",
+  });
 }
 
 export default function delegatesExtension(pi: ExtensionAPI) {
-  const activeSessions = new Set<AgentSession>();
+  const activeSessions = createActiveSubagentSessionRegistry();
   const capacity: Record<DelegateName, DelegateCapacity> = {
     oracle: new DelegateCapacity(DELEGATE_CONCURRENCY.oracle),
     worker: new DelegateCapacity(DELEGATE_CONCURRENCY.worker),
@@ -257,9 +152,9 @@ export default function delegatesExtension(pi: ExtensionAPI) {
       startedAt: Date.now(),
     };
     let session: AgentSession | undefined;
-    let unsubscribe: (() => void) | undefined;
-    let abort: (() => void) | undefined;
-    let lastUpdate = 0;
+    let stopTracking: (() => void) | undefined;
+    let removeAbortListener: (() => void) | undefined;
+    let removeActiveSession: (() => void) | undefined;
 
     const buildDetails = (): DelegateDetails => ({
       status: run.status,
@@ -269,10 +164,7 @@ export default function delegatesExtension(pi: ExtensionAPI) {
       thinking: policy.thinking,
       run,
     });
-    const emitUpdate = (force = false) => {
-      const now = Date.now();
-      if (!force && now - lastUpdate < 120) return;
-      lastUpdate = now;
+    const emitUpdate = () => {
       const text = run.summaryText ?? `${options.name} is working…`;
       options.onUpdate?.({
         content: [{ type: "text", text }],
@@ -280,7 +172,7 @@ export default function delegatesExtension(pi: ExtensionAPI) {
       });
     };
 
-    emitUpdate(true);
+    emitUpdate();
 
     try {
       const child = await createIsolatedSession({
@@ -288,68 +180,29 @@ export default function delegatesExtension(pi: ExtensionAPI) {
         ctx: options.ctx,
       });
       session = child;
-      activeSessions.add(child);
-
-      let wrapRequested = false;
-      let hardAbortRequested = false;
-      unsubscribe = child.subscribe((event) => {
-        switch (event.type) {
-          case "turn_end": {
-            run.turns++;
-            if (run.turns >= policy.maxTurns && !wrapRequested) {
-              wrapRequested = true;
-              void child
-                .steer("Wrap up now. Return your best concise final result without more exploration.")
-                .catch(() => undefined);
-            } else if (run.turns >= policy.maxTurns + 2 && !hardAbortRequested) {
-              hardAbortRequested = true;
-              void child.abort().catch(() => undefined);
-            }
-            emitUpdate();
-            break;
-          }
-          case "tool_execution_start": {
-            run.toolCalls.push({
-              id: event.toolCallId,
-              name: event.toolName,
-              args: event.args,
-              startedAt: Date.now(),
-            });
-            if (run.toolCalls.length > MAX_TOOL_CALLS_TO_KEEP) {
-              run.toolCalls.splice(0, run.toolCalls.length - MAX_TOOL_CALLS_TO_KEEP);
-            }
-            emitUpdate(true);
-            break;
-          }
-          case "tool_execution_end": {
-            const call = run.toolCalls.find((candidate) => candidate.id === event.toolCallId);
-            if (call) {
-              call.endedAt = Date.now();
-              call.isError = event.isError;
-            }
-            emitUpdate(true);
-            break;
-          }
-        }
+      removeActiveSession = activeSessions.add(child);
+      const tracker = trackSubagentEvents(child, {
+        run,
+        maxTurns: policy.maxTurns,
+        onUpdate: () => emitUpdate(),
       });
-
-      abort = () => {
+      stopTracking = tracker.unsubscribe;
+      removeAbortListener = bindAbortSignal(options.signal, () => {
         void child.abort().catch(() => undefined);
-      };
-      options.signal?.addEventListener("abort", abort, { once: true });
+      });
       if (options.signal?.aborted) throw new Error(`${options.name} was aborted.`);
 
       await child.prompt(options.task, { expandPromptTemplates: false });
       if (options.signal?.aborted) throw new Error(`${options.name} was aborted.`);
 
-      const output = assistantText(child);
+      const output = extractAssistantText(child);
       if (!output) throw new Error(`${options.name} returned no final answer.`);
       const result = truncateDelegateOutput(output);
       const stats = child.getSessionStats();
       run.status = "done";
       run.summaryText = result.text;
       run.endedAt = Date.now();
-      emitUpdate(true);
+      emitUpdate();
 
       return {
         text: result.text,
@@ -366,15 +219,13 @@ export default function delegatesExtension(pi: ExtensionAPI) {
       run.error = aborted ? undefined : error instanceof Error ? error.message : String(error);
       run.summaryText = aborted ? "Aborted" : run.error;
       run.endedAt = Date.now();
-      emitUpdate(true);
+      emitUpdate();
       throw error;
     } finally {
-      if (abort) options.signal?.removeEventListener("abort", abort);
-      unsubscribe?.();
-      if (session) {
-        activeSessions.delete(session);
-        await shutdownAndDisposeChildSession(session);
-      }
+      removeAbortListener?.();
+      stopTracking?.();
+      removeActiveSession?.();
+      if (session) await shutdownAndDisposeChildSession(session);
       releaseCapacity();
     }
   }
@@ -447,13 +298,6 @@ export default function delegatesExtension(pi: ExtensionAPI) {
   });
 
   pi.on("session_shutdown", async () => {
-    const sessions = [...activeSessions];
-    activeSessions.clear();
-    await Promise.all(
-      sessions.map(async (session) => {
-        await session.abort().catch(() => undefined);
-        await shutdownAndDisposeChildSession(session);
-      }),
-    );
+    await activeSessions.shutdown();
   });
 }
