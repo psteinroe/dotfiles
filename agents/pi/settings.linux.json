@@ -11,6 +11,7 @@
     "shellCommandPrefix": "fpath=($HOME/Developer/dotfiles/zsh/functions $fpath); autoload -Uz gpr",
     "packages": [
         "git:github.com/default-anton/pi-librarian",
+        "git:github.com/default-anton/pi-finder",
         "git:github.com/nicobailon/pi-mcp-adapter@v2.8.0",
         "git:github.com/davebcn87/pi-autoresearch"
     ],
@@ -18,5 +19,5 @@
     "theme": "gruvbox-high-contrast",
     "defaultProvider": "openai-codex",
     "defaultModel": "gpt-5.6-sol",
-    "defaultThinkingLevel": "high"
+    "defaultThinkingLevel": "medium"
 }

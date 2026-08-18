@@ -25,6 +25,11 @@ in
 {
   assertions = piSkillAssertions;
 
+  home.sessionVariables = {
+    PI_FINDER_MODELS = "openai-codex/gpt-5.6-luna:medium";
+    PI_LIBRARIAN_MODELS = "openai-codex/gpt-5.6-luna:high";
+  };
+
   home.activation.agentConfigs = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
         remove_path() {
           target="$1"
