@@ -27,6 +27,7 @@ import {
 	TerminalManager,
 	type TerminalSnapshot,
 } from "./src/manager.ts";
+import { BackgroundTerminalDelivery } from "./src/delivery.ts";
 
 /** Model-facing output caps. Status is generous; completion is compact. */
 const STATUS_STDOUT_MAX = 16 * 1024;
@@ -40,16 +41,6 @@ const RESULT_STDERR_LINES = 20;
 
 const RESULT_MESSAGE_TYPE = "background-terminal-result";
 const UI_KEY = "background-terminals";
-/**
- * Quiet window after the agent goes idle before delivering settled results.
- *
- * Delivery must NOT be a fixed timer from settle: an LLM round-trip is seconds,
- * so a short timer fires before the agent's next bg_status can claim the result
- * and the model gets told twice. Instead results wait until the agent is idle
- * (agent_settled), which is also the only moment a followUp can be acted on.
- * This small extra delay lets a burst of exits batch into one message.
- */
-const DELIVERY_QUIET_MS = 250;
 
 const glyph = (status: TerminalSnapshot["status"]): string =>
 	status === "running" ? "●" : status === "done" ? "✓" : status === "killed" ? "⊘" : "✗";
@@ -122,8 +113,24 @@ function resultText(snapshot: TerminalSnapshot): string {
 
 export default function (pi: ExtensionAPI) {
 	const manager = new TerminalManager();
-	/** Settled results awaiting delivery, keyed by id so a retry cannot double up. */
-	const pending = new Map<string, TerminalSnapshot>();
+	const delivery = new BackgroundTerminalDelivery((snapshot) =>
+		pi.sendMessage(
+			{
+				customType: RESULT_MESSAGE_TYPE,
+				content: resultText(snapshot),
+				display: true,
+				details: {
+					id: snapshot.id,
+					title: snapshot.title,
+					status: snapshot.status,
+					exitCode: snapshot.exitCode ?? null,
+				},
+			},
+			// followUp never interrupts a streaming turn; triggerTurn wakes an
+			// idle agent so a finished build is noticed promptly.
+			{ deliverAs: "followUp", triggerTurn: true },
+		),
+	);
 	let uiCtx: ExtensionContext | undefined;
 
 	const refreshUi = () => {
@@ -138,66 +145,26 @@ export default function (pi: ExtensionAPI) {
 		);
 	};
 
-	const flush = () => {
-		if (!pending.size) return;
-		const snapshots = [...pending.values()];
-		pending.clear();
-		for (const snapshot of snapshots) {
-			try {
-				pi.sendMessage(
-					{
-						customType: RESULT_MESSAGE_TYPE,
-						content: resultText(snapshot),
-						display: true,
-						details: {
-							id: snapshot.id,
-							title: snapshot.title,
-							status: snapshot.status,
-							exitCode: snapshot.exitCode ?? null,
-						},
-					},
-					// followUp never interrupts a streaming turn; triggerTurn wakes an
-					// idle agent so a finished build is noticed promptly.
-					{ deliverAs: "followUp", triggerTurn: true },
-				);
-			} catch {
-				// Re-queue so a transient send failure is not a lost result.
-				pending.set(snapshot.id, snapshot);
-			}
-		}
-	};
-
-	/**
-	 * Settle -> queue. Delivery happens when the agent is idle (see agent_settled
-	 * below), never straight from settle: flushing immediately races the agent's
-	 * own next bg_status call and duplicates the result.
-	 */
-	let flushTimer: NodeJS.Timeout | undefined;
-	const scheduleFlush = () => {
-		if (flushTimer) clearTimeout(flushTimer);
-		flushTimer = setTimeout(() => {
-			flushTimer = undefined;
-			flush();
-		}, DELIVERY_QUIET_MS);
-		flushTimer.unref?.();
-	};
-
 	manager.onSettle((snapshot, consumed) => {
 		refreshUi();
-		if (consumed) return; // already shown via bg_status / bg_kill
-		pending.set(snapshot.id, snapshot);
-		// Deliberately no flush here — agent_settled drives delivery.
+		if (consumed) {
+			delivery.consume(snapshot.id);
+			return; // already shown via bg_status / bg_kill
+		}
+		delivery.enqueue(snapshot);
 	});
 
 	pi.on("session_start", async (_event, ctx) => {
 		uiCtx = ctx;
+		delivery.setIdle();
 		refreshUi();
 	});
+	pi.on("agent_start", async () => delivery.setBusy());
 	// The agent has stopped working: now it is safe to hand over any results it
 	// did not already collect itself, and a followUp can actually be acted on.
-	pi.on("agent_settled", async () => scheduleFlush());
+	pi.on("agent_settled", async () => delivery.setIdle());
 	pi.on("session_shutdown", async () => {
-		pending.clear();
+		delivery.shutdown();
 		uiCtx?.ui.setStatus(UI_KEY, undefined);
 		uiCtx?.ui.setWidget(UI_KEY, undefined);
 		uiCtx = undefined;
@@ -268,7 +235,7 @@ export default function (pi: ExtensionAPI) {
 			// Peeking a settled terminal consumes it: no duplicate follow-up.
 			if (snapshot.status !== "running") {
 				manager.markConsumed(snapshot.id);
-				pending.delete(snapshot.id);
+				delivery.consume(snapshot.id);
 			}
 			return {
 				content: [{ type: "text" as const, text: statusText(snapshot) }],
@@ -320,12 +287,12 @@ export default function (pi: ExtensionAPI) {
 					const before = manager.get(id);
 					if (before && before.status !== "running") {
 						manager.markConsumed(id);
-						pending.delete(id);
+						delivery.consume(id);
 						lines.push(`${id} was already ${before.status}`);
 						continue;
 					}
 					const snapshot = await manager.kill(id);
-					pending.delete(id);
+					delivery.consume(id);
 					lines.push(`${id} ${snapshot.status}${snapshot.signal ? ` (signal ${snapshot.signal})` : ""}`);
 				} catch (error) {
 					lines.push(`${id}: ${error instanceof Error ? error.message : String(error)}`);

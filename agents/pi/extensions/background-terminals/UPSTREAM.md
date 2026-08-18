@@ -9,4 +9,5 @@ Local changes:
 - renamed the extension entry point to `index.ts` and adjusted its relative manager import;
 - added Pi prompt metadata for explicit parallel background starts;
 - expanded one TypeScript parameter property for Node's strip-only test runner;
-- copied the bundled skill to `agents/skills/background-terminals` and corrected its runtime descriptions.
+- copied the bundled skill to `agents/skills/background-terminals` and corrected its runtime descriptions;
+- made completion delivery lifecycle-aware so terminals that settle after the agent becomes idle still resume it, with deduplication, retry, and shutdown-safe timer cleanup.

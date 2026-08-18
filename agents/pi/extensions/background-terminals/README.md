@@ -21,9 +21,11 @@ input sees EOF immediately rather than hanging — pass credentials via env or
 flags instead.
 
 When a terminal exits, its result is delivered automatically as a follow-up
-message, so the agent does not need to poll. Calling `bg_status` or `bg_kill` on
-an already-finished terminal **consumes** that result and suppresses the
-automatic message, so the same outcome is never delivered twice.
+message, so the agent does not need to poll. Delivery wakes an idle agent, waits
+for an active turn to settle, and retries transient handoff failures. Calling
+`bg_status` or `bg_kill` on an already-finished terminal **consumes** that result
+and suppresses the automatic message, so the same outcome is never delivered
+twice.
 
 Output is retained in memory (bounded per stream); status and completion
 messages show a truncated tail of what matters. While terminals are running,
