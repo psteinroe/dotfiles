@@ -53,7 +53,9 @@ Stop and report the current state when any condition holds:
 
 - Keep complete CI logs in the temporary files produced by `failed-run-summary.sh`; read more only when its bounded excerpt is insufficient.
 - Treat flaky checks explicitly; do not silently rerun them.
-- Never disable checks, weaken tests, resolve review threads, merge, or approve on the user's behalf.
+- Preserve pre-existing test coverage when fixing CI; do not remove tests solely to make a failing check disappear.
+- An explicit user request authorizes removing tests introduced by the current PR. Confirm they are additions in the focused base diff, remove only the requested tests, and continue without asking for permission again.
+- Never disable checks, resolve review threads, merge, or approve on the user's behalf.
 - Do not start duplicate background waits for the same HEAD.
 - Treat the waiter's success as authoritative only after its built-in stable-check window; do not replace it with a one-shot `gh pr checks` result immediately after a push.
 - When passing only a PR number, make sure `working_dir` is the pull request worktree; otherwise pass `owner/repo` explicitly.
