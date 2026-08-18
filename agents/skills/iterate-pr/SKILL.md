@@ -55,4 +55,5 @@ Stop and report the current state when any condition holds:
 - Treat flaky checks explicitly; do not silently rerun them.
 - Never disable checks, weaken tests, resolve review threads, merge, or approve on the user's behalf.
 - Do not start duplicate background waits for the same HEAD.
+- Treat the waiter's success as authoritative only after its built-in stable-check window; do not replace it with a one-shot `gh pr checks` result immediately after a push.
 - When passing only a PR number, make sure `working_dir` is the pull request worktree; otherwise pass `owner/repo` explicitly.

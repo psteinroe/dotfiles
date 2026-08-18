@@ -19,8 +19,11 @@ args+=(--json name,state,bucket,link,workflow)
 interval="${CI_WAIT_INTERVAL_SECONDS:-30}"
 timeout="${CI_WAIT_TIMEOUT_SECONDS:-3600}"
 max_errors="${CI_WAIT_MAX_ERRORS:-3}"
+stable_polls_required="${CI_WAIT_STABLE_POLLS:-3}"
 deadline=$((SECONDS + timeout))
 consecutive_errors=0
+stable_polls=0
+stable_fingerprint=""
 gh_error_file="$(mktemp "${TMPDIR:-/tmp}/wait-for-pr-checks.XXXXXX")"
 trap 'rm -f "$gh_error_file"' EXIT
 
@@ -36,6 +39,8 @@ while ((SECONDS < deadline)); do
 
   if [[ $command_status -ne 0 && $command_status -ne 1 && $command_status -ne 8 ]] || [[ $valid_json == false ]]; then
     consecutive_errors=$((consecutive_errors + 1))
+    stable_polls=0
+    stable_fingerprint=""
     if ((consecutive_errors >= max_errors)); then
       message="${command_error:-gh pr checks returned invalid output}"
       jq -cn \
@@ -50,6 +55,8 @@ while ((SECONDS < deadline)); do
   consecutive_errors=0
 
   if ! jq -e 'length > 0' <<<"$checks" >/dev/null 2>&1; then
+    stable_polls=0
+    stable_fingerprint=""
     sleep "$interval"
     continue
   fi
@@ -67,6 +74,23 @@ while ((SECONDS < deadline)); do
 
   pending="$(jq '[.[] | select(.bucket == "pending")] | length' <<<"$checks")"
   if [[ "$pending" -gt 0 ]]; then
+    stable_polls=0
+    stable_fingerprint=""
+    sleep "$interval"
+    continue
+  fi
+
+  # GitHub registers workflow jobs asynchronously after a push. A nonempty,
+  # terminal check list can therefore be incomplete. Require the same terminal
+  # set across multiple polls before declaring the checks passed.
+  fingerprint="$(jq -c 'sort_by(.name, .workflow, .link) | map({name, workflow, bucket, state, link})' <<<"$checks")"
+  if [[ "$fingerprint" == "$stable_fingerprint" ]]; then
+    stable_polls=$((stable_polls + 1))
+  else
+    stable_fingerprint="$fingerprint"
+    stable_polls=1
+  fi
+  if ((stable_polls < stable_polls_required)); then
     sleep "$interval"
     continue
   fi
