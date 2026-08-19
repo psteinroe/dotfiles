@@ -20,6 +20,9 @@ Use `bg_start` when the command does not naturally end, or ends much later:
 - log tails, `kubectl logs -f`
 - long streaming builds and full test suites
 
+On macOS and Linux, background commands run under **Bash**, so guards may safely use
+`set -o pipefail` or `set -euo pipefail`. Windows commands run under `ComSpec`.
+
 Background commands get **no stdin**. Commands that prompt receive EOF, so pass credentials
 and non-interactive options via env or flags.
 

@@ -241,7 +241,9 @@ export class TerminalManager {
 
 		try {
 			const isWindows = process.platform === "win32";
-			const shell = isWindows ? (process.env.ComSpec ?? "cmd.exe") : "/bin/sh";
+			// Agents commonly use `set -o pipefail` for CI guards. POSIX sh does
+			// not provide it, so use Bash consistently across macOS and Linux.
+			const shell = isWindows ? (process.env.ComSpec ?? "cmd.exe") : "bash";
 			const args = isWindows ? ["/d", "/s", "/c", command] : ["-c", command];
 			const child = spawn(shell, args, {
 				cwd: options.cwd,

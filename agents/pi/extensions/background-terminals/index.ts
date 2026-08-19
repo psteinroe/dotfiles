@@ -41,7 +41,7 @@ const RESULT_STDERR_LINES = 20;
 
 const RESULT_MESSAGE_TYPE = "background-terminal-result";
 const UI_KEY = "background-terminals";
-const RUNTIME_VERSION = "2026-08-19.2";
+const RUNTIME_VERSION = "2026-08-19.3";
 
 const glyph = (status: TerminalSnapshot["status"]): string =>
 	status === "running" ? "●" : status === "done" ? "✓" : status === "killed" ? "⊘" : "✗";
@@ -191,15 +191,18 @@ export default function (pi: ExtensionAPI) {
 		name: "bg_start",
 		label: "Start Terminal",
 		description:
-			"Start a long-running shell command in a background terminal and return immediately. Use this for dev servers, watchers, streaming builds, log tails — anything that should keep running while you continue working. Use the regular bash tool for commands that finish quickly. The command gets no stdin, so it must not expect interactive input.",
+			"Start a long-running shell command in a background terminal and return immediately. Commands run with Bash on macOS/Linux and ComSpec on Windows. Use this for dev servers, watchers, streaming builds, log tails — anything that should keep running while you continue working. Use the regular bash tool for commands that finish quickly. The command gets no stdin, so it must not expect interactive input.",
 		promptSnippet: "Start and manage long-running shell commands without blocking the agent",
 		promptGuidelines: [
 			"Use bg_start for commands that run for a long time or continuously; start independent commands with separate bg_start calls in the same response so they run concurrently.",
+			"On macOS and Linux, bg_start commands run under Bash, so guards may safely use `set -o pipefail` or `set -euo pipefail`.",
 		],
 		executionMode: "parallel",
 		parameters: Type.Object(
 			{
-				command: Type.String({ description: "Shell command to run." }),
+				command: Type.String({
+					description: "Command to run with Bash on macOS/Linux or ComSpec on Windows.",
+				}),
 				title: Type.String({ description: "Short label shown in listings, e.g. 'vite dev'." }),
 				working_dir: Type.Optional(
 					Type.String({

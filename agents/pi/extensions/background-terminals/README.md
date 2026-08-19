@@ -16,6 +16,9 @@ At most **8** terminals run at once. Starting a ninth fails until something is
 killed. Terminals are session-scoped: everything is stopped on shutdown or
 reload, so a dev server cannot outlive the session that started it.
 
+Commands run with **Bash** on macOS and Linux, including support for guards such
+as `set -euo pipefail`. Windows commands run with `ComSpec`.
+
 Commands get **no stdin** (`stdio` stdin is ignored). Anything that prompts for
 input sees EOF immediately rather than hanging — pass credentials via env or
 flags instead.

@@ -28,6 +28,49 @@ test("runs multiple background terminals concurrently", async () => {
   }
 });
 
+test(
+  "supports pipefail in POSIX background commands",
+  { skip: process.platform === "win32" },
+  async () => {
+    const manager = new TerminalManager();
+    try {
+      const terminal = manager.start({
+        command: "set -o pipefail; printf ok",
+        title: "pipefail",
+        cwd: process.cwd(),
+      });
+
+      await waitForSettlement(manager, [terminal.id]);
+      assert.equal(manager.get(terminal.id)?.status, "done");
+      assert.equal(manager.get(terminal.id)?.stdout.text, "ok");
+      assert.equal(manager.get(terminal.id)?.stderr.text, "");
+    } finally {
+      await manager.disposeAll();
+    }
+  },
+);
+
+test(
+  "propagates pipeline failures when pipefail is enabled",
+  { skip: process.platform === "win32" },
+  async () => {
+    const manager = new TerminalManager();
+    try {
+      const terminal = manager.start({
+        command: "set -o pipefail; false | true",
+        title: "failing pipeline",
+        cwd: process.cwd(),
+      });
+
+      await waitForSettlement(manager, [terminal.id]);
+      assert.equal(manager.get(terminal.id)?.status, "failed");
+      assert.equal(manager.get(terminal.id)?.exitCode, 1);
+    } finally {
+      await manager.disposeAll();
+    }
+  },
+);
+
 test("enforces the eight-terminal parallel limit", async () => {
   const manager = new TerminalManager();
   try {

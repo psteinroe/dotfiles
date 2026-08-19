@@ -10,4 +10,5 @@ Local changes:
 - added Pi prompt metadata for explicit parallel background starts;
 - expanded one TypeScript parameter property for Node's strip-only test runner;
 - copied the bundled skill to `agents/skills/background-terminals` and corrected its runtime descriptions;
-- made completion delivery lifecycle-aware so terminals that settle after the agent becomes idle still resume it, with deduplication, retry, and shutdown-safe timer cleanup.
+- made completion delivery lifecycle-aware so terminals that settle after the agent becomes idle still resume it, with deduplication, retry, and shutdown-safe timer cleanup;
+- run commands with Bash on macOS/Linux so defensive CI guards can use `pipefail` reliably.
