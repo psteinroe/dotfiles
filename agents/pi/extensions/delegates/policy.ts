@@ -47,7 +47,7 @@ export const DELEGATE_POLICIES: Record<DelegateName, DelegatePolicy> = {
   worker: {
     model: "gpt-5.6-luna",
     thinking: "high",
-    maxTurns: 30,
+    maxTurns: 50,
     tools: ["read", "bash", "edit", "write", "grep", "find", "ls"],
   },
 };

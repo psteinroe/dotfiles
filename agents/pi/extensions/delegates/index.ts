@@ -17,7 +17,8 @@ import {
   bindAndPrepareChildSession,
   bindAbortSignal,
   createActiveSubagentSessionRegistry,
-  extractAssistantText,
+  describeMissingSubagentOutput,
+  extractLatestAssistantText,
   shutdownAndDisposeChildSession,
   trackSubagentEvents,
 } from "../shared/subagent-runtime.ts";
@@ -31,6 +32,7 @@ import {
   type GitDiffTarget,
 } from "./policy.ts";
 import { createSubagentRenderers } from "../shared/subagent-progress.ts";
+import { createTurnBudgetExtension } from "../shared/turn-budget.ts";
 import {
   type DelegateDetails,
   type DelegateRunDetails,
@@ -96,6 +98,7 @@ async function createIsolatedSession(options: {
     agentDir,
     settingsManager,
     noExtensions: true,
+    extensionFactories: [createTurnBudgetExtension(policy.maxTurns)],
     noSkills: true,
     noPromptTemplates: true,
     noThemes: true,
@@ -195,11 +198,30 @@ export default function delegatesExtension(pi: ExtensionAPI) {
       await child.prompt(options.task, { expandPromptTemplates: false });
       if (options.signal?.aborted) throw new Error(`${options.name} was aborted.`);
 
-      const output = extractAssistantText(child);
-      if (!output) throw new Error(`${options.name} returned no final answer.`);
-      const result = truncateDelegateOutput(output);
+      const output = extractLatestAssistantText(child);
       const stats = child.getSessionStats();
+      if (run.terminationReason === "turn_limit" || !output) {
+        const missing = describeMissingSubagentOutput(options.name, run);
+        run.status = "error";
+        run.terminationReason = missing.terminationReason;
+        run.error = missing.message;
+        run.summaryText = missing.message;
+        run.endedAt = Date.now();
+        emitUpdate();
+        return {
+          text: missing.message,
+          details: {
+            ...buildDetails(),
+            tokens: stats.tokens,
+            cost: stats.cost,
+          } satisfies DelegateDetails,
+          isError: true,
+        };
+      }
+
+      const result = truncateDelegateOutput(output);
       run.status = "done";
+      run.terminationReason = "completed";
       run.summaryText = result.text;
       run.endedAt = Date.now();
       emitUpdate();
@@ -212,15 +234,27 @@ export default function delegatesExtension(pi: ExtensionAPI) {
           cost: stats.cost,
           truncated: result.truncated,
         } satisfies DelegateDetails,
+        isError: false,
       };
     } catch (error) {
       const aborted = options.signal?.aborted ?? false;
+      const turnLimited = run.terminationReason === "turn_limit";
       run.status = aborted ? "aborted" : "error";
-      run.error = aborted ? undefined : error instanceof Error ? error.message : String(error);
-      run.summaryText = aborted ? "Aborted" : run.error;
+      run.terminationReason = aborted
+        ? "cancelled"
+        : run.terminationReason ?? "prompt_error";
+      const message = turnLimited
+        ? describeMissingSubagentOutput(options.name, run).message
+        : error instanceof Error ? error.message : String(error);
+      run.error = aborted ? undefined : message;
+      run.summaryText = aborted ? "Aborted" : message;
       run.endedAt = Date.now();
       emitUpdate();
-      throw error;
+      return {
+        text: run.summaryText ?? "Aborted",
+        details: buildDetails(),
+        isError: !aborted,
+      };
     } finally {
       removeAbortListener?.();
       stopTracking?.();
@@ -259,6 +293,7 @@ export default function delegatesExtension(pi: ExtensionAPI) {
       return {
         content: [{ type: "text", text: result.text }],
         details: result.details,
+        ...(result.isError ? { isError: true } : {}),
       };
     },
   });
@@ -293,6 +328,7 @@ export default function delegatesExtension(pi: ExtensionAPI) {
       return {
         content: [{ type: "text", text: result.text }],
         details: result.details,
+        ...(result.isError ? { isError: true } : {}),
       };
     },
   });

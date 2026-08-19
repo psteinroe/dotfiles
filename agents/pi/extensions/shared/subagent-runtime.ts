@@ -16,6 +16,14 @@ import {
 export { bindChildSessionExtensions, shutdownAndDisposeChildSession } from "./child-session.ts";
 export type { DisposableChildSession } from "./child-session.ts";
 
+function assistantMessageText(message: AssistantMessage): string {
+  return message.content
+    .filter((part) => part.type === "text")
+    .map((part) => part.text)
+    .join("\n")
+    .trim();
+}
+
 /** Extract the last non-empty assistant text, ignoring thinking/tool parts. */
 export function extractAssistantText(
   session: Pick<AgentSession, "messages">,
@@ -23,14 +31,45 @@ export function extractAssistantText(
   for (let index = session.messages.length - 1; index >= 0; index--) {
     const message = session.messages[index];
     if ((message as { role?: string }).role !== "assistant") continue;
-    const text = (message as AssistantMessage).content
-      .filter((part) => part.type === "text")
-      .map((part) => part.text)
-      .join("\n")
-      .trim();
+    const text = assistantMessageText(message as AssistantMessage);
     if (text) return text;
   }
   return "";
+}
+
+/** Extract text only from the latest assistant response. */
+export function extractLatestAssistantText(
+  session: Pick<AgentSession, "messages">,
+): string {
+  for (let index = session.messages.length - 1; index >= 0; index--) {
+    const message = session.messages[index];
+    if ((message as { role?: string }).role === "assistant") {
+      return assistantMessageText(message as AssistantMessage);
+    }
+  }
+  return "";
+}
+
+/** Explain missing text without hiding a bounded run that exhausted its budget. */
+export function describeMissingSubagentOutput(
+  agent: string,
+  run: Pick<SubagentRunDetails, "turns" | "maxTurns" | "terminationReason">,
+) {
+  const label = agent.charAt(0).toUpperCase() + agent.slice(1);
+  if (
+    run.maxTurns !== undefined
+    && (run.terminationReason === "turn_limit" || run.turns >= run.maxTurns)
+  ) {
+    return {
+      terminationReason: "turn_limit" as const,
+      message:
+        `${label} reached its ${run.maxTurns}-turn limit after working but did not return a final summary. Review the working-tree diff and recent tool calls.`,
+    };
+  }
+  return {
+    terminationReason: "empty_output" as const,
+    message: `${label} completed without a final text response.`,
+  };
 }
 
 export interface SubagentEventTrackingOptions {
@@ -63,8 +102,9 @@ export function trackSubagentEvents(
   const updateIntervalMs = options.updateIntervalMs ?? 120;
   const now = options.now ?? Date.now;
   const softLimit = options.maxTurns;
+  const wrapAtTurn = softLimit === undefined ? undefined : Math.max(1, softLimit - 1);
   const softLimitPrompt = options.softLimitPrompt
-    ?? "Wrap up now. Return your best concise final result without more exploration.";
+    ?? "Your next turn is reserved for the final answer. Stop exploring and return your best concise result without using more tools.";
   let lastUpdate = 0;
   let wrapRequested = false;
   let hardAbortRequested = false;
@@ -81,7 +121,11 @@ export function trackSubagentEvents(
     switch (event.type) {
       case "turn_end": {
         options.run.turns++;
-        if (softLimit !== undefined && options.run.turns >= softLimit && !wrapRequested) {
+        if (
+          wrapAtTurn !== undefined
+          && options.run.turns >= wrapAtTurn
+          && !wrapRequested
+        ) {
           wrapRequested = true;
           void session.steer(softLimitPrompt).catch(() => undefined);
         } else if (
@@ -89,8 +133,14 @@ export function trackSubagentEvents(
           && options.run.turns >= softLimit + 2
           && !hardAbortRequested
         ) {
-          hardAbortRequested = true;
-          void session.abort().catch(() => undefined);
+          const endedWithText = (event.message as AssistantMessage | undefined)?.content
+            ?.some((part) => part.type === "text" && part.text.trim().length > 0)
+            ?? false;
+          if (!endedWithText) {
+            hardAbortRequested = true;
+            options.run.terminationReason = "turn_limit";
+            void session.abort().catch(() => undefined);
+          }
         }
         emitUpdate();
         break;

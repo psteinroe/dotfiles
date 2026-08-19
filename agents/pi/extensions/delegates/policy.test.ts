@@ -18,7 +18,7 @@ test("delegate routing keeps the coordinator out of routine implementation", () 
   assert.deepEqual(DELEGATE_POLICIES.worker, {
     model: "gpt-5.6-luna",
     thinking: "high",
-    maxTurns: 30,
+    maxTurns: 50,
     tools: ["read", "bash", "edit", "write", "grep", "find", "ls"],
   });
   assert.equal(DELEGATE_POLICIES.oracle.tools.includes("bash"), false);

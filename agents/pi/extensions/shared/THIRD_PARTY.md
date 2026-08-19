@@ -1,7 +1,7 @@
 # Third-party notices
 
-The subagent progress tracking and rendering in `subagent-progress.ts` are
-adapted from:
+The subagent progress tracking and rendering in `subagent-progress.ts` and the
+bounded child turn handling in `turn-budget.ts` are adapted from:
 
 - [`default-anton/pi-finder`](https://github.com/default-anton/pi-finder), commit
   [`be44e311a0d35f57b44058f45a5e824fc48a05fe`](https://github.com/default-anton/pi-finder/commit/be44e311a0d35f57b44058f45a5e824fc48a05fe)

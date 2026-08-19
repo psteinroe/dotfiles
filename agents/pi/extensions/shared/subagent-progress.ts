@@ -7,6 +7,13 @@ import { Container, Markdown, Spacer, Text } from "@earendil-works/pi-tui";
 export const MAX_TOOL_CALLS_TO_KEEP = 80;
 
 export type SubagentStatus = "running" | "done" | "error" | "aborted";
+export type SubagentTerminationReason =
+  | "completed"
+  | "cancelled"
+  | "turn_limit"
+  | "prompt_error"
+  | "empty_output"
+  | "shutdown";
 
 export interface SubagentToolCall {
   id: string;
@@ -27,6 +34,7 @@ export interface SubagentRunDetails {
   toolCalls: SubagentToolCall[];
   summaryText?: string;
   error?: string;
+  terminationReason?: SubagentTerminationReason;
   startedAt: number;
   endedAt?: number;
 }
