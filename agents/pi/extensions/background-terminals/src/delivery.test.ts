@@ -75,6 +75,25 @@ test("retries a transient send failure while idle", async () => {
   delivery.shutdown();
 });
 
+test("rechecks live safety at flush time and retries without another lifecycle event", async () => {
+  const delivered: string[] = [];
+  let canDeliver = true;
+  const delivery = new BackgroundTerminalDelivery(
+    (result) => delivered.push(result.id),
+    { quietMs: 5, retryMs: 5, canDeliver: () => canDeliver },
+  );
+
+  delivery.enqueue(snapshot("live-state"));
+  canDeliver = false;
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.deepEqual(delivered, []);
+
+  canDeliver = true;
+  await waitFor(() => delivered.length === 1);
+  assert.deepEqual(delivered, ["live-state"]);
+  delivery.shutdown();
+});
+
 test("shutdown cancels queued delivery", async () => {
   const delivered: string[] = [];
   const delivery = new BackgroundTerminalDelivery(

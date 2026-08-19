@@ -6,6 +6,8 @@ type SendMessage = (snapshot: TerminalSnapshot) => unknown;
 export interface DeliveryOptions {
   quietMs?: number;
   retryMs?: number;
+  /** Live Pi state check evaluated immediately before each handoff. */
+  canDeliver?: () => boolean;
 }
 
 /**
@@ -20,6 +22,8 @@ export class BackgroundTerminalDelivery {
   private readonly pending = new Map<string, TerminalSnapshot>();
   private readonly quietMs: number;
   private readonly retryMs: number;
+  private readonly canDeliver: () => boolean;
+  /** Lifecycle hint used to choose a quiet flush or coarse reconciliation. */
   private idle = true;
   private closed = false;
   private flushing = false;
@@ -32,24 +36,28 @@ export class BackgroundTerminalDelivery {
   ) {
     this.quietMs = options.quietMs ?? 250;
     this.retryMs = options.retryMs ?? 1_000;
+    this.canDeliver = options.canDeliver ?? (() => this.idle);
   }
 
   setBusy(): void {
     if (this.closed) return;
     this.idle = false;
     this.clearTimers();
+    this.scheduleRetry();
   }
 
   setIdle(): void {
     if (this.closed) return;
     this.idle = true;
+    this.clearTimers();
     this.scheduleQuiet();
   }
 
   enqueue(snapshot: TerminalSnapshot): void {
     if (this.closed) return;
     this.pending.set(snapshot.id, snapshot);
-    this.scheduleQuiet();
+    if (this.idle) this.scheduleQuiet();
+    else this.scheduleRetry();
   }
 
   consume(id: string): void {
@@ -85,7 +93,7 @@ export class BackgroundTerminalDelivery {
   }
 
   private scheduleRetry(): void {
-    if (this.closed || !this.idle || !this.pending.size || this.retryTimer) return;
+    if (this.closed || !this.pending.size || this.flushing || this.retryTimer) return;
     this.retryTimer = setTimeout(() => {
       this.retryTimer = undefined;
       void this.flush();
@@ -94,12 +102,16 @@ export class BackgroundTerminalDelivery {
   }
 
   private async flush(): Promise<void> {
-    if (this.closed || !this.idle || this.flushing || !this.pending.size) return;
+    if (this.closed || this.flushing || !this.pending.size) return;
+    if (!this.canDeliver()) {
+      this.scheduleRetry();
+      return;
+    }
     this.flushing = true;
     let failed = false;
     try {
       for (const [id, snapshot] of [...this.pending]) {
-        if (this.closed || !this.idle) break;
+        if (this.closed || !this.canDeliver()) break;
         // Remove before sending so a successful send cannot be delivered twice.
         // A failed send is put back below for an autonomous retry.
         if (this.pending.get(id) !== snapshot) continue;
@@ -113,8 +125,8 @@ export class BackgroundTerminalDelivery {
       }
     } finally {
       this.flushing = false;
-      if (this.closed || !this.pending.size || !this.idle) return;
-      if (failed) this.scheduleRetry();
+      if (this.closed || !this.pending.size) return;
+      if (failed || !this.idle || !this.canDeliver()) this.scheduleRetry();
       else this.scheduleQuiet();
     }
   }

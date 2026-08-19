@@ -41,6 +41,7 @@ const RESULT_STDERR_LINES = 20;
 
 const RESULT_MESSAGE_TYPE = "background-terminal-result";
 const UI_KEY = "background-terminals";
+const RUNTIME_VERSION = "2026-08-19.1";
 
 const glyph = (status: TerminalSnapshot["status"]): string =>
 	status === "running" ? "●" : status === "done" ? "✓" : status === "killed" ? "⊘" : "✗";
@@ -113,8 +114,10 @@ function resultText(snapshot: TerminalSnapshot): string {
 
 export default function (pi: ExtensionAPI) {
 	const manager = new TerminalManager();
-	const delivery = new BackgroundTerminalDelivery((snapshot) =>
-		pi.sendMessage(
+	let uiCtx: ExtensionContext | undefined;
+	const delivery = new BackgroundTerminalDelivery(
+		(snapshot) =>
+			pi.sendMessage(
 			{
 				customType: RESULT_MESSAGE_TYPE,
 				content: resultText(snapshot),
@@ -129,24 +132,49 @@ export default function (pi: ExtensionAPI) {
 			// followUp never interrupts a streaming turn; triggerTurn wakes an
 			// idle agent so a finished build is noticed promptly.
 			{ deliverAs: "followUp", triggerTurn: true },
-		),
+			),
+		{
+			// Event ordering is advisory. Pi's live state is authoritative at the
+			// actual handoff boundary, including queued steering/follow-up messages.
+			canDeliver: () => Boolean(uiCtx?.isIdle() && !uiCtx.hasPendingMessages()),
+		},
 	);
-	let uiCtx: ExtensionContext | undefined;
+	let uiTimer: ReturnType<typeof setInterval> | undefined;
+
+	const stopUiTimer = () => {
+		if (!uiTimer) return;
+		clearInterval(uiTimer);
+		uiTimer = undefined;
+	};
 
 	const refreshUi = () => {
-		if (!uiCtx?.hasUI) return;
+		if (!uiCtx?.hasUI) {
+			stopUiTimer();
+			return;
+		}
 		const running = manager.list().filter((entry) => entry.status === "running");
 		const status = backgroundTerminalStatus(running.length);
 		uiCtx.ui.setStatus(UI_KEY, status ? uiCtx.ui.theme.fg("warning", status) : undefined);
-		if (!running.length) return uiCtx.ui.setWidget(UI_KEY, undefined);
+		if (!running.length) {
+			stopUiTimer();
+			return uiCtx.ui.setWidget(UI_KEY, undefined);
+		}
 		uiCtx.ui.setWidget(
 			UI_KEY,
 			running.map((entry) => `● ${entry.id} ${entry.title} (${formatElapsed(entry.createdAt)})`),
 		);
+		if (!uiTimer) {
+			uiTimer = setInterval(refreshUi, 1_000);
+			uiTimer.unref?.();
+		}
 	};
 
 	manager.onSettle((snapshot, consumed) => {
 		refreshUi();
+		// Lifecycle callbacks can race another extension starting a run. Consult
+		// Pi's live state at the delivery boundary instead of trusting stale state.
+		if (uiCtx?.isIdle()) delivery.setIdle();
+		else delivery.setBusy();
 		if (consumed) {
 			delivery.consume(snapshot.id);
 			return; // already shown via bg_status / bg_kill
@@ -156,15 +184,21 @@ export default function (pi: ExtensionAPI) {
 
 	pi.on("session_start", async (_event, ctx) => {
 		uiCtx = ctx;
-		delivery.setIdle();
+		if (ctx.isIdle()) delivery.setIdle();
+		else delivery.setBusy();
 		refreshUi();
 	});
 	pi.on("agent_start", async () => delivery.setBusy());
 	// The agent has stopped working: now it is safe to hand over any results it
-	// did not already collect itself, and a followUp can actually be acted on.
-	pi.on("agent_settled", async () => delivery.setIdle());
+	// did not already collect itself. Another extension may already have started
+	// a run by the time this callback executes, so verify Pi's live idle state.
+	pi.on("agent_settled", async (_event, ctx) => {
+		if (ctx.isIdle()) delivery.setIdle();
+		else delivery.setBusy();
+	});
 	pi.on("session_shutdown", async () => {
 		delivery.shutdown();
+		stopUiTimer();
 		uiCtx?.ui.setStatus(UI_KEY, undefined);
 		uiCtx?.ui.setWidget(UI_KEY, undefined);
 		uiCtx = undefined;
@@ -258,10 +292,10 @@ export default function (pi: ExtensionAPI) {
 						type: "text" as const,
 						text: all.length
 							? [
-									`${all.length} terminal(s), ${running} running (max ${MAX_RUNNING}):`,
+									`Background terminals ${RUNTIME_VERSION}: ${all.length} tracked, ${running} running (max ${MAX_RUNNING})`,
 									...all.map(describe),
 								].join("\n")
-							: "No background terminals. Start one with bg_start.",
+							: `Background terminals ${RUNTIME_VERSION}: none. Start one with bg_start.`,
 					},
 				],
 				details: { count: all.length, running },
@@ -320,7 +354,12 @@ export default function (pi: ExtensionAPI) {
 				}
 			}
 			const all = manager.list();
-			ctx.ui.notify(all.length ? all.map(describe).join("\n") : "No background terminals", "info");
+			ctx.ui.notify(
+				all.length
+					? [`Background terminals ${RUNTIME_VERSION}`, ...all.map(describe)].join("\n")
+					: `Background terminals ${RUNTIME_VERSION}: none`,
+				"info",
+			);
 		},
 	});
 }
