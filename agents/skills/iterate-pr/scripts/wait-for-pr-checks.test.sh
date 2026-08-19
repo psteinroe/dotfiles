@@ -10,6 +10,18 @@ mkdir -p "$tmp_dir/bin"
 cat >"$tmp_dir/bin/gh" <<'MOCK'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >>"$GH_ARGS_LOG"
+if [[ "${1:-}" == "pr" && "${2:-}" == "view" ]]; then
+  if [[ "${GH_MOCK_MODE:-error}" == "conflicting" ]]; then
+    printf '%s\n' '{"headRefOid":"conflicting-head","mergeStateStatus":"DIRTY","mergeable":"CONFLICTING","url":"https://github.com/example/project/pull/123"}'
+  else
+    printf '%s\n' '{"headRefOid":"clean-head","mergeStateStatus":"CLEAN","mergeable":"MERGEABLE","url":"https://github.com/example/project/pull/123"}'
+  fi
+  exit 0
+fi
+if [[ "${GH_MOCK_MODE:-error}" == "conflicting" ]]; then
+  printf '%s\n' '[{"bucket":"pending","link":"test-url","name":"Test","state":"QUEUED","workflow":"CI"}]'
+  exit 8
+fi
 if [[ "${GH_MOCK_MODE:-error}" == "completed" ]]; then
   printf '%s\n' '[{"bucket":"pass","link":"pass-url","name":"Lint","state":"SUCCESS","workflow":"CI"},{"bucket":"fail","link":"fail-url","name":"Test","state":"FAILURE","workflow":"CI"}]'
   exit 1
@@ -88,6 +100,27 @@ if [[ $error_status -ne 2 ]]; then
 fi
 jq -e '.status == "error" and .commandStatus == 4 and (.message | contains("authentication"))' \
   "$tmp_dir/error.out" >/dev/null
+
+: >"$GH_ARGS_LOG"
+set +e
+GH_MOCK_MODE=conflicting CI_WAIT_INTERVAL_SECONDS=0.05 CI_WAIT_TIMEOUT_SECONDS=1 \
+  "$wait_script" "$pr_url" >"$tmp_dir/conflicting.out"
+conflicting_status=$?
+set -e
+if [[ $conflicting_status -ne 3 ]]; then
+  printf 'expected a conflicting PR to exit 3 immediately, got %s\n' "$conflicting_status" >&2
+  exit 1
+fi
+jq -e '.status == "conflict" and .mergeable == "CONFLICTING" and .mergeStateStatus == "DIRTY"' \
+  "$tmp_dir/conflicting.out" >/dev/null
+if ! grep -Fxq "pr view $pr_url --json mergeable,mergeStateStatus,headRefOid,url" "$GH_ARGS_LOG"; then
+  printf 'conflict guard did not inspect PR mergeability: %s\n' "$(cat "$GH_ARGS_LOG")" >&2
+  exit 1
+fi
+if grep -Fq "pr checks $pr_url" "$GH_ARGS_LOG"; then
+  printf 'conflict guard queried checks instead of exiting immediately: %s\n' "$(cat "$GH_ARGS_LOG")" >&2
+  exit 1
+fi
 
 set +e
 GH_MOCK_MODE=pending-review-named-check CI_WAIT_INTERVAL_SECONDS=0.05 CI_WAIT_TIMEOUT_SECONDS=1 \

@@ -16,12 +16,13 @@ Drive one pull request to a clean state or, when explicitly authorized, merge it
    - Record the current HEAD SHA and attempt count.
 
 2. **Collect compact state**
-   - Run `gh pr view --json number,url,isDraft,reviewDecision,headRefOid`.
+   - Run `gh pr view --json number,url,isDraft,reviewDecision,headRefOid,mergeable,mergeStateStatus`.
    - Run `gh pr checks --json name,state,bucket,link,workflow`.
    - Run `scripts/review-summary.sh` from this skill directory for unresolved review threads.
    - A draft PR is terminal. An approval requirement or other review-only gate is terminal unless the user explicitly authorized merging this PR and bypassing reviews.
 
 3. **Choose one action**
+   - Merge conflicts (`mergeable == CONFLICTING` or `mergeStateStatus == DIRTY`): do not rerun CI or start another watcher. Update the branch from its base using the repository's established rebase/merge convention, resolve the conflicts deliberately, validate, push, and return to step 2. Stop for user judgment if conflict resolution changes product behavior or branch intent.
    - Failed checks: resolve the failed run ID and run `scripts/failed-run-summary.sh <run-id>`.
    - Actionable review feedback: include the relevant thread, path, and requested behavior, unless the user explicitly authorized skipping reviews for the merge.
    - Pending automated checks with no actionable failure: start the quiet wait script explicitly with `bg_start`, title it `Wait for PR checks`, and use the pull request worktree as `working_dir`. Pass either the PR URL or its number; a number defaults to the repository at `working_dir`, or accepts an explicit `owner/repo` second argument. Do not poll with `bg_status`; its completion will resume the main agent.
@@ -36,8 +37,8 @@ Drive one pull request to a clean state or, when explicitly authorized, merge it
 5. **Publish and wait**
    - Run the relevant local check, create one focused commit, and push.
    - Increment the pushed-attempt count.
-   - Start `<skill-dir>/scripts/wait-for-pr-checks.sh <pr-number-or-url> [owner/repo]` with `bg_start` as described above.
-   - When it completes, return to step 2 for the new HEAD.
+   - Start `<skill-dir>/scripts/wait-for-pr-checks.sh <pr-number-or-url> [owner/repo]` with `bg_start` as described above. The watcher checks mergeability before each CI poll and exits `3` with `status:"conflict"` as soon as GitHub reports a conflict.
+   - When it completes, return to step 2 for the new HEAD. A conflict result is actionable branch state, not a reason to rerun checks.
 
 6. **Merge only when explicitly authorized**
    - Treat `merge this PR` as authorization to merge the identified current PR after automated checks pass. Treat `skip reviews` or `bypass review` as separate authorization to ignore review approval and actionable review feedback for that merge.

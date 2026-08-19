@@ -10,11 +10,14 @@ if [[ $# -gt 2 ]] \
   exit 64
 fi
 
-args=(pr checks "$pr_selector")
+checks_args=(pr checks "$pr_selector")
+view_args=(pr view "$pr_selector")
 if [[ -n "$repo_selector" ]]; then
-  args+=(--repo "$repo_selector")
+  checks_args+=(--repo "$repo_selector")
+  view_args+=(--repo "$repo_selector")
 fi
-args+=(--json name,state,bucket,link,workflow)
+checks_args+=(--json name,state,bucket,link,workflow)
+view_args+=(--json mergeable,mergeStateStatus,headRefOid,url)
 
 interval="${CI_WAIT_INTERVAL_SECONDS:-30}"
 timeout="${CI_WAIT_TIMEOUT_SECONDS:-3600}"
@@ -29,7 +32,38 @@ trap 'rm -f "$gh_error_file"' EXIT
 
 while ((SECONDS < deadline)); do
   : >"$gh_error_file"
-  checks="$(gh "${args[@]}" 2>"$gh_error_file")"
+  pr_state="$(gh "${view_args[@]}" 2>"$gh_error_file")"
+  command_status=$?
+  command_error="$(<"$gh_error_file")"
+  if [[ $command_status -ne 0 ]] || ! jq -e 'type == "object"' <<<"$pr_state" >/dev/null 2>&1; then
+    consecutive_errors=$((consecutive_errors + 1))
+    stable_polls=0
+    stable_fingerprint=""
+    if ((consecutive_errors >= max_errors)); then
+      message="${command_error:-gh pr view returned invalid output}"
+      jq -cn \
+        --arg message "$message" \
+        --argjson command_status "$command_status" \
+        '{status:"error", commandStatus:$command_status, message:$message}'
+      exit 2
+    fi
+    sleep "$interval"
+    continue
+  fi
+
+  if jq -e '.mergeable == "CONFLICTING" or .mergeStateStatus == "DIRTY"' <<<"$pr_state" >/dev/null; then
+    jq -c '{
+      status: "conflict",
+      mergeable,
+      mergeStateStatus,
+      headRefOid,
+      url
+    }' <<<"$pr_state"
+    exit 3
+  fi
+
+  : >"$gh_error_file"
+  checks="$(gh "${checks_args[@]}" 2>"$gh_error_file")"
   command_status=$?
   command_error="$(<"$gh_error_file")"
   valid_json=false
