@@ -1,5 +1,24 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { rm } from "node:fs/promises";
+import { createServer } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import test, { after } from "node:test";
+
+const originalHerdrEnvironment = {
+  HERDR_ENV: process.env.HERDR_ENV,
+  HERDR_PANE_ID: process.env.HERDR_PANE_ID,
+  HERDR_SOCKET_PATH: process.env.HERDR_SOCKET_PATH,
+};
+delete process.env.HERDR_ENV;
+delete process.env.HERDR_PANE_ID;
+delete process.env.HERDR_SOCKET_PATH;
+after(() => {
+  for (const [name, value] of Object.entries(originalHerdrEnvironment)) {
+    if (value === undefined) delete process.env[name];
+    else process.env[name] = value;
+  }
+});
 
 const { default: installBackgroundTerminals } = await import("./index.ts");
 
@@ -176,6 +195,56 @@ test("does not deliver from agent_settled when another extension already started
     assert.equal(messages.length, 1);
   } finally {
     await emit(handlers, "session_shutdown", {}, context);
+  }
+});
+
+test("does not publish Herdr metadata from a headless session", async () => {
+  if (process.platform === "win32") return;
+  const socketPath = join(tmpdir(), `background-index-herdr-${process.pid}-${Date.now()}.sock`);
+  await rm(socketPath, { force: true });
+  let connections = 0;
+  const server = createServer((socket) => {
+    connections++;
+    socket.end();
+  });
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(socketPath, resolve);
+  });
+  process.env.HERDR_ENV = "1";
+  process.env.HERDR_PANE_ID = "test:p1";
+  process.env.HERDR_SOCKET_PATH = socketPath;
+
+  const { handlers, tools } = createHarness();
+  const context = {
+    cwd: process.cwd(),
+    mode: "print",
+    hasUI: false,
+    isIdle: () => true,
+    hasPendingMessages: () => false,
+    ui: { setStatus() {}, setWidget() {} },
+  };
+
+  try {
+    await emit(handlers, "session_start", { reason: "startup" }, context);
+    await tools.get("bg_start").execute(
+      "call-headless",
+      { command: "sleep 2", title: "headless terminal" },
+      undefined,
+      undefined,
+      context,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.equal(connections, 0);
+  } finally {
+    await emit(handlers, "session_shutdown", {}, context);
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => (error ? reject(error) : resolve()));
+    });
+    await rm(socketPath, { force: true });
+    delete process.env.HERDR_ENV;
+    delete process.env.HERDR_PANE_ID;
+    delete process.env.HERDR_SOCKET_PATH;
   }
 });
 

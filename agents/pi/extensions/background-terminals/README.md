@@ -33,7 +33,9 @@ twice.
 Output is retained in memory (bounded per stream); status and completion
 messages show a truncated tail of what matters. While terminals are running,
 Pi's extension-status API exposes a terse count and `/ps` hint to custom
-footers such as `@parke.dev/pi-dashboard`.
+footers such as `@parke.dev/pi-dashboard`. In Herdr panes, source-scoped display
+metadata labels otherwise-idle or done Pi agents as `background` while a terminal
+is running; the underlying lifecycle state remains unchanged for automation.
 
 The matching skill at `agents/skills/background-terminals/SKILL.md` teaches the model
 when to reach for these tools instead of `bash`.

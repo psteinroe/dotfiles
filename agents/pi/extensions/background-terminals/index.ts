@@ -28,6 +28,7 @@ import {
 	type TerminalSnapshot,
 } from "./src/manager.ts";
 import { BackgroundTerminalDelivery } from "./src/delivery.ts";
+import { HerdrBackgroundMetadata } from "./src/herdr-metadata.ts";
 
 /** Model-facing output caps. Status is generous; completion is compact. */
 const STATUS_STDOUT_MAX = 16 * 1024;
@@ -41,7 +42,7 @@ const RESULT_STDERR_LINES = 20;
 
 const RESULT_MESSAGE_TYPE = "background-terminal-result";
 const UI_KEY = "background-terminals";
-const RUNTIME_VERSION = "2026-08-19.3";
+const RUNTIME_VERSION = "2026-08-19.4";
 
 const glyph = (status: TerminalSnapshot["status"]): string =>
 	status === "running" ? "●" : status === "done" ? "✓" : status === "killed" ? "⊘" : "✗";
@@ -114,7 +115,10 @@ function resultText(snapshot: TerminalSnapshot): string {
 
 export default function (pi: ExtensionAPI) {
 	const manager = new TerminalManager();
+	const herdrMetadata = new HerdrBackgroundMetadata();
 	let uiCtx: ExtensionContext | undefined;
+	let ownsHerdrMetadata = false;
+	let shuttingDown = false;
 	const delivery = new BackgroundTerminalDelivery(
 		(snapshot) =>
 			pi.sendMessage(
@@ -139,6 +143,10 @@ export default function (pi: ExtensionAPI) {
 			canDeliver: () => Boolean(uiCtx?.isIdle() && !uiCtx.hasPendingMessages()),
 		},
 	);
+	const refreshHerdrMetadata = () => {
+		if (!ownsHerdrMetadata || shuttingDown) return;
+		void herdrMetadata.setActive(manager.runningCount() > 0);
+	};
 	const refreshUi = () => {
 		if (!uiCtx?.hasUI) return;
 		const running = manager.list().filter((entry) => entry.status === "running");
@@ -153,6 +161,7 @@ export default function (pi: ExtensionAPI) {
 
 	manager.onSettle((snapshot, consumed) => {
 		refreshUi();
+		refreshHerdrMetadata();
 		// Lifecycle callbacks can race another extension starting a run. Consult
 		// Pi's live state at the delivery boundary instead of trusting stale state.
 		if (uiCtx?.isIdle()) delivery.setIdle();
@@ -166,9 +175,13 @@ export default function (pi: ExtensionAPI) {
 
 	pi.on("session_start", async (_event, ctx) => {
 		uiCtx = ctx;
+		// Herdr's lifecycle integration is TUI-only. Headless child sessions may
+		// inherit the pane environment but must never contend for its metadata.
+		ownsHerdrMetadata = ctx.mode === "tui";
 		if (ctx.isIdle()) delivery.setIdle();
 		else delivery.setBusy();
 		refreshUi();
+		refreshHerdrMetadata();
 	});
 	pi.on("agent_start", async () => delivery.setBusy());
 	// The agent has stopped working: now it is safe to hand over any results it
@@ -180,11 +193,15 @@ export default function (pi: ExtensionAPI) {
 	});
 	pi.on("session_shutdown", async () => {
 		delivery.shutdown();
+		shuttingDown = true;
 		uiCtx?.ui.setStatus(UI_KEY, undefined);
 		uiCtx?.ui.setWidget(UI_KEY, undefined);
 		uiCtx = undefined;
-		// A dev server must not outlive the session that started it.
-		await manager.disposeAll();
+		// Start process cleanup synchronously; best-effort display I/O must not
+		// delay SIGTERM, and late settlement callbacks cannot reassert metadata.
+		const dispose = manager.disposeAll();
+		const clearMetadata = ownsHerdrMetadata ? herdrMetadata.shutdown() : Promise.resolve();
+		await Promise.allSettled([dispose, clearMetadata]);
 	});
 
 	pi.registerTool({
@@ -216,6 +233,7 @@ export default function (pi: ExtensionAPI) {
 			const cwd = path.resolve(ctx.cwd, params.working_dir ?? ".");
 			const snapshot = manager.start({ command: params.command, title: params.title, cwd });
 			refreshUi();
+			refreshHerdrMetadata();
 			return {
 				content: [
 					{
