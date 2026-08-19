@@ -38,9 +38,10 @@ async function waitFor(predicate: () => boolean) {
   }
 }
 
-test("updates the displayed age while a terminal is running", async () => {
+test("renders running terminals without a ticking elapsed-time widget", async () => {
   const { handlers, tools } = createHarness();
   let widget: string[] | undefined;
+  let widgetUpdates = 0;
   const context = {
     cwd: process.cwd(),
     hasUI: true,
@@ -51,6 +52,7 @@ test("updates the displayed age while a terminal is running", async () => {
       setStatus() {},
       setWidget(_key: string, value: string[] | undefined) {
         widget = value;
+        widgetUpdates++;
       },
     },
   };
@@ -58,16 +60,17 @@ test("updates the displayed age while a terminal is running", async () => {
   try {
     await emit(handlers, "session_start", { reason: "startup" }, context);
     await tools.get("bg_start").execute(
-      "call-age",
-      { command: "sleep 2", title: "age terminal" },
+      "call-widget",
+      { command: "sleep 2", title: "quiet widget" },
       undefined,
       undefined,
       context,
     );
 
-    assert.match(widget?.[0] ?? "", /\(0s\)/);
-    await new Promise((resolve) => setTimeout(resolve, 1_100));
-    assert.match(widget?.[0] ?? "", /\(1s\)/);
+    assert.equal(widget?.[0], "● bt-1 quiet widget");
+    const updatesAfterStart = widgetUpdates;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    assert.equal(widgetUpdates, updatesAfterStart);
   } finally {
     await emit(handlers, "session_shutdown", {}, context);
   }

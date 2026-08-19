@@ -41,7 +41,7 @@ const RESULT_STDERR_LINES = 20;
 
 const RESULT_MESSAGE_TYPE = "background-terminal-result";
 const UI_KEY = "background-terminals";
-const RUNTIME_VERSION = "2026-08-19.1";
+const RUNTIME_VERSION = "2026-08-19.2";
 
 const glyph = (status: TerminalSnapshot["status"]): string =>
 	status === "running" ? "●" : status === "done" ? "✓" : status === "killed" ? "⊘" : "✗";
@@ -139,34 +139,16 @@ export default function (pi: ExtensionAPI) {
 			canDeliver: () => Boolean(uiCtx?.isIdle() && !uiCtx.hasPendingMessages()),
 		},
 	);
-	let uiTimer: ReturnType<typeof setInterval> | undefined;
-
-	const stopUiTimer = () => {
-		if (!uiTimer) return;
-		clearInterval(uiTimer);
-		uiTimer = undefined;
-	};
-
 	const refreshUi = () => {
-		if (!uiCtx?.hasUI) {
-			stopUiTimer();
-			return;
-		}
+		if (!uiCtx?.hasUI) return;
 		const running = manager.list().filter((entry) => entry.status === "running");
 		const status = backgroundTerminalStatus(running.length);
 		uiCtx.ui.setStatus(UI_KEY, status ? uiCtx.ui.theme.fg("warning", status) : undefined);
-		if (!running.length) {
-			stopUiTimer();
-			return uiCtx.ui.setWidget(UI_KEY, undefined);
-		}
+		if (!running.length) return uiCtx.ui.setWidget(UI_KEY, undefined);
 		uiCtx.ui.setWidget(
 			UI_KEY,
-			running.map((entry) => `● ${entry.id} ${entry.title} (${formatElapsed(entry.createdAt)})`),
+			running.map((entry) => `● ${entry.id} ${entry.title}`),
 		);
-		if (!uiTimer) {
-			uiTimer = setInterval(refreshUi, 1_000);
-			uiTimer.unref?.();
-		}
 	};
 
 	manager.onSettle((snapshot, consumed) => {
@@ -198,7 +180,6 @@ export default function (pi: ExtensionAPI) {
 	});
 	pi.on("session_shutdown", async () => {
 		delivery.shutdown();
-		stopUiTimer();
 		uiCtx?.ui.setStatus(UI_KEY, undefined);
 		uiCtx?.ui.setWidget(UI_KEY, undefined);
 		uiCtx = undefined;
