@@ -57,6 +57,37 @@ async function waitFor(predicate: () => boolean) {
   }
 }
 
+test("tells the agent not to poll or sleep while a terminal runs", async () => {
+  const { handlers, tools } = createHarness();
+  const context = {
+    cwd: process.cwd(),
+    hasUI: false,
+    isIdle: () => true,
+    hasPendingMessages: () => false,
+    ui: { setStatus() {}, setWidget() {} },
+  };
+  const start = tools.get("bg_start");
+  const status = tools.get("bg_status");
+
+  try {
+    assert.match(start.description, /never use foreground bash with sleep/i);
+    assert.ok(start.promptGuidelines.some((guideline: string) => /end the turn/i.test(guideline)));
+    assert.match(status.description, /not as a polling or waiting mechanism/i);
+
+    const result = await start.execute(
+      "call-guidance",
+      { command: "sleep 2", title: "guidance terminal" },
+      undefined,
+      undefined,
+      context,
+    );
+    assert.match(result.content[0].text, /Do not poll or run foreground sleep/i);
+    assert.match(result.content[0].text, /continue useful work or end the turn/i);
+  } finally {
+    await emit(handlers, "session_shutdown", {}, context);
+  }
+});
+
 test("renders running terminals without a ticking elapsed-time widget", async () => {
   const { handlers, tools } = createHarness();
   let widget: string[] | undefined;

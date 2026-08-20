@@ -208,10 +208,11 @@ export default function (pi: ExtensionAPI) {
 		name: "bg_start",
 		label: "Start Terminal",
 		description:
-			"Start a long-running shell command in a background terminal and return immediately. Commands run with Bash on macOS/Linux and ComSpec on Windows. Use this for dev servers, watchers, streaming builds, log tails — anything that should keep running while you continue working. Use the regular bash tool for commands that finish quickly. The command gets no stdin, so it must not expect interactive input.",
+			"Start a long-running shell command in a background terminal and return immediately. Commands run with Bash on macOS/Linux and ComSpec on Windows. Use this for dev servers, watchers, streaming builds, log tails — anything that should keep running while you continue working. Use the regular bash tool for commands that finish quickly. After starting a background terminal, never use foreground bash with sleep to wait for it and do not repeatedly poll with bg_status. Continue other useful work; if none remains, end the turn so completion can be delivered automatically and resume the agent. The command gets no stdin, so it must not expect interactive input.",
 		promptSnippet: "Start and manage long-running shell commands without blocking the agent",
 		promptGuidelines: [
 			"Use bg_start for commands that run for a long time or continuously; start independent commands with separate bg_start calls in the same response so they run concurrently.",
+			"After bg_start, never run foreground `bash` with `sleep` to wait and do not repeatedly poll with bg_status. Continue useful work; if none remains, end the turn. Terminal completion is delivered automatically and resumes the agent.",
 			"On macOS and Linux, bg_start commands run under Bash, so guards may safely use `set -o pipefail` or `set -euo pipefail`.",
 		],
 		executionMode: "parallel",
@@ -240,7 +241,7 @@ export default function (pi: ExtensionAPI) {
 						type: "text" as const,
 						text: [
 							`Started ${snapshot.id} "${snapshot.title}"${snapshot.pid ? ` (pid ${snapshot.pid})` : ""} in ${cwd}.`,
-							`Peek with bg_status id:"${snapshot.id}", stop with bg_kill. You will get a message when it exits.`,
+							`You will get a message when it exits. Do not poll or run foreground sleep to wait; continue useful work or end the turn. Stop it with bg_kill if needed.`,
 						].join("\n"),
 					},
 				],
@@ -253,7 +254,7 @@ export default function (pi: ExtensionAPI) {
 		name: "bg_status",
 		label: "Terminal Status",
 		description:
-			"Show a background terminal's status and its most recent output. Reading a finished terminal here counts as collecting its result, so you will not also get a separate completion message for it.",
+			"Show a background terminal's status and its most recent output. Use only when current output is needed to unblock immediate work, not as a polling or waiting mechanism. Never pair repeated bg_status calls with foreground bash sleep; terminal completion is delivered automatically. Reading a finished terminal here counts as collecting its result, so you will not also get a separate completion message for it.",
 		parameters: Type.Object(
 			{ id: Type.String({ description: "Terminal id from bg_start / bg_list." }) },
 			{
