@@ -7,7 +7,7 @@ _rauth_usage() {
 Usage: rauth [--host host] [--user user] [--home home] [spec ...]
 
 Specs:
-  all                         copy gh, default Pi provider, all MCP OAuth, and Exa
+  all                         copy gh, all Pi providers, all MCP OAuth, and Exa
   gh[:github-host]            copy GitHub CLI auth (default: github.com)
   pi                          copy default Pi provider auth (default: openai-codex)
   pi:provider[,provider...]   copy selected Pi providers from ~/.pi/agent/auth.json
@@ -321,7 +321,7 @@ for spec in "${specs[@]}"; do
   case "$spec" in
     all)
       _rauth_copy_gh github.com || return
-      _rauth_copy_pi "" || return
+      _rauth_copy_pi all || return
       _rauth_copy_mcp all || return
       _rauth_copy_exa || return
       ;;
