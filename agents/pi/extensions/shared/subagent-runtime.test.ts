@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
+import type {
+  AgentSession,
+  AgentSessionEvent,
+  ToolDefinition,
+} from "@earendil-works/pi-coding-agent";
+import { Type } from "typebox";
 import {
+  bindAndPrepareChildSession,
   createActiveSubagentSessionRegistry,
   describeMissingSubagentOutput,
   extractAssistantText,
@@ -50,6 +56,39 @@ function runFixture(maxTurns = 3): SubagentRunDetails {
     startedAt: 0,
   };
 }
+
+test("prepared child sessions time out hung tool calls", async () => {
+  const hungTool: ToolDefinition = {
+    name: "hung_fixture",
+    label: "Hung fixture",
+    description: "Never resolves",
+    parameters: Type.Object({}),
+    async execute() {
+      return new Promise(() => {});
+    },
+  };
+  const definitions = new Map<string, ToolDefinition>([[hungTool.name, hungTool]]);
+  const session = {
+    async bindExtensions() {},
+    getAllTools: () => [...definitions.keys()].map((name) => ({ name })),
+    getToolDefinition: (name: string) => definitions.get(name),
+    extensionRunner: { hasHandlers: () => false, emit: async () => undefined },
+    dispose() {},
+  };
+
+  await bindAndPrepareChildSession(session as unknown as AgentSession, { toolCallTimeoutMs: 10 });
+  const execute = definitions.get("hung_fixture")?.execute;
+  assert.ok(execute);
+  const outcome = await Promise.race([
+    execute("call-1", {}, undefined, undefined, {} as any).then(
+      () => "resolved",
+      (error: unknown) => error instanceof Error ? error.message : String(error),
+    ),
+    new Promise<string>((resolve) => setTimeout(() => resolve("still running"), 50)),
+  ]);
+
+  assert.equal(outcome, 'Tool call "hung_fixture" timed out after 10 ms.');
+});
 
 test("extracts the last non-empty assistant text", () => {
   const session = {

@@ -12,6 +12,7 @@ import {
   MAX_TOOL_CALLS_TO_KEEP,
   type SubagentRunDetails,
 } from "./subagent-progress.ts";
+import { createToolCallTimeoutGuard } from "./tool-call-timeout.ts";
 
 export { bindChildSessionExtensions, shutdownAndDisposeChildSession } from "./child-session.ts";
 export type { DisposableChildSession } from "./child-session.ts";
@@ -264,15 +265,17 @@ export function createActiveSubagentSessionRegistry(): ActiveSubagentSessionRegi
   };
 }
 
-/** Bind extensions and make a failed bind terminal and disposable. */
+/** Bind extensions, guard every child tool call, and make preparation failures terminal. */
 export async function bindAndPrepareChildSession(
   session: AgentSession,
+  options: { toolCallTimeoutMs?: number } = {},
 ): Promise<AgentSession> {
   try {
     await bindChildSessionExtensions(session);
+    createToolCallTimeoutGuard(options.toolCallTimeoutMs).apply(session);
+    return session;
   } catch (error) {
     await shutdownAndDisposeChildSession(session);
     throw error;
   }
-  return session;
 }
