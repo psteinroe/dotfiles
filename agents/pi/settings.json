@@ -9,7 +9,7 @@
       "maxRetries": 0
     }
   },
-  "hideThinkingBlock": false,
+  "hideThinkingBlock": true,
   "shellPath": "/bin/zsh",
   "shellCommandPrefix": "fpath=($HOME/Developer/dotfiles/zsh/functions $fpath); autoload -Uz gpr coffee",
   "packages": [

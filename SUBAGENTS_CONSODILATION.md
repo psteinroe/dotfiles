@@ -308,7 +308,7 @@ Preserve these policy differences initially:
 |---|---|---|---|---|---|---|
 | Finder | `gpt-5.6-luna` | medium | parent cwd | read, bash | unlimited | current behavior |
 | Librarian | `gpt-5.6-luna` | high | isolated `/tmp/pi-librarian/run-*` | read, bash | 10 | current behavior |
-| Oracle | `gpt-5.6-sol` | xhigh | parent cwd | read, grep, find, ls, `git_diff` | 10 | 1 |
+| Oracle | `gpt-5.6-sol` | high | parent cwd | read, grep, find, ls, `git_diff` | 10 | 1 |
 | Worker | `gpt-5.6-luna` | high | parent cwd | read, bash, edit, write, grep, find, ls | 50 | 4 |
 
 Do not broaden tool permissions during the structural move.
@@ -340,7 +340,7 @@ Librarian retains:
 
 Oracle retains:
 
-- Sol-xhigh policy;
+- Sol-high policy;
 - one-call capacity;
 - read-only purpose;
 - safe, argv-based `git_diff` custom tool;
@@ -579,7 +579,7 @@ Librarian:
 
 Oracle:
 
-- Sol-xhigh/read-only policy;
+- Sol-high/read-only policy;
 - safe `git_diff` targets;
 - one-call capacity;
 - no editing or shell tool.

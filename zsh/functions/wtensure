@@ -133,7 +133,9 @@ if [[ ! -d "$worktree_path" ]]; then
     wtsetup
   else
     local base
-    base=$(source "$dotfiles/zsh/functions/gh-default-branch") || return
+    # Clear wtensure's positional parameters so the sourced helper does not
+    # mistake the requested branch for its optional owner/repo argument.
+    base=$(source "$dotfiles/zsh/functions/gh-default-branch" "") || return
     git worktree add "$worktree_path" -b "$input" --no-track "origin/$base" || return
     cd "$worktree_path" || return
     wtsetup

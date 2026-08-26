@@ -268,8 +268,8 @@ export default function delegatesExtension(pi: ExtensionAPI) {
     name: "oracle",
     label: "Ask Oracle",
     description:
-      "Ask a read-only Sol xhigh second opinion for architecture, consequential plans, difficult debugging, or independent review. Provide a self-contained question with relevant paths and constraints. Do not use for routine work.",
-    promptSnippet: "Ask a read-only Sol xhigh oracle for a consequential second opinion",
+      "Ask a read-only Sol high second opinion for architecture, consequential plans, difficult debugging, or independent review. Provide a self-contained question with relevant paths and constraints. Do not use for routine work.",
+    promptSnippet: "Ask a read-only Sol high oracle for a consequential second opinion",
     promptGuidelines: [
       "Use oracle for consequential architecture, difficult debugging, ambiguous plans, or independent review; give it a self-contained question with relevant paths and constraints.",
       "Run at most one oracle at a time; it may run alongside independent workers.",

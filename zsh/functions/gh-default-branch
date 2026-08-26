@@ -41,7 +41,9 @@ fi
 local branch
 branch=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null)
 branch="${branch#origin/}"
-if [[ -n "$branch" ]]; then
+# A remote can rename or delete its default branch without updating this local
+# symbolic ref. Only trust origin/HEAD when its target still exists locally.
+if [[ -n "$branch" ]] && git show-ref --verify --quiet "refs/remotes/origin/$branch"; then
   print -r -- "$branch"
   return 0
 fi

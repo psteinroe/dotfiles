@@ -69,7 +69,7 @@ _ws_open_worktree() {
 }
 
 _ws_create_worktree() {
-  local requested
+  local requested create_status
   echo "Project: $WS_PROJECT_NAME"
   echo "Current worktree: $WS_PROJECT_CWD"
   echo
@@ -78,6 +78,13 @@ _ws_create_worktree() {
   [[ -n "$requested" ]] || return 1
   cd "$WS_PROJECT_ROOT" || return
   source "$WS_DOTFILES/zsh/functions/hwtcreate" "$requested"
+  create_status=$?
+  if (( create_status != 0 )); then
+    echo
+    echo "Worktree creation failed (exit $create_status)."
+    _ws_pause
+    return "$create_status"
+  fi
   _ws_close_self
 }
 

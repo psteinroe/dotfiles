@@ -54,4 +54,55 @@ if run_hwtcreate --no-focus >/dev/null 2>&1; then
   exit 1
 fi
 
+# The Shift+G create overlay must not close itself when hwtcreate fails. Closing
+# immediately hides the useful Git/setup error and makes the overlay look like
+# it crashed after Enter.
+manager_fixture="$fixture/manager"
+mkdir -p "$manager_fixture/repo" "$manager_fixture/dotfiles/zsh/functions" "$manager_fixture/bin"
+git -C "$manager_fixture/repo" init -q -b main
+cat > "$manager_fixture/dotfiles/zsh/functions/_herdr_worktree_helpers" <<'EOF'
+_h_repo_context() {
+  typeset -g H_REPO_ROOT="$PWD"
+  typeset -g H_REPO_NAME=repo
+  typeset -g H_WORKTREE_ROOT="${PWD:h}/repo.git"
+}
+EOF
+cat > "$manager_fixture/dotfiles/zsh/functions/hwtcreate" <<'EOF'
+print -u2 -- 'simulated worktree creation failure'
+return 42
+EOF
+cat > "$manager_fixture/bin/herdr" <<'EOF'
+#!/bin/sh
+printf '%s\n' "$*" >> "$HERDR_TRACE"
+EOF
+chmod +x "$manager_fixture/bin/herdr"
+: > "$manager_fixture/herdr.trace"
+
+set +e
+printf 'new-branch\n\n' | env \
+  PATH="$manager_fixture/bin:$PATH" \
+  RDEV_DOTFILES="$manager_fixture/dotfiles" \
+  HWS_MODE=create \
+  HWS_PROJECT_CWD="$manager_fixture/repo" \
+  HERDR_PANE_ID=manager-overlay \
+  HERDR_TRACE="$manager_fixture/herdr.trace" \
+  zsh "$repo_root/herdr/plugins/worktree-sync/manager.sh" \
+  > "$manager_fixture/output" 2>&1
+manager_status=$?
+set -e
+
+[[ "$manager_status" == 42 ]] || {
+  print -u2 -- "failed create overlay returned $manager_status instead of 42"
+  exit 1
+}
+grep -q 'simulated worktree creation failure' "$manager_fixture/output"
+grep -q 'Worktree creation failed' "$manager_fixture/output" || {
+  print -u2 -- 'failed create overlay did not explain that creation failed'
+  exit 1
+}
+if grep -q '^pane close manager-overlay$' "$manager_fixture/herdr.trace"; then
+  print -u2 -- 'failed create overlay closed itself immediately'
+  exit 1
+fi
+
 print 'hwtcreate tests passed'
