@@ -217,11 +217,11 @@ printf 'y\n' | env \
 git --git-dir="$closed_fixture/repo.git" show-ref --verify --quiet refs/heads/closed-pr \
   || fail "closed-PR cleanup deleted the local branch"
 
-# No-PR worktrees already contained in the default branch are removable. Idle
-# and done agents do not make their workspace active, and persisted agent
-# metadata alone is not a live agent. Working, blocked, and unknown live agents
-# remain protected. Dirty worktrees join the confirmation only when their newest
-# local change is at least seven days old; recent local work must remain untouched.
+# No-PR worktrees already contained in the default branch are removable. Every
+# live agent remains protected, including idle and done agents whose process and
+# conversation are still open. Persisted agent metadata alone is not a live
+# agent. Dirty worktrees join the confirmation only when their newest local
+# change is at least seven days old; recent local work must remain untouched.
 stale_fixture="$test_root/stale"
 make_fixture "$stale_fixture"
 git --git-dir="$stale_fixture/repo.git" branch stale-dirty main
@@ -285,11 +285,9 @@ printf 'y\n' | env \
   > "$stale_fixture/output" 2>&1
 
 [[ ! -d "$stale_fixture/repo.git/integrated-clean" ]] || fail "clean integrated worktree was not removed"
-[[ ! -d "$stale_fixture/repo.git/integrated-idle" ]] || fail "idle agent incorrectly protected an integrated worktree"
-[[ ! -d "$stale_fixture/repo.git/integrated-done" ]] || fail "done agent incorrectly protected an integrated worktree"
 [[ ! -d "$stale_fixture/repo.git/integrated-persisted" ]] || fail "persisted agent metadata incorrectly protected an integrated worktree"
-for state in working blocked unknown; do
-  [[ -d "$stale_fixture/repo.git/integrated-$state" ]] || fail "$state agent did not protect its integrated worktree"
+for state in idle done working blocked unknown; do
+  [[ -d "$stale_fixture/repo.git/integrated-$state" ]] || fail "$state live agent did not protect its integrated worktree"
 done
 [[ ! -d "$stale_fixture/repo.git/stale-dirty" ]] || fail "stale dirty integrated worktree was not removed"
 [[ -d "$stale_fixture/repo.git/recent-dirty" ]] || fail "recent dirty integrated worktree was removed"
