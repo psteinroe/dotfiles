@@ -287,6 +287,7 @@ export default function tasksExtension(pi: ExtensionAPI) {
 
   const activeTasks = () => registry.list().filter((task) =>
     task.status === "starting" || task.status === "running" || task.status === "cancelling");
+  const activeBackgroundCommand = () => activeTasks().find((task) => task.kind === "command");
   const refreshHerdrMetadata = () => {
     if (!ownsHerdrMetadata || shuttingDown) return;
     void herdrMetadata.setActive(activeTasks().length > 0);
@@ -335,6 +336,7 @@ export default function tasksExtension(pi: ExtensionAPI) {
   terminalManager.onSettle((snapshot) => {
     const taskId = terminalTaskIds.get(snapshot.id);
     if (!taskId) return;
+    terminalTaskIds.delete(snapshot.id);
     const status = snapshot.status === "done"
       ? "done"
       : snapshot.status === "killed" ? "cancelled" : "failed";
@@ -403,6 +405,7 @@ export default function tasksExtension(pi: ExtensionAPI) {
     // is a bounded safety net after command cancellation has settled.
     await registry.shutdown();
     await terminalManager.disposeAll();
+    terminalTaskIds.clear();
     await Promise.allSettled([
       ...subagents.shutdownHandlers.map((handler) => Promise.resolve(handler(event, ctx))),
       ownsHerdrMetadata ? herdrMetadata.shutdown() : Promise.resolve(),
@@ -450,6 +453,14 @@ export default function tasksExtension(pi: ExtensionAPI) {
       }
       if (agent === "worker" && (!Array.isArray(params.write_scope) || params.write_scope.length === 0)) {
         throw new Error("Worker tasks require a non-empty write_scope so background edits cannot overlap.");
+      }
+      if (agent === "worker") {
+        const command = activeBackgroundCommand();
+        if (command) {
+          throw new Error(
+            `Cannot start Worker while background command ${command.id} (${command.title}) is active.`,
+          );
+        }
       }
       const activeForProfile = activeTasks().filter((task) => task.agent === agent).length;
       if (activeForProfile >= SUBAGENT_CAPACITY[agent]) {
@@ -543,6 +554,12 @@ export default function tasksExtension(pi: ExtensionAPI) {
     }, { additionalProperties: false }),
     async execute(_toolCallId, params: any, signal, _onUpdate, ctx) {
       if (signal?.aborted) throw new Error("Background command launch was cancelled before acceptance.");
+      const worker = registry.firstActiveWorker();
+      if (worker) {
+        throw new Error(
+          `Cannot start background command while Worker ${worker.id} (${worker.title}) is active.`,
+        );
+      }
       const cwd = path.resolve(ctx.cwd, params.working_dir ?? ".");
       const terminal = terminalManager.start({ command: params.command, title: params.title, cwd });
       let task: TaskSnapshot;

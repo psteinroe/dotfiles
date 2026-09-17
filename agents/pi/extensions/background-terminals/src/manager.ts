@@ -148,6 +148,8 @@ interface Entry {
 	errored: boolean;
 	/** A kill was requested while still running. */
 	killRequested: boolean;
+	/** The shell exited cleanly, but its stdio required forced cleanup. */
+	forcedCleanup: boolean;
 	/** Someone already read the terminal result, so suppress auto-delivery. */
 	consumed: boolean;
 	exitTimer?: NodeJS.Timeout;
@@ -235,6 +237,7 @@ export class TerminalManager {
 			closed: false,
 			errored: false,
 			killRequested: false,
+			forcedCleanup: false,
 			consumed: false,
 			settleWaiters: [],
 		};
@@ -279,6 +282,7 @@ export class TerminalManager {
 				// Give it a grace period, then force the issue.
 				entry.exitTimer = setTimeout(() => {
 					if (entry.snapshot.status === "running" && !entry.closed) {
+						entry.forcedCleanup = true;
 						entry.snapshot.errorText ??= "stdio did not close after exit; output may be incomplete";
 						this.killTree(entry, "SIGKILL");
 						this.settle(entry);
@@ -317,7 +321,7 @@ export class TerminalManager {
 		snap.settledAt = Date.now();
 		snap.status = entry.killRequested
 			? "killed"
-			: entry.errored
+			: entry.errored || entry.forcedCleanup
 				? "failed"
 				: snap.exitCode === 0 ? "done" : "failed";
 		snap.stdout = entry.stdout.view();

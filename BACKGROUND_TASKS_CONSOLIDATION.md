@@ -98,7 +98,8 @@ Worker launches require `write_scope`. The registry and child runtime:
 - reject repository-wide, out-of-repository, and overlapping live scopes;
 - block Worker `edit` and `write` calls outside the scope;
 - block coordinator `edit` and `write` calls inside the active scope;
-- block coordinator shell commands while any Worker is active;
+- block coordinator shell commands and background-command launches while any Worker is active;
+- reject Worker launch while any unrestricted background command is active;
 - release ownership only when the task settles.
 
 The scope remains a coordination lease rather than an OS sandbox: arbitrary Worker Bash commands cannot be proven safe by path inspection. Worker prompts explicitly require keeping shell writes inside the scope.
@@ -111,12 +112,14 @@ On session shutdown or reload:
 
 1. completion delivery closes;
 2. every subagent abort controller is signalled;
-3. terminal process trees receive SIGTERM and bounded SIGKILL escalation;
+3. terminal process trees receive SIGTERM and bounded SIGKILL escalation; forced cleanup after a nominal parent exit is classified as failure;
 4. child extension shutdown hooks run;
 5. child sessions dispose idempotently;
 6. Herdr background metadata clears.
 
 No task is promised to survive Pi exit or reload. Librarian workspaces remain inspectable during the session and are removed on session shutdown.
+
+POSIX commands run in their own process group, so descendant teardown is enforceable. Windows uses `taskkill /T` as a best-effort fallback; if a command parent exits before teardown while an orphan retains stdio, Windows cannot provide the same process-tree guarantee without a Job Object implementation.
 
 ## Source layout
 
@@ -151,9 +154,9 @@ Detached child usage is retained in task result details, but Pi 0.83 has no API 
 Required checks:
 
 1. task registry unit tests;
-2. idle delivery and duplicate-suppression tests;
+2. idle delivery, handoff-boundary, and duplicate-suppression tests;
 3. registration test: six task tools, no legacy tools;
-4. command start/result/cancel and process-tree cleanup tests;
+4. command start/result/cancel, Worker/command exclusion, and process-tree cleanup tests;
 5. immediate subagent launch and asynchronous failure tests;
 6. exact Executor tool availability in every child profile;
 7. subagent provider failover integration tests;

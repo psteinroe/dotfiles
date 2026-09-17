@@ -111,6 +111,63 @@ test("rejects profile-incompatible fields and unsafe Worker scopes", async () =>
   await emit(h.handlers, "session_shutdown", ctx);
 });
 
+test("rejects a background command while a Worker is active", async () => {
+  const h = harness();
+  const ctx = context();
+  await emit(h.handlers, "session_start", ctx);
+  const workerLaunch = h.tools.get("start_subagent").execute(
+    "call",
+    {
+      agent: "worker",
+      task: "hold the Worker lease",
+      write_scope: ["agents/pi/extensions/tasks/index.ts"],
+    },
+    undefined,
+    undefined,
+    ctx,
+  );
+  await assert.rejects(
+    h.tools.get("start_background_command").execute(
+      "call",
+      { command: "sleep 1", title: "blocked" },
+      undefined,
+      undefined,
+      ctx,
+    ),
+    /Worker .* is active/,
+  );
+  await workerLaunch;
+  await emit(h.handlers, "session_shutdown", ctx);
+});
+
+test("rejects a Worker while a background command is active", async () => {
+  const h = harness();
+  const ctx = context();
+  await emit(h.handlers, "session_start", ctx);
+  await h.tools.get("start_background_command").execute(
+    "call",
+    { command: "sleep 1", title: "active" },
+    undefined,
+    undefined,
+    ctx,
+  );
+  await assert.rejects(
+    h.tools.get("start_subagent").execute(
+      "call",
+      {
+        agent: "worker",
+        task: "must be excluded by the command",
+        write_scope: ["agents/pi/extensions/tasks/index.ts"],
+      },
+      undefined,
+      undefined,
+      ctx,
+    ),
+    /background command .* is active/,
+  );
+  await emit(h.handlers, "session_shutdown", ctx);
+});
+
 test("subagent launch returns a handle before asynchronous setup failure", async () => {
   const h = harness();
   const ctx = context();

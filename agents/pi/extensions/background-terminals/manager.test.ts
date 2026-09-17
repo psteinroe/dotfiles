@@ -71,6 +71,29 @@ test(
   },
 );
 
+test(
+  "fails when a clean parent exit leaves a descendant holding stdio",
+  { skip: process.platform === "win32" },
+  async () => {
+    const manager = new TerminalManager();
+    try {
+      const task = manager.start({
+        command: '(trap "" TERM; while :; do sleep 1; done) & printf PARENT_OK',
+        title: "orphaned stdio",
+        cwd: process.cwd(),
+      });
+      await waitForSettlement(manager, [task.id]);
+      const settled = manager.get(task.id);
+      assert.equal(settled?.status, "failed");
+      assert.equal(settled?.exitCode, 0);
+      assert.equal(settled?.stdout.text, "PARENT_OK");
+      assert.match(settled?.errorText ?? "", /stdio did not close after exit/);
+    } finally {
+      await manager.disposeAll();
+    }
+  },
+);
+
 test("classifies a TERM-trapping zero exit as cancelled", async () => {
   if (process.platform === "win32") return;
   const manager = new TerminalManager();

@@ -16,7 +16,7 @@ Use `start_subagent` for specialized agent work:
 - `oracle` — read-only architecture, debugging, planning, or review
 - `worker` — bounded implementation and validation
 
-Worker launches require a narrow `write_scope`. Treat it as a coordination lease until the task settles or is cancelled. Structured Worker writes are gated to the scope, and the coordinator stays read-only while the Worker runs; Worker shell effects remain policy-constrained rather than sandboxed.
+Worker launches require a narrow `write_scope`. Treat it as a coordination lease until the task settles or is cancelled. Structured Worker writes are gated to the scope, and the coordinator stays read-only while the Worker runs. Do not overlap Workers with unrestricted background commands; each launcher rejects the other while active. Worker shell effects remain policy-constrained rather than sandboxed.
 
 Use `start_background_command` for dev servers, watchers, log tails, streaming builds, and long test suites. Use `bash` for commands that normally finish in seconds. Commands receive no stdin.
 
