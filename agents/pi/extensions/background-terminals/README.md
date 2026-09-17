@@ -1,74 +1,28 @@
-# @parke.dev/pi-background-terminals
+# Background command backend
 
-Long-running shell commands for the [pi coding agent](https://pi.dev): dev
-servers, watchers and builds that keep running while the agent works.
+This directory contains the process-management backend used by `extensions/tasks`.
+It is not an independently loaded Pi extension.
 
-Four tools plus a `/ps` command:
+Public tools are registered by `extensions/tasks/index.ts`:
 
-| Tool        | What it does                                                       |
-| ----------- | ------------------------------------------------------------------ |
-| `bg_start`  | start a command in the background and return immediately           |
-| `bg_status` | status plus a truncated tail of recent output                      |
-| `bg_list`   | all terminals with status, age and output sizes                    |
-| `bg_kill`   | stop one or more terminals (SIGTERM → SIGKILL, whole process tree) |
+- `start_background_command`
+- `task_status`
+- `task_result`
+- `task_list`
+- `task_cancel`
 
-At most **8** terminals run at once. Starting a ninth fails until something is
-killed. Terminals are session-scoped: everything is stopped on shutdown or
-reload, so a dev server cannot outlive the session that started it.
+The backend preserves these invariants:
 
-Commands run with **Bash** on macOS and Linux, including support for guards such
-as `set -euo pipefail`. Windows commands run with `ComSpec`.
+- Bash on macOS/Linux and ComSpec on Windows
+- ignored stdin
+- detached POSIX process groups
+- bounded stdout/stderr retention
+- exactly-once settlement
+- SIGTERM to SIGKILL process-tree cancellation
+- session-scoped cleanup
 
-Commands get **no stdin** (`stdio` stdin is ignored). Anything that prompts for
-input sees EOF immediately rather than hanging — pass credentials via env or
-flags instead.
+Completion delivery moved to the shared task control plane. See
+`BACKGROUND_TASKS_CONSOLIDATION.md` and `agents/skills/background-tasks/SKILL.md`.
 
-When a terminal exits, its result is delivered automatically as a follow-up
-message, so the agent does not need to poll. Delivery wakes an idle agent, waits
-for an active turn to settle, and retries transient handoff failures. Calling
-`bg_status` or `bg_kill` on an already-finished terminal **consumes** that result
-and suppresses the automatic message, so the same outcome is never delivered
-twice.
-
-Output is retained in memory (bounded per stream); status and completion
-messages show a truncated tail of what matters. While terminals are running,
-Pi's extension-status API exposes a terse count and `/ps` hint to custom
-footers such as `@parke.dev/pi-dashboard`. In Herdr panes, source-scoped display
-metadata labels otherwise-idle or done Pi agents as `background` while a terminal
-is running; the underlying lifecycle state remains unchanged for automation.
-
-The matching skill at `agents/skills/background-terminals/SKILL.md` teaches the model
-when to reach for these tools instead of `bash`.
-
-## Deployment
-
-This source is vendored into the dotfiles and linked into Pi's global extensions by
-`nix/home/agents.nix`. See `UPSTREAM.md` for provenance and local changes.
-
-## Why not just bash
-
-`bash` blocks the turn until the command finishes. That is correct for
-`git status`, a single test file, or a build you intend to wait on.
-
-It is wrong for anything that does not naturally end, or ends much later:
-
-- dev servers (`vite dev`, `next dev`, an API server)
-- watchers (`tsc --watch`, `vitest --watch`)
-- log tails (`kubectl logs -f`)
-- long streaming builds and full test suites
-
-`bg_start` returns immediately with an id. Keep working. You will get a message
-when it exits; only call `bg_status` when you need output _now_ (server up
-before a request, how far a build has got). Check `bg_list` before starting a
-second copy of something that may already be running.
-
-## Diagnostics
-
-```
-/ps                 list background terminals (status, age, output sizes)
-/ps kill <id>       stop one terminal
-```
-
-## License
-
-MIT
+The process manager remains adapted from `@parke.dev/pi-background-terminals@0.1.0`.
+See `UPSTREAM.md` and `LICENSE`.

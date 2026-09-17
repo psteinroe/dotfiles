@@ -18,10 +18,22 @@ import {
   bindAbortSignal,
   bindAndPrepareChildSession,
   createActiveSubagentSessionRegistry,
-  extractAssistantText,
+  extractLatestAssistantText,
   shutdownAndDisposeChildSession,
   trackSubagentEvents,
 } from "../shared/subagent-runtime.ts";
+import {
+  createSubagentModelPlan,
+  createSubagentSettings,
+} from "../shared/subagent-models.ts";
+import { promptSubagentWithFailover } from "../shared/subagent-failover.ts";
+import {
+  assertExecutorMcpToolsRegistered,
+  EXECUTOR_MCP_TOOLS,
+  isolateExecutorMcpExtension,
+  isolatedSubagentResourceDir,
+  resolveExecutorMcpExtensionPath,
+} from "../shared/subagent-mcp.ts";
 import installSubdirContext from "../shared/subdir-context/src/index.ts";
 import {
   DEFAULT_MAX_SEARCH_RESULTS,
@@ -43,13 +55,14 @@ function createDetails(
   run: LibrarianRunDetails,
   workspace: string,
   metadata: LibrarianMetadata,
+  model = `${LIBRARIAN_MODEL_PROVIDER}/${LIBRARIAN_MODEL_ID}`,
 ): LibrarianDetails {
   return {
     status: run.status,
     agent: "librarian",
     taskLabel: "GitHub research",
     workspace,
-    model: `${LIBRARIAN_MODEL_PROVIDER}/${LIBRARIAN_MODEL_ID}`,
+    model,
     thinking: LIBRARIAN_THINKING,
     run,
     metadata,
@@ -82,9 +95,14 @@ function errorResult(message: string, workspace: string, task = "") {
 
 export default function librarianExtension(pi: ExtensionAPI) {
   const activeSessions = createActiveSubagentSessionRegistry();
+  const temporaryWorkspaces = new Set<string>();
 
   pi.on("session_shutdown", async () => {
     await activeSessions.shutdown();
+    await Promise.allSettled(
+      [...temporaryWorkspaces].map((workspace) => fs.rm(workspace, { recursive: true, force: true })),
+    );
+    temporaryWorkspaces.clear();
   });
 
   pi.registerTool({
@@ -117,21 +135,22 @@ export default function librarianExtension(pi: ExtensionAPI) {
         return errorResult(normalized.error, ctx.cwd);
       }
 
-      const model = ctx.modelRegistry.find(LIBRARIAN_MODEL_PROVIDER, LIBRARIAN_MODEL_ID);
-      if (!model) {
-        const message =
-          `Required model is unavailable: ${LIBRARIAN_MODEL_PROVIDER}/${LIBRARIAN_MODEL_ID}`;
-        const rawQuery = typeof (params as { query?: unknown }).query === "string"
-          ? (params as { query: string }).query.trim()
-          : "";
-        return errorResult(message, ctx.cwd, rawQuery);
-      }
-
       const { query, repos, owners, maxSearchResults } = normalized.value;
+      let plan: Awaited<ReturnType<typeof createSubagentModelPlan>>;
+      let executorMcpExtensionPath: string;
+      try {
+        executorMcpExtensionPath = resolveExecutorMcpExtensionPath(pi);
+        plan = await createSubagentModelPlan(ctx, LIBRARIAN_MODEL_ID);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return errorResult(message, ctx.cwd, query);
+      }
       const metadata: LibrarianMetadata = { repos, owners, maxSearchResults };
+      let currentModel = `${LIBRARIAN_MODEL_PROVIDER}/${LIBRARIAN_MODEL_ID}`;
       const workspaceBase = "/tmp/pi-librarian";
       await fs.mkdir(workspaceBase, { recursive: true });
       const workspace = await fs.mkdtemp(path.join(workspaceBase, "run-"));
+      temporaryWorkspaces.add(workspace);
       await fs.mkdir(path.join(workspace, "repos"), { recursive: true });
 
       const run: LibrarianRunDetails = {
@@ -142,7 +161,7 @@ export default function librarianExtension(pi: ExtensionAPI) {
         toolCalls: [],
         startedAt: Date.now(),
       };
-      const buildResultDetails = () => createDetails(run, workspace, metadata);
+      const buildResultDetails = () => createDetails(run, workspace, metadata, currentModel);
       const emitUpdate = (_force = false) => {
         onUpdate?.({
           content: [{ type: "text", text: run.summaryText ?? "(searching...)" }],
@@ -164,15 +183,23 @@ export default function librarianExtension(pi: ExtensionAPI) {
           workspace,
           maxSearchResults || DEFAULT_MAX_SEARCH_RESULTS,
         );
+        const agentDir = getAgentDir();
+        const settingsManager = createSubagentSettings(workspace, agentDir);
         const resourceLoader = new DefaultResourceLoader({
           cwd: workspace,
-          agentDir: getAgentDir(),
-          noExtensions: true,
+          agentDir: isolatedSubagentResourceDir(),
+          settingsManager,
+          additionalExtensionPaths: [executorMcpExtensionPath],
+          extensionsOverride: isolateExecutorMcpExtension(executorMcpExtensionPath),
           noSkills: true,
           noPromptTemplates: true,
           noThemes: true,
           noContextFiles: true,
-          extensionFactories: [installSubdirContext, createTurnBudgetExtension(DEFAULT_MAX_TURNS)],
+          extensionFactories: [
+            installSubdirContext,
+            createTurnBudgetExtension(DEFAULT_MAX_TURNS),
+            plan.extensionFactory,
+          ],
           systemPromptOverride: () => systemPrompt,
           skillsOverride: () => ({ skills: [], diagnostics: [] }),
         });
@@ -186,12 +213,16 @@ export default function librarianExtension(pi: ExtensionAPI) {
         const created = await createAgentSession({
           cwd: workspace,
           resourceLoader,
+          agentDir,
+          settingsManager,
           sessionManager: SessionManager.inMemory(workspace),
-          model,
+          model: plan.models[0],
           thinkingLevel: LIBRARIAN_THINKING,
-          tools: ["read", "bash"],
+          tools: ["read", "bash", ...EXECUTOR_MCP_TOOLS],
         });
         session = await bindAndPrepareChildSession(created.session);
+        assertExecutorMcpToolsRegistered(session);
+        currentModel = `${plan.models[0].provider}/${plan.models[0].id}`;
         removeActiveSession = activeSessions.add(session);
 
         const tracker = trackSubagentEvents(session, {
@@ -206,19 +237,31 @@ export default function librarianExtension(pi: ExtensionAPI) {
         });
         if (aborted) throw new Error("Aborted");
 
-        await session.prompt(buildLibrarianUserPrompt(query, repos, owners, maxSearchResults), {
-          expandPromptTemplates: false,
-        });
+        await promptSubagentWithFailover(
+          session,
+          buildLibrarianUserPrompt(query, repos, owners, maxSearchResults),
+          {
+            models: plan.models,
+            thinkingLevel: LIBRARIAN_THINKING,
+            signal,
+            run,
+            onModelChange: (model) => {
+              currentModel = `${model.provider}/${model.id}`;
+              emitUpdate(true);
+            },
+          },
+        );
         if (aborted || signal?.aborted) throw new Error("Aborted");
 
-        const output = extractAssistantText(session).trim();
+        const output = extractLatestAssistantText(session).trim();
         if (!output) throw new Error("Librarian returned no final answer.");
         run.status = "done";
         run.summaryText = output;
         run.endedAt = Date.now();
         emitUpdate(true);
       } catch (error) {
-        const isAborted = aborted || signal?.aborted;
+        const isAborted = aborted || signal?.aborted || run.terminationReason === "cancelled"
+          || run.terminationReason === "shutdown";
         run.status = isAborted ? "aborted" : "error";
         run.error = isAborted ? undefined : error instanceof Error ? error.message : String(error);
         run.summaryText = isAborted ? "Aborted" : run.error;

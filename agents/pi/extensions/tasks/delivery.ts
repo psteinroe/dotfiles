@@ -1,39 +1,31 @@
-import type { TerminalSnapshot } from "./manager.ts";
+import type { TaskSnapshot } from "./registry.ts";
 
 type Timer = ReturnType<typeof setTimeout>;
-type SendMessage = (snapshot: TerminalSnapshot) => unknown;
+type SendMessage = (snapshots: TaskSnapshot[]) => unknown;
 
-export interface DeliveryOptions {
+export interface TaskDeliveryOptions {
   quietMs?: number;
   retryMs?: number;
-  /** Live Pi state check evaluated immediately before each handoff. */
   canDeliver?: () => boolean;
 }
 
-/**
- * Delivers settled terminals only while the agent is idle.
- *
- * The manager can settle from a child-process event at any point in a turn, so
- * delivery state is kept separate from process state. Timers are owned here
- * too, which makes shutdown and retry behavior explicit instead of relying on
- * a later lifecycle event to wake a stale queue.
- */
-export class BackgroundTerminalDelivery {
-  private readonly pending = new Map<string, TerminalSnapshot>();
+/** Idle-aware, deduplicated and batched completion delivery. */
+export class TaskDelivery {
+  private readonly pending = new Map<string, TaskSnapshot>();
+  private readonly inFlight = new Set<string>();
+  private readonly consumed = new Set<string>();
   private readonly quietMs: number;
   private readonly retryMs: number;
   private readonly canDeliver: () => boolean;
-  /** Lifecycle hint used to choose a quiet flush or coarse reconciliation. */
+  private readonly sendMessage: SendMessage;
   private idle = true;
   private closed = false;
   private flushing = false;
   private quietTimer?: Timer;
   private retryTimer?: Timer;
 
-  constructor(
-    private readonly sendMessage: SendMessage,
-    options: DeliveryOptions = {},
-  ) {
+  constructor(sendMessage: SendMessage, options: TaskDeliveryOptions = {}) {
+    this.sendMessage = sendMessage;
     this.quietMs = options.quietMs ?? 250;
     this.retryMs = options.retryMs ?? 1_000;
     this.canDeliver = options.canDeliver ?? (() => this.idle);
@@ -53,8 +45,8 @@ export class BackgroundTerminalDelivery {
     this.scheduleQuiet();
   }
 
-  enqueue(snapshot: TerminalSnapshot): void {
-    if (this.closed) return;
+  enqueue(snapshot: TaskSnapshot): void {
+    if (this.closed || this.consumed.has(snapshot.id)) return;
     this.pending.set(snapshot.id, snapshot);
     if (this.idle) this.scheduleQuiet();
     else this.scheduleRetry();
@@ -62,24 +54,23 @@ export class BackgroundTerminalDelivery {
 
   consume(id: string): void {
     this.pending.delete(id);
+    if (this.inFlight.has(id)) this.consumed.add(id);
     if (!this.pending.size) this.clearTimers();
   }
 
   shutdown(): void {
     this.closed = true;
     this.pending.clear();
+    this.inFlight.clear();
+    this.consumed.clear();
     this.clearTimers();
   }
 
   private clearTimers(): void {
-    if (this.quietTimer) {
-      clearTimeout(this.quietTimer);
-      this.quietTimer = undefined;
-    }
-    if (this.retryTimer) {
-      clearTimeout(this.retryTimer);
-      this.retryTimer = undefined;
-    }
+    if (this.quietTimer) clearTimeout(this.quietTimer);
+    if (this.retryTimer) clearTimeout(this.retryTimer);
+    this.quietTimer = undefined;
+    this.retryTimer = undefined;
   }
 
   private scheduleQuiet(): void {
@@ -109,21 +100,37 @@ export class BackgroundTerminalDelivery {
     }
     this.flushing = true;
     let failed = false;
+    const batch = [...this.pending.values()];
+    for (const task of batch) {
+      if (this.pending.get(task.id) !== task) continue;
+      this.pending.delete(task.id);
+      this.inFlight.add(task.id);
+    }
+    const deliverable = batch.filter((task) =>
+      this.inFlight.has(task.id) && !this.consumed.has(task.id));
     try {
-      for (const [id, snapshot] of [...this.pending]) {
-        if (this.closed || !this.canDeliver()) break;
-        // Remove before sending so a successful send cannot be delivered twice.
-        // A failed send is put back below for an autonomous retry.
-        if (this.pending.get(id) !== snapshot) continue;
-        this.pending.delete(id);
-        try {
-          await this.sendMessage(snapshot);
-        } catch {
+      if (deliverable.length && !this.closed) {
+        if (!this.canDeliver()) {
           failed = true;
-          if (!this.closed) this.pending.set(id, snapshot);
+          for (const task of deliverable) {
+            if (!this.consumed.has(task.id)) this.pending.set(task.id, task);
+          }
+        } else {
+          await this.sendMessage(deliverable);
+        }
+      }
+    } catch {
+      failed = true;
+      if (!this.closed) {
+        for (const task of deliverable) {
+          if (!this.consumed.has(task.id)) this.pending.set(task.id, task);
         }
       }
     } finally {
+      for (const task of batch) {
+        this.inFlight.delete(task.id);
+        this.consumed.delete(task.id);
+      }
       this.flushing = false;
       if (this.closed || !this.pending.size) return;
       if (failed || !this.idle || !this.canDeliver()) this.scheduleRetry();

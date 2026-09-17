@@ -6,7 +6,6 @@ import {
   defineTool,
   getAgentDir,
   SessionManager,
-  SettingsManager,
   type AgentSession,
   type AgentToolUpdateCallback,
   type ExtensionAPI,
@@ -34,6 +33,20 @@ import {
 import { createSubagentRenderers } from "../shared/subagent-progress.ts";
 import { createTurnBudgetExtension } from "../shared/turn-budget.ts";
 import {
+  createSubagentModelPlan,
+  createSubagentSettings,
+  type Model,
+} from "../shared/subagent-models.ts";
+import { promptSubagentWithFailover } from "../shared/subagent-failover.ts";
+import {
+  assertExecutorMcpToolsRegistered,
+  EXECUTOR_MCP_TOOLS,
+  isolateExecutorMcpExtension,
+  isolatedSubagentResourceDir,
+  resolveExecutorMcpExtensionPath,
+} from "../shared/subagent-mcp.ts";
+import { createWorkerWriteScopeExtension } from "../shared/write-scope.ts";
+import {
   type DelegateDetails,
   type DelegateRunDetails,
 } from "./progress.ts";
@@ -43,11 +56,11 @@ const GIT_OUTPUT_LIMIT = 64_000;
 
 const ORACLE_SYSTEM_PROMPT = `You are a read-only oracle providing a rigorous second opinion.
 
-Inspect the relevant code before answering. Focus on architecture, correctness, difficult debugging, plans, and code review. State a clear recommendation, the reasoning behind it, concrete risks, and any assumptions that need validation. Prefer specific file references over generic advice. You cannot modify files or run shell commands.`;
+Inspect the relevant code before answering. Focus on architecture, correctness, difficult debugging, plans, and code review. State a clear recommendation, the reasoning behind it, concrete risks, and any assumptions that need validation. Prefer specific file references over generic advice. You cannot modify files or run shell commands. Executor MCP access is for read-only research only; never invoke an external mutation.`;
 
 const WORKER_SYSTEM_PROMPT = `You are an implementation worker operating in the current working tree.
 
-Complete only the bounded task you receive. Read the relevant code, make focused changes, and run the most relevant checks. Leave commits, pushes, pull requests, and product decisions to the coordinator. Return a concise summary of changed files, validation results, and unresolved decisions.`;
+Complete only the bounded task you receive. Read the relevant code, make focused changes, and run the most relevant checks. Use Executor MCP tools when external integrations are relevant to the task. Leave commits, pushes, pull requests, and product decisions to the coordinator. Return a concise summary of changed files, validation results, and unresolved decisions.`;
 
 function createGitDiffTool(cwd: string) {
   return defineTool({
@@ -81,24 +94,28 @@ function createGitDiffTool(cwd: string) {
 async function createIsolatedSession(options: {
   name: DelegateName;
   ctx: ExtensionContext;
-}) {
-  const { name, ctx } = options;
+  executorMcpExtensionPath: string;
+  writeScope?: string[];
+}): Promise<{ session: AgentSession; models: Model[] }> {
+  const { name, ctx, executorMcpExtensionPath, writeScope } = options;
   const policy = DELEGATE_POLICIES[name];
-  const model = ctx.modelRegistry.find("openai-codex", policy.model);
-  if (!model) {
-    throw new Error(`Required model is unavailable: openai-codex/${policy.model}`);
-  }
+  const plan = await createSubagentModelPlan(ctx, policy.model);
 
   const agentDir = getAgentDir();
-  const settingsManager = SettingsManager.create(ctx.cwd, agentDir, {
-    projectTrusted: false,
-  });
+  const settingsManager = createSubagentSettings(ctx.cwd, agentDir);
   const loader = new DefaultResourceLoader({
     cwd: ctx.cwd,
-    agentDir,
+    agentDir: isolatedSubagentResourceDir(),
     settingsManager,
-    noExtensions: true,
-    extensionFactories: [createTurnBudgetExtension(policy.maxTurns)],
+    additionalExtensionPaths: [executorMcpExtensionPath],
+    extensionsOverride: isolateExecutorMcpExtension(executorMcpExtensionPath),
+    extensionFactories: [
+      createTurnBudgetExtension(policy.maxTurns),
+      ...(name === "worker" && writeScope?.length
+        ? [createWorkerWriteScopeExtension(writeScope)]
+        : []),
+      plan.extensionFactory,
+    ],
     noSkills: true,
     noPromptTemplates: true,
     noThemes: true,
@@ -113,13 +130,23 @@ async function createIsolatedSession(options: {
     settingsManager,
     resourceLoader: loader,
     sessionManager: SessionManager.inMemory(ctx.cwd),
-    model,
+    model: plan.models[0],
     thinkingLevel: policy.thinking,
-    tools: [...policy.tools],
+    tools: [...policy.tools, ...EXECUTOR_MCP_TOOLS],
     customTools: name === "oracle" ? [createGitDiffTool(ctx.cwd)] : [],
   });
 
-  return bindAndPrepareChildSession(session);
+  const boundSession = await bindAndPrepareChildSession(session);
+  try {
+    assertExecutorMcpToolsRegistered(boundSession);
+  } catch (error) {
+    await shutdownAndDisposeChildSession(boundSession);
+    throw error;
+  }
+  return {
+    session: boundSession,
+    models: plan.models,
+  };
 }
 
 function createDelegateRenderers(name: DelegateName) {
@@ -142,10 +169,11 @@ export default function delegatesExtension(pi: ExtensionAPI) {
     signal?: AbortSignal;
     onUpdate?: AgentToolUpdateCallback<DelegateDetails>;
     ctx: ExtensionContext;
+    writeScope?: string[];
   }) {
     const releaseCapacity = capacity[options.name].acquire();
     const policy = DELEGATE_POLICIES[options.name];
-    const model = `openai-codex/${policy.model}`;
+    let model = `openai-codex/${policy.model}`;
     const run: DelegateRunDetails = {
       status: "running",
       task: options.task,
@@ -178,10 +206,16 @@ export default function delegatesExtension(pi: ExtensionAPI) {
     emitUpdate();
 
     try {
-      const child = await createIsolatedSession({
+      const executorMcpExtensionPath = resolveExecutorMcpExtensionPath(pi);
+      const created = await createIsolatedSession({
         name: options.name,
         ctx: options.ctx,
+        executorMcpExtensionPath,
+        writeScope: options.writeScope,
       });
+      const child = created.session;
+      model = `${created.models[0].provider}/${created.models[0].id}`;
+      emitUpdate();
       session = child;
       removeActiveSession = activeSessions.add(child);
       const tracker = trackSubagentEvents(child, {
@@ -195,7 +229,16 @@ export default function delegatesExtension(pi: ExtensionAPI) {
       });
       if (options.signal?.aborted) throw new Error(`${options.name} was aborted.`);
 
-      await child.prompt(options.task, { expandPromptTemplates: false });
+      await promptSubagentWithFailover(child, options.task, {
+        models: created.models,
+        thinkingLevel: policy.thinking,
+        signal: options.signal,
+        run,
+        onModelChange: (candidate) => {
+          model = `${candidate.provider}/${candidate.id}`;
+          emitUpdate();
+        },
+      });
       if (options.signal?.aborted) throw new Error(`${options.name} was aborted.`);
 
       const output = extractLatestAssistantText(child);
@@ -237,7 +280,8 @@ export default function delegatesExtension(pi: ExtensionAPI) {
         isError: false,
       };
     } catch (error) {
-      const aborted = options.signal?.aborted ?? false;
+      const aborted = options.signal?.aborted || run.terminationReason === "cancelled"
+        || run.terminationReason === "shutdown";
       const turnLimited = run.terminationReason === "turn_limit";
       run.status = aborted ? "aborted" : "error";
       run.terminationReason = aborted
@@ -316,6 +360,9 @@ export default function delegatesExtension(pi: ExtensionAPI) {
         description:
           "Self-contained task with relevant paths, constraints, and the expected validation or result",
       }),
+      writeScope: Type.Optional(Type.Array(Type.String(), {
+        description: "Canonical Worker write paths supplied by the background task coordinator.",
+      })),
     }),
     async execute(_toolCallId, params, signal, onUpdate, ctx) {
       const result = await runDelegate({
@@ -324,6 +371,7 @@ export default function delegatesExtension(pi: ExtensionAPI) {
         signal,
         onUpdate,
         ctx,
+        writeScope: params.writeScope,
       });
       return {
         content: [{ type: "text", text: result.text }],

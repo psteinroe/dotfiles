@@ -1,6 +1,6 @@
 import net from "node:net";
 
-const SOURCE = "pi:background-terminals";
+const SOURCE = "pi:background-tasks";
 const PI_SOURCE = "herdr:pi";
 const MAX_TTL_MS = 86_400_000;
 const RENEW_AFTER_MS = 12 * 60 * 60 * 1_000;

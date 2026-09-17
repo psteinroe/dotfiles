@@ -71,6 +71,37 @@ test(
   },
 );
 
+test("classifies a TERM-trapping zero exit as cancelled", async () => {
+  if (process.platform === "win32") return;
+  const manager = new TerminalManager();
+  try {
+    const task = manager.start({
+      command: "trap 'exit 0' TERM; while :; do sleep 0.1; done",
+      title: "term trap",
+      cwd: process.cwd(),
+    });
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    const settled = await manager.kill(task.id);
+    assert.equal(settled.status, "killed");
+  } finally {
+    await manager.disposeAll();
+  }
+});
+
+test("disposeAll waits for stubborn process tasks to settle", async () => {
+  if (process.platform === "win32") return;
+  const manager = new TerminalManager();
+  const task = manager.start({
+    command: "trap '' TERM; while :; do sleep 0.1; done",
+    title: "stubborn",
+    cwd: process.cwd(),
+  });
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  const count = await manager.disposeAll();
+  assert.equal(count, 1);
+  assert.notEqual(manager.get(task.id)?.status, "running");
+});
+
 test("enforces the eight-terminal parallel limit", async () => {
   const manager = new TerminalManager();
   try {
@@ -81,7 +112,7 @@ test("enforces the eight-terminal parallel limit", async () => {
     assert.equal(manager.runningCount(), MAX_RUNNING);
     assert.throws(
       () => manager.start({ command: "sleep 10", title: "overflow", cwd: process.cwd() }),
-      /Max 8 background terminals/,
+      /Max 8 background commands/,
     );
   } finally {
     await manager.disposeAll();

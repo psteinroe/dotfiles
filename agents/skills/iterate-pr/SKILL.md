@@ -25,19 +25,19 @@ Drive one pull request to a clean state or, when explicitly authorized, merge it
    - Merge conflicts (`mergeable == CONFLICTING` or `mergeStateStatus == DIRTY`): do not rerun CI or start another watcher. Update the branch from its base using the repository's established rebase/merge convention, resolve the conflicts deliberately, validate, push, and return to step 2. Stop for user judgment if conflict resolution changes product behavior or branch intent.
    - Failed checks: resolve the failed run ID and run `scripts/failed-run-summary.sh <run-id>`.
    - Actionable review feedback: include the relevant thread, path, and requested behavior, unless the user explicitly authorized skipping reviews for the merge.
-   - Pending automated checks with no actionable failure: start the quiet wait script explicitly with `bg_start`, title it `Wait for PR checks`, and use the pull request worktree as `working_dir`. Pass either the PR URL or its number; a number defaults to the repository at `working_dir`, or accepts an explicit `owner/repo` second argument. Do not poll with `bg_status`; its completion will resume the main agent.
+   - Pending automated checks with no actionable failure: start the quiet wait script with `start_background_command`, title it `Wait for PR checks`, and use the pull request worktree as `working_dir`. Pass either the PR URL or its number; a number defaults to the repository at `working_dir`, or accepts an explicit `owner/repo` second argument. Continue useful work; completion resumes the main agent automatically.
    - No failures or automated checks pending: merge when explicitly authorized; otherwise report completion or actionable feedback.
 
 4. **Delegate a bounded fix**
-   - Call `worker` with the failure excerpt or review feedback, branch intent, relevant paths, constraints, and expected validation.
-   - The worker edits and tests but does not commit or push.
-   - Inspect the resulting diff and validation. Use `oracle` only when the diagnosis, architecture, or correctness remains uncertain.
+   - Call `start_subagent` with `agent: "worker"`, a narrow `write_scope`, the failure excerpt or review feedback, branch intent, relevant paths, constraints, and expected validation.
+   - The Worker edits and tests in the background but does not commit or push.
+   - Inspect the resulting diff and validation. Start an `oracle` subagent only when the diagnosis, architecture, or correctness remains uncertain.
    - Stop for user input when the fix changes product behavior, requires secrets, or has multiple consequential designs.
 
 5. **Publish and wait**
    - Run the relevant local check, create one focused commit, and push.
    - Increment the pushed-attempt count.
-   - Start `<skill-dir>/scripts/wait-for-pr-checks.sh <pr-number-or-url> [owner/repo]` with `bg_start` as described above. The watcher checks mergeability before each CI poll and exits `3` with `status:"conflict"` as soon as GitHub reports a conflict.
+   - Start `<skill-dir>/scripts/wait-for-pr-checks.sh <pr-number-or-url> [owner/repo]` with `start_background_command` as described above. The watcher checks mergeability before each CI poll and exits `3` with `status:"conflict"` as soon as GitHub reports a conflict.
    - When it completes, return to step 2 for the new HEAD. A conflict result is actionable branch state, not a reason to rerun checks.
 
 6. **Merge only when explicitly authorized**

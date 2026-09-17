@@ -5,7 +5,7 @@ import { buildLibrarianSystemPrompt, buildLibrarianUserPrompt } from "./prompt.t
 test("preserves the evidence-first system prompt contract", () => {
   const prompt = buildLibrarianSystemPrompt(10, "/tmp/pi-librarian/run-test", 30);
   assert.match(prompt, /You are Librarian, an evidence-first GitHub scout\./);
-  assert.match(prompt, /may only use the provided tools \(bash\/read\)/);
+  assert.match(prompt, /provided local tools \(bash\/read\) and Executor MCP tools/);
   assert.match(prompt, /Turn budget: at most 10 turns total/);
   assert.match(prompt, /Tool use is disabled on the final allowed turn/);
   assert.match(prompt, /Keep workspace changes scoped to cache files under `repos\//);

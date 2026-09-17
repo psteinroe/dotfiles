@@ -3,9 +3,7 @@ import {
   DefaultResourceLoader,
   getAgentDir,
   SessionManager,
-  SettingsManager,
   type AgentSession,
-  type AgentToolUpdateCallback,
   type ExtensionAPI,
   type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
@@ -14,10 +12,23 @@ import {
   bindAbortSignal,
   bindAndPrepareChildSession,
   createActiveSubagentSessionRegistry,
-  extractAssistantText,
+  extractLatestAssistantText,
   shutdownAndDisposeChildSession,
   trackSubagentEvents,
 } from "../shared/subagent-runtime.ts";
+import {
+  createSubagentModelPlan,
+  createSubagentSettings,
+  type Model,
+} from "../shared/subagent-models.ts";
+import { promptSubagentWithFailover } from "../shared/subagent-failover.ts";
+import {
+  assertExecutorMcpToolsRegistered,
+  EXECUTOR_MCP_TOOLS,
+  isolateExecutorMcpExtension,
+  isolatedSubagentResourceDir,
+  resolveExecutorMcpExtensionPath,
+} from "../shared/subagent-mcp.ts";
 import {
   createSubagentRenderers,
   shorten,
@@ -45,13 +56,14 @@ function errorText(error: unknown): string {
 function detailsFor(
   run: FinderDetails["run"],
   cwd: string,
+  model = FINDER_MODEL,
 ): FinderDetails {
   return {
     status: run.status,
     agent: "finder",
     taskLabel: "query",
     workspace: cwd,
-    model: FINDER_MODEL,
+    model,
     thinking: FINDER_THINKING,
     run,
     metadata: { query: run.task },
@@ -64,35 +76,37 @@ function resultFor(
   text: string,
   isError = false,
   stats?: { tokens?: unknown; cost?: number },
+  model = FINDER_MODEL,
 ) {
   return {
     content: [{ type: "text" as const, text }],
     details: {
-      ...detailsFor(run, cwd),
+      ...detailsFor(run, cwd, model),
       ...stats,
     } satisfies FinderDetails,
     ...(isError ? { isError: true } : {}),
   };
 }
 
-async function createFinderSession(ctx: ExtensionContext) {
-  const model = ctx.modelRegistry.find(FINDER_PROVIDER, FINDER_MODEL_ID);
-  if (!model) {
-    throw new Error(`Required model is unavailable: ${FINDER_MODEL}`);
-  }
-
+async function createFinderSession(
+  ctx: ExtensionContext,
+  executorMcpExtensionPath: string,
+): Promise<{
+  session: AgentSession;
+  models: Model[];
+}> {
+  const plan = await createSubagentModelPlan(ctx, FINDER_MODEL_ID);
   const agentDir = getAgentDir();
-  const settingsManager = SettingsManager.create(ctx.cwd, agentDir, {
-    projectTrusted: false,
-  });
+  const settingsManager = createSubagentSettings(ctx.cwd, agentDir);
   const resourceLoader = new DefaultResourceLoader({
     cwd: ctx.cwd,
-    agentDir,
+    agentDir: isolatedSubagentResourceDir(),
     settingsManager,
-    // Finder must not inherit the parent/global extension set. The context
-    // extension is explicitly installed here so it exists only in this child.
-    noExtensions: true,
-    extensionFactories: [subdirContextExtension],
+    // Load the explicit MCP path plus inline child policies, then discard every
+    // other discovered extension before child binding.
+    additionalExtensionPaths: [executorMcpExtensionPath],
+    extensionFactories: [subdirContextExtension, plan.extensionFactory],
+    extensionsOverride: isolateExecutorMcpExtension(executorMcpExtensionPath),
     noSkills: true,
     noPromptTemplates: true,
     noThemes: true,
@@ -107,11 +121,21 @@ async function createFinderSession(ctx: ExtensionContext) {
     settingsManager,
     resourceLoader,
     sessionManager: SessionManager.inMemory(ctx.cwd),
-    model,
+    model: plan.models[0],
     thinkingLevel: FINDER_THINKING,
-    tools: ["read", "bash"],
+    tools: ["read", "bash", ...EXECUTOR_MCP_TOOLS],
   });
-  return bindAndPrepareChildSession(session);
+  const boundSession = await bindAndPrepareChildSession(session);
+  try {
+    assertExecutorMcpToolsRegistered(boundSession);
+  } catch (error) {
+    await shutdownAndDisposeChildSession(boundSession);
+    throw error;
+  }
+  return {
+    session: boundSession,
+    models: plan.models,
+  };
 }
 
 export default function finderExtension(pi: ExtensionAPI) {
@@ -161,10 +185,11 @@ export default function finderExtension(pi: ExtensionAPI) {
         toolCalls: [],
         startedAt: Date.now(),
       };
+      let currentModel = FINDER_MODEL;
       const emitUpdate = (force = false) => {
         onUpdate?.({
           content: [{ type: "text", text: run.summaryText ?? "(searching…)" }],
-          details: detailsFor(run, ctx.cwd),
+          details: detailsFor(run, ctx.cwd, currentModel),
         });
       };
 
@@ -174,7 +199,7 @@ export default function finderExtension(pi: ExtensionAPI) {
         run.error = message;
         run.summaryText = message;
         run.endedAt = Date.now();
-        return resultFor(run, ctx.cwd, message, true);
+        return resultFor(run, ctx.cwd, message, true, undefined, currentModel);
       }
 
       emitUpdate(true);
@@ -184,10 +209,10 @@ export default function finderExtension(pi: ExtensionAPI) {
       let removeActiveSession: (() => void) | undefined;
 
       try {
-        const model = ctx.modelRegistry.find(FINDER_PROVIDER, FINDER_MODEL_ID);
-        if (!model) throw new Error(`Required model is unavailable: ${FINDER_MODEL}`);
-
-        const child = await createFinderSession(ctx);
+        const executorMcpExtensionPath = resolveExecutorMcpExtensionPath(pi);
+        const created = await createFinderSession(ctx, executorMcpExtensionPath);
+        const child = created.session;
+        currentModel = `${created.models[0].provider}/${created.models[0].id}`;
         session = child;
         removeActiveSession = activeSessions.add(child);
 
@@ -204,12 +229,23 @@ export default function finderExtension(pi: ExtensionAPI) {
         });
         if (signal?.aborted) throw new Error("Finder was aborted.");
 
-        await child.prompt(buildFinderUserPrompt(query), {
-          expandPromptTemplates: false,
-        });
+        await promptSubagentWithFailover(
+          child,
+          buildFinderUserPrompt(query),
+          {
+            models: created.models,
+            thinkingLevel: FINDER_THINKING,
+            signal,
+            run,
+            onModelChange: (model) => {
+              currentModel = `${model.provider}/${model.id}`;
+              emitUpdate(true);
+            },
+          },
+        );
         if (signal?.aborted) throw new Error("Finder was aborted.");
 
-        const output = extractAssistantText(child);
+        const output = extractLatestAssistantText(child);
         if (!output) throw new Error("Finder returned no final answer.");
 
         run.status = "done";
@@ -220,16 +256,17 @@ export default function finderExtension(pi: ExtensionAPI) {
         return resultFor(run, ctx.cwd, output, false, {
           tokens: stats.tokens,
           cost: stats.cost,
-        });
+        }, currentModel);
       } catch (error) {
-        const aborted = signal?.aborted || errorText(error) === "Finder was aborted.";
+        const aborted = signal?.aborted || run.terminationReason === "cancelled"
+          || run.terminationReason === "shutdown" || errorText(error) === "Finder was aborted.";
         const message = aborted ? "Aborted" : errorText(error);
         run.status = aborted ? "aborted" : "error";
         run.error = aborted ? undefined : message;
         run.summaryText = message;
         run.endedAt = Date.now();
         emitUpdate(true);
-        return resultFor(run, ctx.cwd, message, !aborted);
+        return resultFor(run, ctx.cwd, message, !aborted, undefined, currentModel);
       } finally {
         removeAbortListener?.();
         stopTracking?.();

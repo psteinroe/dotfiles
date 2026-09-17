@@ -18,7 +18,7 @@
  *   whole tree. A dev server that spawns children must not leak them.
  * - **Settles exactly once.** Status is decided by the first of error/exit/close
  *   to complete, then frozen; later events are ignored.
- * - **Bounded memory.** Each stream retains at most 2 MiB, evicting whole
+ * - **Bounded memory.** Each stream retains at most 512 KiB, evicting whole
  *   chunks from the head. A single oversized write is sliced on a UTF-8
  *   boundary so we never cut a multi-byte character in half.
  * - **Nothing outlives the session.** Disposal SIGTERMs then SIGKILLs every
@@ -35,7 +35,7 @@ export const MAX_RUNNING = 8;
 /** Max tracked entries; oldest settled are pruned beyond this. */
 export const MAX_TRACKED = 32;
 /** In-memory retention per stream. */
-export const RETAINED_PER_STREAM = 2 * 1024 * 1024;
+export const RETAINED_PER_STREAM = 512 * 1024;
 /** Gap between SIGTERM and SIGKILL. */
 const FORCE_KILL_AFTER_MS = 2_000;
 /** Wait for 'close' after SIGKILL before giving up. */
@@ -198,10 +198,10 @@ export class TerminalManager {
 		if (this.disposed) throw new Error("Background terminals are shutting down");
 		const command = options.command.trim();
 		if (!command) throw new Error("command must not be empty");
-		// Reserve synchronously: two parallel bg_start calls must not both pass.
+		// Reserve synchronously: two parallel command launches must not both pass.
 		if (this.runningCount() + this.reserved >= MAX_RUNNING) {
 			throw new Error(
-				`Max ${MAX_RUNNING} background terminals can run at once. Kill one with bg_kill before starting another.`,
+				`Max ${MAX_RUNNING} background commands can run at once. Cancel one with task_cancel before starting another.`,
 			);
 		}
 		this.reserved++;
@@ -305,13 +305,8 @@ export class TerminalManager {
 		return this.snapshot(entry);
 	}
 
-	/**
-	 * Decide the terminal state, exactly once.
-	 *
-	 * `killRequested` only wins when the shell had not already exited: a process
-	 * that finished on its own microseconds before a kill request should report
-	 * its real exit code, not "killed".
-	 */
+	/** Decide the terminal state exactly once. A cancellation requested while the
+	 * public task still reported running wins over a later zero exit. */
 	private settle(entry: Entry): void {
 		if (entry.snapshot.status !== "running") return;
 		if (entry.exitTimer) {
@@ -320,16 +315,11 @@ export class TerminalManager {
 		}
 		const snap = entry.snapshot;
 		snap.settledAt = Date.now();
-		snap.status =
-			entry.killRequested && !entry.exited
-				? "killed"
-				: entry.errored
-					? "failed"
-					: snap.exitCode === 0
-						? "done"
-						: snap.signal && entry.killRequested
-							? "killed"
-							: "failed";
+		snap.status = entry.killRequested
+			? "killed"
+			: entry.errored
+				? "failed"
+				: snap.exitCode === 0 ? "done" : "failed";
 		snap.stdout = entry.stdout.view();
 		snap.stderr = entry.stderr.view();
 		for (const waiter of entry.settleWaiters.splice(0)) waiter();
@@ -370,7 +360,7 @@ export class TerminalManager {
 	/** SIGTERM, then SIGKILL if it does not close in time. */
 	async kill(id: string): Promise<TerminalSnapshot> {
 		const entry = this.entries.get(id);
-		if (!entry) throw new Error(`No background terminal ${id}. Use bg_list to see known ids.`);
+		if (!entry) throw new Error(`No background command backend ${id}. Use task_list to see public task ids.`);
 		if (entry.snapshot.status !== "running") return this.snapshot(entry);
 		entry.killRequested = true;
 		entry.consumed = true;
@@ -421,28 +411,25 @@ export class TerminalManager {
 	 */
 	async disposeAll(): Promise<number> {
 		this.disposed = true;
-		const running = [...this.entries.values()].filter((entry) => entry.snapshot.status === "running");
-		await Promise.race([
-			Promise.all(
-				running.map(async (entry) => {
-					entry.killRequested = true;
-					const settled = new Promise<void>((resolve) => entry.settleWaiters.push(resolve));
-					this.killTree(entry, "SIGTERM");
-					const closed = await Promise.race([
-						settled.then(() => true),
-						new Promise<false>((resolve) => {
-							const timer = setTimeout(() => resolve(false), FORCE_KILL_AFTER_MS);
-							timer.unref?.();
-						}),
-					]);
-					if (!closed) this.killTree(entry, "SIGKILL");
-				}),
-			),
-			new Promise<void>((resolve) => {
-				const timer = setTimeout(resolve, STOP_TIMEOUT_MS);
+		const running = [...this.entries.entries()]
+			.filter(([, entry]) => entry.snapshot.status === "running");
+		const shutdown = Promise.allSettled(running.map(([id]) => this.kill(id)));
+		const completed = await Promise.race([
+			shutdown.then(() => true),
+			new Promise<false>((resolve) => {
+				const timer = setTimeout(() => resolve(false), STOP_TIMEOUT_MS);
 				timer.unref?.();
 			}),
 		]);
+		if (!completed) {
+			for (const [, entry] of running) {
+				if (entry.snapshot.status !== "running") continue;
+				entry.killRequested = true;
+				entry.snapshot.errorText ??= "process tree remained alive at shutdown deadline";
+				this.killTree(entry, "SIGKILL");
+				this.settle(entry);
+			}
+		}
 		return running.length;
 	}
 }

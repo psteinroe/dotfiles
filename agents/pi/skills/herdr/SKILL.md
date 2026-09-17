@@ -59,7 +59,7 @@ Helpers own worktree resolution, setup, and workspace reuse through `wtensure` a
 
 After helper success, discover live workspace and pane IDs using the CLI. Verify the target workspace and working directory before sending work. The helper's `cd` runs inside the zsh subprocess; subsequent Pi shell calls must explicitly use the resolved worktree directory when needed.
 
-Start a persistent Herdr agent only when the user requested one, in an available shell pane in the resolved workspace, and send its task through the Herdr agent surface. Ordinary delegation stays with Pi's `finder`, `worker`, and `oracle` tools; ordinary background commands stay with Pi's background-terminal tools.
+Start a persistent Herdr agent only when the user requested one, in an available shell pane in the resolved workspace, and send its task through the Herdr agent surface. Ordinary delegation uses Pi's `start_subagent`; ordinary long-running commands use `start_background_command`.
 
 Keep focus unchanged unless the user asked to switch.
 
