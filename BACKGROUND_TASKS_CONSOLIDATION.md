@@ -112,14 +112,16 @@ On session shutdown or reload:
 
 1. completion delivery closes;
 2. every subagent abort controller is signalled;
-3. terminal process trees receive SIGTERM and bounded SIGKILL escalation; forced cleanup after a nominal parent exit is classified as failure;
+3. terminal process trees receive SIGTERM and bounded SIGKILL escalation; POSIX cleanup combines process-group signalling with a private inherited containment token and same-UID process scans so ordinary descendants that reparent or call `setsid()` are still reaped; forced cleanup after a nominal parent exit is classified as failure;
 4. child extension shutdown hooks run;
 5. child sessions dispose idempotently;
 6. Herdr background metadata clears.
 
 No task is promised to survive Pi exit or reload. Librarian workspaces remain inspectable during the session and are removed on session shutdown.
 
-POSIX commands run in their own process group, so descendant teardown is enforceable. Windows uses `taskkill /T` as a best-effort fallback; if a command parent exits before teardown while an orphan retains stdio, Windows cannot provide the same process-tree guarantee without a Job Object implementation.
+POSIX commands run in their own process group and receive a cryptographically random private containment token. Teardown scans for that token and, on macOS, also retains same-UID descendants discovered through PPID traversal before signalling. This covers normal long-lived subprocess trees that reparent or create a new session, including the tested Python `start_new_session` case and detached native descendants observed before shutdown.
+
+This is containment rather than a hostile-code or kernel sandbox. On macOS, a native platform process can evade dependency-free userspace tracking if it both hides its inherited environment from `ps` and fully reparents before the first ancestry snapshot; deliberate environment scrubbing has the same limitation. A live test confirmed this with an immediate detached `/bin/sleep`, which was manually reaped afterward. Eliminating that residual requires a native OS containment facility or VM boundary. Windows uses `taskkill /T` as a best-effort fallback; if a command parent exits before teardown while an orphan retains stdio, Windows cannot provide the same process-tree guarantee without a Job Object implementation.
 
 ## Source layout
 
@@ -156,7 +158,7 @@ Required checks:
 1. task registry unit tests;
 2. idle delivery, handoff-boundary, and duplicate-suppression tests;
 3. registration test: six task tools, no legacy tools;
-4. command start/result/cancel, Worker/command exclusion, and process-tree cleanup tests;
+4. command start/result/cancel, Worker/command exclusion, process-tree cleanup, and detached-session descendant tests;
 5. immediate subagent launch and asynchronous failure tests;
 6. exact Executor tool availability in every child profile;
 7. subagent provider failover integration tests;

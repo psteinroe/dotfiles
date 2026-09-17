@@ -14,8 +14,10 @@
  *
  * Load-bearing invariants:
  *
- * - **Own process group on POSIX** (`detached: true`) so `kill(-pid)` reaps the
- *   whole tree. A dev server that spawns children must not leak them.
+ * - **Process groups plus containment scans on POSIX** (`detached: true`):
+ *   signaling `kill(-pid)` is the fast path, while scans catch escaped or
+ *   reparented normal descendants. `kill(-pid)` alone does not reap the whole
+ *   tree.
  * - **Settles exactly once.** Status is decided by the first of error/exit/close
  *   to complete, then frozen; later events are ignored.
  * - **Bounded memory.** Each stream retains at most 512 KiB, evicting whole
@@ -26,6 +28,7 @@
  */
 
 import { type ChildProcess, spawn } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -48,6 +51,326 @@ const STOP_TIMEOUT_MS = 5_000;
 const ERROR_TEXT_MAX = 4_096;
 /** Title cap. */
 const TITLE_MAX = 80;
+/** Name of the inherited, per-entry process containment label. */
+const CONTAINMENT_ENV = "PI_BACKGROUND_TERMINAL_TOKEN";
+/** A process scan must not make shutdown unbounded. */
+const MARKER_SCAN_TIMEOUT_MS = 500;
+/** Do not allow an unexpectedly large ps listing to consume unbounded memory. */
+const MAX_PS_OUTPUT_BYTES = 16 * 1024 * 1024;
+
+interface ProcessIdentity {
+	pid: number;
+	/** A start-time signature from the same process snapshot as the PID. */
+	startSignature: string;
+}
+
+interface MarkerScan {
+	pids: Set<number>;
+	/** Identities for every PID in `pids`, from this scan. */
+	identities: Map<number, ProcessIdentity>;
+	/** Descendants found through PPID traversal, retained across rescans. */
+	discoveredPids: Set<number>;
+	/** Stable identities for retained macOS descendants. */
+	discoveredIdentities: Map<number, ProcessIdentity>;
+	/** The root identity observed in this snapshot, if it was eligible to seed traversal. */
+	rootIdentity?: ProcessIdentity;
+	complete: boolean;
+}
+
+const isSafePid = (pid: number): boolean =>
+	Number.isSafeInteger(pid) && pid > 1 && pid !== process.pid;
+
+const errorCode = (error: unknown): string | undefined =>
+	error && typeof error === "object" && "code" in error ? String((error as { code?: unknown }).code) : undefined;
+
+const markerInEnvironment = (environment: Buffer, token: string): boolean => {
+	const marker = Buffer.from(`${CONTAINMENT_ENV}=${token}`);
+	let start = 0;
+	while (start < environment.length) {
+		const end = environment.indexOf(0, start);
+		const valueEnd = end === -1 ? environment.length : end;
+		if (environment.subarray(start, valueEnd).equals(marker)) return true;
+		start = valueEnd + 1;
+	}
+	return false;
+};
+
+const emptyMarkerScan = (complete = false): MarkerScan => ({
+	pids: new Set(),
+	identities: new Map(),
+	discoveredPids: new Set(),
+	discoveredIdentities: new Map(),
+	complete,
+});
+
+interface LinuxProcess {
+	pid: number;
+	ppid: number;
+}
+
+async function scanLinuxProcesses(
+	token: string,
+	previouslyDiscoveredPids: Set<number>,
+): Promise<MarkerScan> {
+	const result = emptyMarkerScan();
+	const uid = process.getuid?.();
+	if (uid === undefined) return result;
+	result.complete = true;
+	const deadline = Date.now() + MARKER_SCAN_TIMEOUT_MS;
+	const controller = new AbortController();
+	const timeout = setTimeout(() => controller.abort(), MARKER_SCAN_TIMEOUT_MS);
+	const processes: LinuxProcess[] = [];
+	const markerPids = new Set<number>();
+	const childrenByPpid = new Map<number, LinuxProcess[]>();
+	const timedOut = (): boolean => Date.now() >= deadline;
+	try {
+		let names: string[];
+		try {
+			names = await fs.promises.readdir("/proc");
+		} catch {
+			result.complete = false;
+			return result;
+		}
+		for (const name of names) {
+			if (timedOut()) {
+				result.complete = false;
+				return result;
+			}
+			if (!/^\d+$/.test(name)) continue;
+			const pid = Number(name);
+			if (!isSafePid(pid)) continue;
+			let status: Buffer;
+			try {
+				status = await fs.promises.readFile(`/proc/${name}/status`, { signal: controller.signal });
+			} catch (error) {
+				// A process can disappear between readdir and readFile. Other status
+				// failures mean the ancestry snapshot is not complete.
+				if (errorCode(error) !== "ENOENT") result.complete = false;
+				if (errorCode(error) === "ABORT_ERR") return result;
+				continue;
+			}
+			const text = status.toString("utf8");
+			const uidMatch = /^Uid:\s+(\d+)/m.exec(text);
+			const ppidMatch = /^PPid:\s+(\d+)/m.exec(text);
+			if (!uidMatch || !ppidMatch) {
+				result.complete = false;
+				continue;
+			}
+			if (Number(uidMatch[1]) !== uid) continue;
+			const row = { pid, ppid: Number(ppidMatch[1]) };
+			processes.push(row);
+			const children = childrenByPpid.get(row.ppid) ?? [];
+			children.push(row);
+			childrenByPpid.set(row.ppid, children);
+			try {
+				const environment = await fs.promises.readFile(`/proc/${name}/environ`, { signal: controller.signal });
+				if (markerInEnvironment(environment, token)) markerPids.add(pid);
+			} catch (error) {
+				// Same-UID processes may deliberately make environ unreadable. That
+				// is expected for unrelated processes; PPID traversal below still
+				// catches an inaccessible descendant of a known marker.
+				const code = errorCode(error);
+				if (code === "ABORT_ERR") {
+					result.complete = false;
+					return result;
+				}
+				if (code !== "ENOENT" && code !== "EACCES" && code !== "EPERM") result.complete = false;
+			}
+		}
+		if (timedOut()) {
+			result.complete = false;
+			return result;
+		}
+
+		const pending = [...markerPids];
+		for (const pid of previouslyDiscoveredPids) {
+			if (processes.some((row) => row.pid === pid)) {
+				result.pids.add(pid);
+				result.discoveredPids.add(pid);
+				pending.push(pid);
+			}
+		}
+		for (const pid of markerPids) {
+			result.pids.add(pid);
+		}
+		for (let index = 0; index < pending.length; index++) {
+			if (timedOut()) {
+				result.complete = false;
+				return result;
+			}
+			for (const row of childrenByPpid.get(pending[index]!) ?? []) {
+				if (result.discoveredPids.has(row.pid)) continue;
+				result.discoveredPids.add(row.pid);
+				result.pids.add(row.pid);
+				pending.push(row.pid);
+			}
+		}
+		if (timedOut()) result.complete = false;
+		return result;
+	} finally {
+		clearTimeout(timeout);
+	}
+}
+
+interface MacProcess {
+	uid: number;
+	pid: number;
+	ppid: number;
+	command: string;
+	identity: ProcessIdentity;
+}
+
+const sameIdentity = (left: ProcessIdentity | undefined, right: ProcessIdentity | undefined): boolean =>
+	left !== undefined && right !== undefined && left.pid === right.pid && left.startSignature === right.startSignature;
+
+async function scanMacProcesses(
+	token: string,
+	rootPid: number | undefined,
+	rootIdentity: ProcessIdentity | undefined,
+	allowRootSeed: boolean,
+	previouslyDiscoveredPids: Set<number>,
+	previouslyDiscoveredIdentities: Map<number, ProcessIdentity>,
+): Promise<MarkerScan> {
+	const result = emptyMarkerScan();
+	const uid = process.getuid?.();
+	if (uid === undefined) return result;
+
+	let ps: ChildProcess;
+	try {
+		// lstart is the stable process identity. stderr is deliberately ignored:
+		// process listings must never enter task output.
+		// PPID catches native descendants that do not expose inherited env in -E.
+		// A native child that fully reparents before any snapshot cannot be inferred.
+		ps = spawn("/bin/ps", ["-A", "-E", "-ww", "-o", "uid=,pid=,ppid=,lstart=,command="], {
+			stdio: ["ignore", "pipe", "ignore"],
+		});
+	} catch {
+		return result;
+	}
+
+	return await new Promise((resolve) => {
+		const chunks: Buffer[] = [];
+		let bytes = 0;
+		let complete = true;
+		let stopping = false;
+		let settled = false;
+		let timeout: NodeJS.Timeout | undefined;
+		let postKillTimeout: NodeJS.Timeout | undefined;
+
+		const finish = (scan: MarkerScan): void => {
+			if (settled) return;
+			settled = true;
+			if (timeout) clearTimeout(timeout);
+			if (postKillTimeout) clearTimeout(postKillTimeout);
+			resolve(scan);
+		};
+		const stop = (): void => {
+			if (stopping) return;
+			stopping = true;
+			complete = false;
+			// Install the hard bound before killing in case a mocked or unusual
+			// ChildProcess emits close synchronously from kill().
+			postKillTimeout = setTimeout(() => finish(emptyMarkerScan()), POST_KILL_WAIT_MS);
+			try { ps.kill("SIGKILL"); } catch { /* already gone */ }
+			// Do not let a broken/reaped ps implementation hold shutdown forever.
+		};
+
+		ps.stdout?.on("data", (chunk: Buffer) => {
+			if (stopping) return;
+			bytes += chunk.byteLength;
+			if (bytes <= MAX_PS_OUTPUT_BYTES) chunks.push(chunk);
+			else stop();
+		});
+		ps.once("error", () => { complete = false; });
+		ps.once("close", (code) => {
+			if (code !== 0 || !complete || stopping) {
+				finish(emptyMarkerScan());
+				return;
+			}
+			result.complete = true;
+			const marker = `${CONTAINMENT_ENV}=${token}`;
+			const processes: MacProcess[] = [];
+			for (const line of Buffer.concat(chunks).toString("utf8").split("\n")) {
+				// macOS lstart is a fixed-width 24-byte field, including its spaces.
+				const match = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(.{24})\s+(.*)$/.exec(line);
+				if (!match) continue;
+				const row = {
+					uid: Number(match[1]),
+					pid: Number(match[2]),
+					ppid: Number(match[3]),
+					identity: { pid: Number(match[2]), startSignature: match[4]!.trim() },
+					command: match[5]!,
+				};
+				if (row.uid !== uid || !isSafePid(row.pid) || !row.identity.startSignature) continue;
+				processes.push(row);
+				if (row.command.split(/\s+/).includes(marker)) {
+					result.pids.add(row.pid);
+					result.identities.set(row.pid, row.identity);
+				}
+			}
+
+			const byPid = new Map(processes.map((row) => [row.pid, row]));
+			const currentRoot = rootPid === undefined ? undefined : byPid.get(rootPid)?.identity;
+			const observedRoot = rootIdentity
+				? (sameIdentity(currentRoot, rootIdentity) ? currentRoot : undefined)
+				: allowRootSeed ? currentRoot : undefined;
+			const childrenByPpid = new Map<number, MacProcess[]>();
+			for (const row of processes) {
+				const children = childrenByPpid.get(row.ppid) ?? [];
+				children.push(row);
+				childrenByPpid.set(row.ppid, children);
+			}
+			const seeds = new Set<number>();
+			if (observedRoot) seeds.add(observedRoot.pid);
+			for (const pid of previouslyDiscoveredPids) {
+				const row = byPid.get(pid);
+				if (!row || !sameIdentity(row.identity, previouslyDiscoveredIdentities.get(pid))) continue;
+				seeds.add(pid);
+				result.pids.add(pid);
+				result.identities.set(pid, row.identity);
+				result.discoveredPids.add(pid);
+				result.discoveredIdentities.set(pid, row.identity);
+			}
+			const pending = [...seeds];
+			for (let index = 0; index < pending.length; index++) {
+				const parentPid = pending[index]!;
+				for (const row of childrenByPpid.get(parentPid) ?? []) {
+					if (result.discoveredPids.has(row.pid)) continue;
+					result.discoveredPids.add(row.pid);
+					result.discoveredIdentities.set(row.pid, row.identity);
+					result.pids.add(row.pid);
+					result.identities.set(row.pid, row.identity);
+					pending.push(row.pid);
+				}
+			}
+			result.rootIdentity = observedRoot;
+			finish(result);
+		});
+		timeout = setTimeout(stop, MARKER_SCAN_TIMEOUT_MS);
+	});
+}
+
+async function scanMarkerProcesses(
+	token: string,
+	rootPid: number | undefined,
+	rootIdentity: ProcessIdentity | undefined,
+	allowRootSeed: boolean,
+	previouslyDiscoveredPids: Set<number>,
+	previouslyDiscoveredIdentities: Map<number, ProcessIdentity>,
+): Promise<MarkerScan> {
+	if (process.platform === "darwin") {
+		return await scanMacProcesses(
+			token,
+			rootPid,
+			rootIdentity,
+			allowRootSeed,
+			previouslyDiscoveredPids,
+			previouslyDiscoveredIdentities,
+		);
+	}
+	if (process.platform !== "linux") return emptyMarkerScan();
+	return await scanLinuxProcesses(token, previouslyDiscoveredPids);
+}
 
 export type TerminalStatus = "running" | "done" | "failed" | "killed";
 
@@ -152,6 +475,16 @@ interface Entry {
 	forcedCleanup: boolean;
 	/** Someone already read the terminal result, so suppress auto-delivery. */
 	consumed: boolean;
+	/** Private inherited label used to find descendants outside our process group. */
+	token: string;
+	/** Same-UID descendants found on macOS, retained across rescans/reparenting. */
+	discoveredPids: Set<number>;
+	/** Start signatures for the retained macOS descendants. */
+	discoveredIdentities: Map<number, ProcessIdentity>;
+	/** Start signature for the shell root, captured while it was observed alive. */
+	rootIdentity?: ProcessIdentity;
+	/** Containment cleanup and settlement are shared by exit and cancellation. */
+	cleanupPromise?: Promise<void>;
 	exitTimer?: NodeJS.Timeout;
 	settleWaiters: Array<() => void>;
 }
@@ -239,6 +572,9 @@ export class TerminalManager {
 			killRequested: false,
 			forcedCleanup: false,
 			consumed: false,
+			token: randomBytes(32).toString("hex"),
+			discoveredPids: new Set(),
+			discoveredIdentities: new Map(),
 			settleWaiters: [],
 		};
 
@@ -250,10 +586,11 @@ export class TerminalManager {
 			const args = isWindows ? ["/d", "/s", "/c", command] : ["-c", command];
 			const child = spawn(shell, args, {
 				cwd: options.cwd,
-				env: process.env,
+				env: { ...process.env, [CONTAINMENT_ENV]: entry.token },
 				// No stdin: anything prompting sees EOF instead of hanging.
 				stdio: ["ignore", "pipe", "pipe"],
-				// Own process group on POSIX so the whole tree can be killed.
+				// Own process group on POSIX for fast-path termination; containment
+				// scans also catch escaped or reparented normal descendants.
 				detached: !isWindows,
 			});
 			entry.child = child;
@@ -268,7 +605,7 @@ export class TerminalManager {
 				entry.errored = true;
 				entry.exited = true;
 				entry.snapshot.errorText = bounded(error.message);
-				this.settle(entry);
+				this.requestSettle(entry);
 			});
 			child.on("exit", (code, signal) => {
 				entry.exited = true;
@@ -284,8 +621,7 @@ export class TerminalManager {
 					if (entry.snapshot.status === "running" && !entry.closed) {
 						entry.forcedCleanup = true;
 						entry.snapshot.errorText ??= "stdio did not close after exit; output may be incomplete";
-						this.killTree(entry, "SIGKILL");
-						this.settle(entry);
+						this.requestSettle(entry);
 					}
 				}, SETTLE_GRACE_MS);
 				entry.exitTimer.unref?.();
@@ -296,7 +632,7 @@ export class TerminalManager {
 					entry.snapshot.exitCode ??= code;
 					entry.snapshot.signal ??= signal;
 				}
-				this.settle(entry);
+				this.requestSettle(entry);
 			});
 		} catch (error) {
 			this.reserved--;
@@ -309,9 +645,8 @@ export class TerminalManager {
 		return this.snapshot(entry);
 	}
 
-	/** Decide the terminal state exactly once. A cancellation requested while the
-	 * public task still reported running wins over a later zero exit. */
-	private settle(entry: Entry): void {
+	/** Decide the terminal state exactly once, after containment is verified. */
+	private settleNow(entry: Entry): void {
 		if (entry.snapshot.status !== "running") return;
 		if (entry.exitTimer) {
 			clearTimeout(entry.exitTimer);
@@ -330,69 +665,148 @@ export class TerminalManager {
 		if (!this.disposed) this.onSettleHook?.(this.snapshot(entry), entry.consumed);
 	}
 
-	/** Kill the whole process group, falling back to the direct child. */
-	private killTree(entry: Entry, signal: NodeJS.Signals): void {
+	/** Scan, terminate, and only then permit the entry to settle. */
+	private requestSettle(entry: Entry): Promise<void> {
+		if (entry.snapshot.status !== "running") return Promise.resolve();
+		// A normally closed Windows process is already gone. In particular, do
+		// not taskkill its PID: it may have been reused by an unrelated process.
+		if (process.platform === "win32" && !entry.killRequested && !entry.forcedCleanup) {
+			this.settleNow(entry);
+			return Promise.resolve();
+		}
+		if (entry.cleanupPromise) return entry.cleanupPromise;
+		entry.cleanupPromise = this.cleanupContainment(entry)
+			.then((failure) => {
+				if (failure) {
+					entry.forcedCleanup = true;
+					entry.snapshot.errorText ??= failure;
+				}
+			})
+			.catch((error: unknown) => {
+				entry.forcedCleanup = true;
+				entry.snapshot.errorText ??= `process containment scan failed: ${bounded(String(error))}`;
+			})
+			.finally(() => this.settleNow(entry));
+		return entry.cleanupPromise;
+	}
+
+	private async cleanupContainment(entry: Entry): Promise<string | undefined> {
+		if (process.platform === "win32") {
+			this.killTree(entry, "SIGTERM");
+			return undefined;
+		}
+		const deadline = Date.now() + STOP_TIMEOUT_MS - POST_KILL_WAIT_MS;
+		const scanProcesses = async (): Promise<MarkerScan> => {
+			const scan = await scanMarkerProcesses(
+				entry.token,
+				entry.snapshot.pid,
+				entry.rootIdentity,
+				!entry.exited && entry.rootIdentity === undefined,
+				entry.discoveredPids,
+				entry.discoveredIdentities,
+			);
+			if (entry.rootIdentity === undefined && scan.rootIdentity !== undefined) {
+				entry.rootIdentity = scan.rootIdentity;
+			}
+			for (const pid of scan.discoveredPids) entry.discoveredPids.add(pid);
+			for (const [pid, identity] of scan.discoveredIdentities) {
+				// Never replace a retained identity: a changed signature means this
+				// PID was reused and must not become a new cleanup target.
+				if (!entry.discoveredIdentities.has(pid)) entry.discoveredIdentities.set(pid, identity);
+			}
+			return scan;
+		};
+		let scan = await scanProcesses();
+		this.killTree(entry, "SIGTERM", scan.pids, scan.identities, scan.rootIdentity);
+
+		// This is the rescan before KILL. Polling lets a normally exiting shell
+		// settle promptly while still giving TERM-trapping descendants a chance.
+		const termDeadline = Math.min(deadline, Date.now() + FORCE_KILL_AFTER_MS);
+		while ((!entry.exited || scan.pids.size > 0 || !scan.complete) && Date.now() < termDeadline) {
+			await new Promise((resolve) => setTimeout(resolve, 100));
+			scan = await scanProcesses();
+			if (entry.exited && scan.complete && scan.pids.size === 0) break;
+		}
+		if (entry.exited && scan.complete && scan.pids.size === 0) {
+			scan = await scanProcesses();
+			if (scan.complete && scan.pids.size === 0) return undefined;
+		}
+
+		this.killTree(entry, "SIGKILL", scan.pids, scan.identities, scan.rootIdentity);
+		// This is the rescan after KILL. Repeat boundedly for process-exit races.
+		while (Date.now() < deadline) {
+			scan = await scanProcesses();
+			if (scan.complete && scan.pids.size === 0) return undefined;
+			this.killTree(entry, "SIGKILL", scan.pids, scan.identities, scan.rootIdentity);
+			await new Promise((resolve) => setTimeout(resolve, 100));
+		}
+		scan = await scanProcesses();
+		return scan.complete && scan.pids.size === 0
+			? undefined
+			: "process containment remained non-empty or could not be completely scanned before shutdown deadline";
+	}
+
+	/** Signal only the process identity validated by the immediately preceding scan. */
+	private killTree(
+		entry: Entry,
+		signal: NodeJS.Signals,
+		markerPids = new Set<number>(),
+		markerIdentities = new Map<number, ProcessIdentity>(),
+		rootIdentity?: ProcessIdentity,
+	): void {
 		const child = entry.child;
 		const pid = child?.pid;
-		if (!child || !pid) return;
-		try {
-			if (process.platform === "win32") {
+		if (process.platform === "win32") {
+			if (!child || !pid) return;
+			try {
 				const args = ["/pid", String(pid), "/T"];
 				if (signal === "SIGKILL") args.push("/F");
 				const killer = spawn("taskkill", args, { stdio: "ignore", windowsHide: true });
-				killer.on("error", () => {
-					try {
-						child.kill(signal);
-					} catch {
-						/* already gone */
-					}
-				});
+				killer.on("error", () => { try { child.kill(signal); } catch { /* already gone */ } });
 				killer.unref();
-				return;
+			} catch { try { child.kill(signal); } catch { /* already gone */ } }
+			return;
+		}
+		if (!pid || !isSafePid(pid)) return;
+		// While Node still owns a live ChildProcess, its PID cannot have been reused;
+		// signal the process group even when a containment scan was incomplete. Once
+		// exit is observed, require the snapshot identity instead.
+		const childStillOwnsPid = !entry.exited && child?.exitCode === null && child?.signalCode === null;
+		const canSignalGroup = childStillOwnsPid || (
+			!entry.exited && process.platform !== "darwin"
+		) || (
+			!entry.exited && sameIdentity(entry.rootIdentity, rootIdentity)
+		);
+		if (canSignalGroup) {
+			try { process.kill(-pid, signal); } catch {
+				if (process.platform !== "darwin") {
+					try { child?.kill(signal); } catch { /* already gone */ }
+				}
 			}
-			// Negative pid targets the group created by detached: true.
-			process.kill(-pid, signal);
-		} catch {
-			try {
-				child.kill(signal);
-			} catch {
-				/* already gone */
+		}
+		for (const markerPid of markerPids) {
+			if (!isSafePid(markerPid)) continue;
+			if (process.platform === "darwin") {
+				const current = markerIdentities.get(markerPid);
+				const retained = entry.discoveredIdentities.get(markerPid);
+				// `current` came from this scan; retained identities additionally
+				// prevent a reused PID from being signalled after reparenting.
+				if (!current || (retained !== undefined && !sameIdentity(retained, current))) continue;
 			}
+			try { process.kill(markerPid, signal); } catch { /* already gone */ }
 		}
 	}
 
-	/** SIGTERM, then SIGKILL if it does not close in time. */
+	/** SIGTERM, then SIGKILL if containment does not become empty in time. */
 	async kill(id: string): Promise<TerminalSnapshot> {
 		const entry = this.entries.get(id);
 		if (!entry) throw new Error(`No background command backend ${id}. Use task_list to see public task ids.`);
 		if (entry.snapshot.status !== "running") return this.snapshot(entry);
 		entry.killRequested = true;
 		entry.consumed = true;
-
 		const settled = new Promise<void>((resolve) => entry.settleWaiters.push(resolve));
-		this.killTree(entry, "SIGTERM");
-		const escalated = await Promise.race([
-			settled.then(() => true),
-			new Promise<false>((resolve) => {
-				const timer = setTimeout(() => resolve(false), FORCE_KILL_AFTER_MS);
-				timer.unref?.();
-			}),
-		]);
-		if (!escalated) {
-			this.killTree(entry, "SIGKILL");
-			await Promise.race([
-				settled,
-				new Promise<void>((resolve) => {
-					const timer = setTimeout(resolve, POST_KILL_WAIT_MS);
-					timer.unref?.();
-				}),
-			]);
-			// Nothing closed the pipes; record what we know and stop waiting.
-			if (entry.snapshot.status === "running") {
-				entry.snapshot.errorText ??= "process did not close after SIGKILL";
-				this.settle(entry);
-			}
-		}
+		await this.requestSettle(entry);
+		await settled;
 		return this.snapshot(entry);
 	}
 
@@ -431,7 +845,9 @@ export class TerminalManager {
 				entry.killRequested = true;
 				entry.snapshot.errorText ??= "process tree remained alive at shutdown deadline";
 				this.killTree(entry, "SIGKILL");
-				this.settle(entry);
+				// This is the bounded-failure escape hatch: cleanup reached the
+				// shutdown deadline, so do not hold Pi open forever.
+				this.settleNow(entry);
 			}
 		}
 		return running.length;
