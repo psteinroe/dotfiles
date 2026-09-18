@@ -1,21 +1,5 @@
 {
   "nodes": {
-    "agent-browser-skills": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1789433423,
-        "narHash": "sha256-E7h8RWATeAbeysKwJBUHlksKAWhN0Z5vFIuDShwvx6I=",
-        "owner": "vercel-labs",
-        "repo": "agent-browser",
-        "rev": "8bbddb840c74d3c41b01d0b6804b059ba40de56e",
-        "type": "github"
-      },
-      "original": {
-        "owner": "vercel-labs",
-        "repo": "agent-browser",
-        "type": "github"
-      }
-    },
     "brew-src": {
       "flake": false,
       "locked": {
@@ -236,7 +220,6 @@
     },
     "root": {
       "inputs": {
-        "agent-browser-skills": "agent-browser-skills",
         "getsentry-skills": "getsentry-skills",
         "gh-stack-skills": "gh-stack-skills",
         "home-manager": "home-manager",

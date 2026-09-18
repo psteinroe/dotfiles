@@ -29,11 +29,6 @@
     };
 
     # Remote skill sources
-    agent-browser-skills = {
-      url = "github:vercel-labs/agent-browser";
-      flake = false;
-    };
-
     getsentry-skills = {
       url = "github:getsentry/skills";
       flake = false;

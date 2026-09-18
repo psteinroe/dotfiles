@@ -4,11 +4,6 @@
   # `nix flake lock --update-input <input>` or `nix flake update`.
   shared = [
     {
-      name = "agent-browser";
-      path = "${inputs.agent-browser-skills}/skills/agent-browser";
-      repo = "vercel-labs/agent-browser";
-    }
-    {
       name = "code-simplifier";
       path = "${inputs.getsentry-skills}/skills/code-simplifier";
       repo = "getsentry/skills";
