@@ -14,7 +14,7 @@ export interface TaskSnapshot {
   status: TaskStatus;
   createdAt: number;
   settledAt?: number;
-  agent?: "finder" | "librarian" | "oracle" | "worker";
+  agent?: "mapper" | "librarian" | "oracle" | "worker";
   command?: string;
   writeScope?: string[];
   resultText?: string;

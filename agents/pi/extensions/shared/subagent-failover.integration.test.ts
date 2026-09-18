@@ -33,7 +33,7 @@ const PRIMARY = "openai-codex";
 const ALIAS = "openai-codex-account-1";
 const API = "openai-responses" as Api;
 
-type Role = "finder" | "librarian" | "worker" | "oracle";
+type Role = "mapper" | "librarian" | "worker" | "oracle";
 type FixtureMode = "failover" | "all-fail" | "aborted";
 type Call = {
   provider: string;
@@ -46,7 +46,7 @@ type Call = {
 
 const EXECUTOR_TOOLS = ["executor_execute", "executor_resume", "executor_skills"];
 const EXPECTED: Record<Role, { model: string; thinking: "medium" | "high"; tools: string[] }> = {
-  finder: { model: MODEL_ID, thinking: "medium", tools: ["bash", ...EXECUTOR_TOOLS, "read"] },
+  mapper: { model: MODEL_ID, thinking: "medium", tools: ["find", "grep", "ls", "read"] },
   librarian: { model: MODEL_ID, thinking: "high", tools: ["bash", ...EXECUTOR_TOOLS, "read"] },
   worker: { model: MODEL_ID, thinking: "high", tools: ["bash", "edit", ...EXECUTOR_TOOLS, "find", "grep", "ls", "read", "write"] },
   oracle: { model: ORACLE_MODEL_ID, thinking: "high", tools: [...EXECUTOR_TOOLS, "find", "git_diff", "grep", "ls", "read"] },
@@ -103,8 +103,8 @@ function fixtureStream(
 ): (fixtureModel: Model<Api>, context: Context, options?: StreamOptions & { reasoning?: string }) => AssistantMessageEventStream {
   return (fixtureModel, context, options) => {
     const system = context.systemPrompt ?? "";
-    const role: Role = system.includes("Finder")
-      ? "finder"
+    const role: Role = system.includes("Mapper")
+      ? "mapper"
       : system.includes("Librarian")
         ? "librarian"
         : system.includes("oracle") || system.includes("Oracle")
@@ -284,7 +284,7 @@ export default function executorFixture(pi) {
   }
 }
 `);
-  const [{ default: finder }, { default: librarian }, { default: delegates }] = await Promise.all([
+  const [{ default: mapper }, { default: librarian }, { default: delegates }] = await Promise.all([
     import("../finder/adapter.ts"),
     import("../librarian/adapter.ts"),
     import("../delegates/adapter.ts"),
@@ -294,7 +294,7 @@ export default function executorFixture(pi) {
     agentDir,
     settingsManager: SettingsManager.create(workspace, agentDir, { projectTrusted: false }),
     additionalExtensionPaths: [executorExtensionPath],
-    extensionFactories: [unrelated, finder, librarian, delegates],
+    extensionFactories: [unrelated, mapper, librarian, delegates],
     noSkills: true,
     noPromptTemplates: true,
     noThemes: true,
@@ -311,7 +311,7 @@ export default function executorFixture(pi) {
     sessionManager: SessionManager.inMemory(workspace),
     model: model(PRIMARY, MODEL_ID),
     thinkingLevel: "low",
-    tools: ["finder", "librarian", "worker", "oracle", ...EXECUTOR_TOOLS],
+    tools: ["mapper", "librarian", "worker", "oracle", ...EXECUTOR_TOOLS],
   })).session;
   await parentSession.bindExtensions({ mode: "print" });
   assert.ok(parentContext, "parent session_start did not capture its context");
@@ -324,7 +324,7 @@ export default function executorFixture(pi) {
     settings,
     calls,
     ctx: parentContext!,
-    tools: new Map(["finder", "librarian", "worker", "oracle"].map((name) => [name, parent.extensionRunner.getToolDefinition(name)!])),
+    tools: new Map(["mapper", "librarian", "worker", "oracle"].map((name) => [name, parent.extensionRunner.getToolDefinition(name)!])),
     dispose: async () => {
       try {
         await shutdownAndDisposeChildSession(parent);
@@ -359,7 +359,7 @@ async function cleanupLibrarianWorkspace(result: any) {
 }
 
 const ADAPTERS = [
-  ["finder", { query: "fixture finder task" }],
+  ["mapper", { query: "fixture mapper task" }],
   ["librarian", { query: "fixture librarian task", repos: [], owners: [] }],
   ["worker", { task: "Write the fixture output and return a summary." }],
   ["oracle", { task: "Give a fixture architecture recommendation." }],
@@ -416,18 +416,18 @@ test("runs all four real adapters through primary-to-alias failover", async () =
   }
 });
 
-test("bridges legacy OAuth provider registrations into a failing-over finder child", async () => {
+test("bridges legacy OAuth provider registrations into a failing-over Mapper child", async () => {
   const h = await harness("failover", "legacy");
   try {
     const updates: any[] = [];
-    const result: any = await runTool(h, "finder", { query: "fixture legacy provider task" }, updates);
+    const result: any = await runTool(h, "mapper", { query: "fixture legacy provider task" }, updates);
     assert.notEqual(result.isError, true, JSON.stringify(result));
-    assert.match(result.content[0].text, /FINDER_ALIAS_OK/);
+    assert.match(result.content[0].text, /MAPPER_ALIAS_OK/);
     assert.ok(updates.some((update) => update.details?.model === `${PRIMARY}/${MODEL_ID}`));
     assert.ok(updates.some((update) => update.details?.model === `${ALIAS}/${MODEL_ID}`));
     assert.equal(result.details.model, `${ALIAS}/${MODEL_ID}`);
     assert.deepEqual(h.calls.map((call) => call.provider), [PRIMARY, ALIAS]);
-    assert.ok(h.calls.every((call) => call.role === "finder"));
+    assert.ok(h.calls.every((call) => call.role === "mapper"));
   } finally {
     await h.dispose();
   }

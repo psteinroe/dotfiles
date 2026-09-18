@@ -1,6 +1,6 @@
 ---
 name: background-tasks
-description: Run and manage session-scoped background subagents and long-lived commands. Use for delegated Finder/Librarian/Oracle/Worker work, dev servers, watchers, streaming builds, log tails, long test suites, checking task progress, collecting results, or cancelling work.
+description: Run and manage session-scoped background subagents and long-lived commands. Use for delegated Mapper/Librarian/Oracle/Worker work, dev servers, watchers, streaming builds, log tails, long test suites, checking task progress, collecting results, or cancelling work.
 ---
 
 # Background Tasks
@@ -9,14 +9,14 @@ Use one task lifecycle for delegated agents and long-running commands. Every acc
 
 ## Launch
 
-Use `start_subagent` for specialized agent work:
+Use `start_subagent` for specialized agent work. Route exactly: **Mapper=where/what, Oracle=why/correctness/what should change, Worker=execution/implementation, Librarian=GitHub research.**
 
-- `finder` — read-only workspace reconnaissance
+- `mapper` — strictly read-only WHERE/WHAT workspace mapping: locate files, symbols, config, tests, dependencies, and explicit call/data-flow anchors with file:line evidence. It must not diagnose, judge correctness, compare designs, plan, or recommend fixes.
 - `librarian` — GitHub code research
-- `oracle` — read-only architecture, debugging, planning, or review
+- `oracle` — the default read-only analyst for WHY, correctness, root cause, architecture, planning, tradeoffs, review, and what should change
 - `worker` — bounded implementation and validation
 
-Express Finder, Librarian, and Oracle ownership boundaries in their task text; `write_scope` is Worker-only. Worker launches require a narrow `write_scope`. Treat it as a coordination lease until the task settles or is cancelled. Structured Worker writes are gated to the scope, and the coordinator stays read-only while the Worker runs. Do not overlap Workers with unrestricted background commands; each launcher rejects the other while active. Worker shell effects remain policy-constrained rather than sandboxed.
+Express Mapper, Librarian, and Oracle ownership boundaries in their task text; `write_scope` is Worker-only. Worker launches require a narrow `write_scope`. Treat it as a coordination lease until the task settles or is cancelled. Structured Worker writes are gated to the scope, and the coordinator stays read-only while the Worker runs. Do not overlap Workers with unrestricted background commands; each launcher rejects the other while active. Worker shell effects remain policy-constrained rather than sandboxed.
 
 Use `start_background_command` for dev servers, watchers, log tails, streaming builds, and long test suites. Use `bash` for commands that normally finish in seconds. Commands receive no stdin.
 
@@ -37,4 +37,4 @@ Completion is delivered automatically when the coordinator is idle. End the turn
 
 Tasks are session-scoped. Session shutdown or reload aborts subagents and terminates command process trees. A task cannot be promised to survive Pi exit.
 
-Finder, Librarian, Oracle, and Worker receive the configured Executor MCP direct tools. Oracle's read-only behavior remains a policy constraint because Executor itself can expose mutating integrations.
+Librarian, Oracle, and Worker receive the configured Executor MCP direct tools. Mapper is deliberately limited to the local read/search tools (`read`, `grep`, `find`, `ls`) and receives no Executor MCP tools. Oracle's read-only behavior remains a policy constraint because Executor itself can expose mutating integrations.

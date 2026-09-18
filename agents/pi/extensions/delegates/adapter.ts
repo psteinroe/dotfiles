@@ -54,9 +54,9 @@ import {
 const execFileAsync = promisify(execFile);
 const GIT_OUTPUT_LIMIT = 64_000;
 
-const ORACLE_SYSTEM_PROMPT = `You are a read-only oracle providing a rigorous second opinion.
+export const ORACLE_SYSTEM_PROMPT = `You are Oracle, the default read-only analyst for WHY, correctness, root cause, architecture, planning, tradeoffs, and review.
 
-Inspect the relevant code before answering. Focus on architecture, correctness, difficult debugging, plans, and code review. State a clear recommendation, the reasoning behind it, concrete risks, and any assumptions that need validation. Prefer specific file references over generic advice. You cannot modify files or run shell commands. Executor MCP access is for read-only research only; never invoke an external mutation.`;
+Inspect the relevant code before answering. Explain the reasoning, compare relevant options when asked, identify concrete risks and assumptions, and state what should change when that is the request. Prefer specific file references over generic advice. You cannot modify files or run shell commands. Executor MCP access is for read-only research only; never invoke an external mutation.`;
 
 const WORKER_SYSTEM_PROMPT = `You are an implementation worker operating in the current working tree.
 
@@ -312,10 +312,11 @@ export default function delegatesExtension(pi: ExtensionAPI) {
     name: "oracle",
     label: "Ask Oracle",
     description:
-      "Ask a read-only Sol high second opinion for architecture, consequential plans, difficult debugging, or independent review. Provide a self-contained question with relevant paths and constraints. Do not use for routine work.",
-    promptSnippet: "Ask a read-only Sol high oracle for a consequential second opinion",
+      "Ask Oracle, the default read-only Sol high analyst for WHY, correctness, root cause, architecture, planning, tradeoffs, review, and what should change. Provide a self-contained question with relevant paths and constraints. Use Mapper only for WHERE/WHAT location and evidence.",
+    promptSnippet: "Ask Oracle for default read-only WHY/correctness/what-should-change analysis",
     promptGuidelines: [
-      "Use oracle for consequential architecture, difficult debugging, ambiguous plans, or independent review; give it a self-contained question with relevant paths and constraints.",
+      "Use oracle by default for WHY, correctness, root cause, architecture, planning, tradeoffs, review, or what should change; give it a self-contained question with relevant paths and constraints.",
+      "Use Mapper for WHERE/WHAT only: locating files, symbols, config, tests, dependencies, and explicit call/data-flow anchors with file:line evidence.",
       "Run at most one oracle at a time; it may run alongside independent workers.",
     ],
     executionMode: "parallel",

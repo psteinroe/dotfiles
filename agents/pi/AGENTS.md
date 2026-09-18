@@ -6,3 +6,7 @@
 - Keep delegated tasks bounded and non-overlapping. Give Workers narrow `write_scope` ownership, then review their changes and evidence before committing or pushing.
 - Cancel delegated work only when the user requests it, its scope becomes invalid or unsafe, it is stuck, or requirements change. Coordinator duplication is not a cancellation reason.
 - Launch long-running commands with `start_background_command`. Continue independent work or end the turn; completion arrives automatically, so inspect status only when it unblocks immediate work.
+
+## Subagent routing
+
+Use the exact role boundary: **Mapper=where/what, Oracle=why/correctness/what should change, Worker=execution/implementation, Librarian=GitHub research.** Mapper only locates files, symbols, config, tests, dependencies, and explicit call/data-flow anchors with file:line evidence; route diagnosis, correctness, root cause, architecture, planning, tradeoffs, review, and recommendations to Oracle.

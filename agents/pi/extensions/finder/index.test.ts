@@ -1,20 +1,25 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-test("preserves Finder's public schema and reconnaissance prompt", async () => {
+test("exposes Mapper's WHERE/WHAT schema and strict read-only mapping prompt", async () => {
   const { FinderParams } = await import("./finder-core.ts");
   const { buildFinderSystemPrompt, buildFinderUserPrompt } = await import(
     "./finder-prompts.md.ts"
   );
   const description = (FinderParams as any).properties.query.description as string;
+  const systemPrompt = buildFinderSystemPrompt();
   assert.equal((FinderParams as any).type, "object");
   assert.equal((FinderParams as any).required.includes("query"), true);
-  assert.match(description, /end goal for reconnaissance/);
-  assert.match(description, /do not request grep or find/);
-  assert.match(buildFinderSystemPrompt(), /You are Finder, an evidence-first workspace scout\./);
-  assert.match(buildFinderSystemPrompt(), /provided local tools \(bash\/read\) and Executor MCP tools/);
+  assert.match(description, /WHERE\/WHAT/);
+  assert.match(description, /Oracle analysis is required/);
+  assert.match(systemPrompt, /You are Mapper/);
+  assert.match(systemPrompt, /strictly WHERE\/WHAT/);
+  assert.match(systemPrompt, /read, grep, find, and ls/);
+  assert.doesNotMatch(systemPrompt, /bash|Executor MCP/);
+  assert.match(systemPrompt, /must not diagnose root cause/);
+  assert.match(systemPrompt, /Oracle analysis is required/);
   assert.equal(
     buildFinderUserPrompt("  map the auth entrypoint  "),
-    "Task: perform one-shot reconnaissance in the workspace and return an evidence-backed map that answers the query and minimizes follow-up scouting.\nFollow the system instructions for tools, citations, and output format.\nRespond with findings directly; skip rephrasing the task.\n\nQuery:\nmap the auth entrypoint",
+    "Task: map the requested WHERE/WHAT facts in the workspace and return an evidence-backed file-and-line map.\nFollow the system instructions: use only read/search tools, do not analyze WHY or correctness, and state that Oracle analysis is required for requests outside Mapper's scope.\nRespond with findings directly; skip rephrasing the task.\n\nQuery:\nmap the auth entrypoint",
   );
 });

@@ -22,13 +22,8 @@ import {
   type Model,
 } from "../shared/subagent-models.ts";
 import { promptSubagentWithFailover } from "../shared/subagent-failover.ts";
-import {
-  assertExecutorMcpToolsRegistered,
-  EXECUTOR_MCP_TOOLS,
-  isolateExecutorMcpExtension,
-  isolatedSubagentResourceDir,
-  resolveExecutorMcpExtensionPath,
-} from "../shared/subagent-mcp.ts";
+import { isolatedSubagentResourceDir } from "../shared/subagent-mcp.ts";
+import { createTurnBudgetExtension } from "../shared/turn-budget.ts";
 import {
   createSubagentRenderers,
   shorten,
@@ -41,10 +36,11 @@ import { buildFinderSystemPrompt, buildFinderUserPrompt } from "./finder-prompts
 const FINDER_PROVIDER = "openai-codex";
 const FINDER_MODEL_ID = "gpt-5.6-luna";
 const FINDER_THINKING = "medium" as const;
+const FINDER_MAX_TURNS = 8;
 const FINDER_MODEL = `${FINDER_PROVIDER}/${FINDER_MODEL_ID}`;
 
 export interface FinderDetails extends SubagentDetails<
-  "finder",
+  "mapper",
   typeof FINDER_THINKING,
   { query: string }
 > {}
@@ -60,7 +56,7 @@ function detailsFor(
 ): FinderDetails {
   return {
     status: run.status,
-    agent: "finder",
+    agent: "mapper",
     taskLabel: "query",
     workspace: cwd,
     model,
@@ -90,7 +86,6 @@ function resultFor(
 
 async function createFinderSession(
   ctx: ExtensionContext,
-  executorMcpExtensionPath: string,
 ): Promise<{
   session: AgentSession;
   models: Model[];
@@ -102,11 +97,17 @@ async function createFinderSession(
     cwd: ctx.cwd,
     agentDir: isolatedSubagentResourceDir(),
     settingsManager,
-    // Load the explicit MCP path plus inline child policies, then discard every
-    // other discovered extension before child binding.
-    additionalExtensionPaths: [executorMcpExtensionPath],
-    extensionFactories: [subdirContextExtension, plan.extensionFactory],
-    extensionsOverride: isolateExecutorMcpExtension(executorMcpExtensionPath),
+    extensionFactories: [
+      subdirContextExtension,
+      createTurnBudgetExtension(FINDER_MAX_TURNS),
+      plan.extensionFactory,
+    ],
+    // Keep child loading limited to the inline Mapper policy extensions; do not
+    // inherit arbitrary workspace or user extensions that could add tools.
+    extensionsOverride: (base) => ({
+      ...base,
+      extensions: base.extensions.filter((extension) => extension.path.startsWith("<inline:")),
+    }),
     noSkills: true,
     noPromptTemplates: true,
     noThemes: true,
@@ -123,15 +124,9 @@ async function createFinderSession(
     sessionManager: SessionManager.inMemory(ctx.cwd),
     model: plan.models[0],
     thinkingLevel: FINDER_THINKING,
-    tools: ["read", "bash", ...EXECUTOR_MCP_TOOLS],
+    tools: ["read", "grep", "find", "ls"],
   });
   const boundSession = await bindAndPrepareChildSession(session);
-  try {
-    assertExecutorMcpToolsRegistered(boundSession);
-  } catch (error) {
-    await shutdownAndDisposeChildSession(boundSession);
-    throw error;
-  }
   return {
     session: boundSession,
     models: plan.models,
@@ -141,8 +136,8 @@ async function createFinderSession(
 export default function finderExtension(pi: ExtensionAPI) {
   const activeSessions = createActiveSubagentSessionRegistry();
   const sharedRenderers = createSubagentRenderers<FinderDetails>({
-    agentLabel: "finder",
-    activity: "Searching workspace…",
+    agentLabel: "mapper",
+    activity: "Mapping workspace…",
   });
 
   pi.on("session_shutdown", async () => {
@@ -150,14 +145,14 @@ export default function finderExtension(pi: ExtensionAPI) {
   });
 
   pi.registerTool({
-    name: "finder",
-    label: "Finder",
+    name: "mapper",
+    label: "Mapper",
     description:
-      "Read-only workspace scout for coding and personal-assistant tasks. Prefer one broad Finder call per task: give it the end goal, likely scope, and hints, and let it do the reconnaissance you would otherwise do manually with ls/rg/fd/read. Finder returns a compact, evidence-backed map: likely entrypoints, core files, nearby config/tests/docs/examples, and key citations.",
+      "Read-only workspace mapper for WHERE/WHAT questions. Locate files, symbols, config, tests, dependencies, and explicit call/data-flow anchors with file:line evidence. Mapper must not diagnose root cause, judge correctness, compare designs, plan, or recommend fixes; route WHY, correctness, root cause, architecture, planning, tradeoffs, review, or what-should-change requests to Oracle.",
     parameters: FinderParams,
     executionMode: "parallel",
     ...sharedRenderers,
-    // The shared renderer uses `task`; Finder's public schema uses `query`.
+    // The shared renderer uses `task`; Mapper's public schema uses `query`.
     renderCall(args: unknown, theme: any) {
       const query = typeof (args as { query?: unknown })?.query === "string"
         ? (args as { query: string }).query.trim()
@@ -181,7 +176,7 @@ export default function finderExtension(pi: ExtensionAPI) {
         status: "running",
         task: query,
         turns: 0,
-        maxTurns: undefined,
+        maxTurns: FINDER_MAX_TURNS,
         toolCalls: [],
         startedAt: Date.now(),
       };
@@ -209,8 +204,7 @@ export default function finderExtension(pi: ExtensionAPI) {
       let removeActiveSession: (() => void) | undefined;
 
       try {
-        const executorMcpExtensionPath = resolveExecutorMcpExtensionPath(pi);
-        const created = await createFinderSession(ctx, executorMcpExtensionPath);
+        const created = await createFinderSession(ctx);
         const child = created.session;
         currentModel = `${created.models[0].provider}/${created.models[0].id}`;
         session = child;
@@ -218,8 +212,7 @@ export default function finderExtension(pi: ExtensionAPI) {
 
         const tracker = trackSubagentEvents(child, {
           run,
-          // Intentionally unlimited: Finder is a one-shot scout, not a worker
-          // with a soft turn budget.
+          maxTurns: FINDER_MAX_TURNS,
           updateIntervalMs: 120,
           onUpdate: emitUpdate,
         });
@@ -227,7 +220,7 @@ export default function finderExtension(pi: ExtensionAPI) {
         removeAbortListener = bindAbortSignal(signal, () => {
           void child.abort().catch(() => undefined);
         });
-        if (signal?.aborted) throw new Error("Finder was aborted.");
+        if (signal?.aborted) throw new Error("Mapper was aborted.");
 
         await promptSubagentWithFailover(
           child,
@@ -243,10 +236,10 @@ export default function finderExtension(pi: ExtensionAPI) {
             },
           },
         );
-        if (signal?.aborted) throw new Error("Finder was aborted.");
+        if (signal?.aborted) throw new Error("Mapper was aborted.");
 
         const output = extractLatestAssistantText(child);
-        if (!output) throw new Error("Finder returned no final answer.");
+        if (!output) throw new Error("Mapper returned no final answer.");
 
         run.status = "done";
         run.summaryText = output;
@@ -259,7 +252,7 @@ export default function finderExtension(pi: ExtensionAPI) {
         }, currentModel);
       } catch (error) {
         const aborted = signal?.aborted || run.terminationReason === "cancelled"
-          || run.terminationReason === "shutdown" || errorText(error) === "Finder was aborted.";
+          || run.terminationReason === "shutdown" || errorText(error) === "Mapper was aborted.";
         const message = aborted ? "Aborted" : errorText(error);
         run.status = aborted ? "aborted" : "error";
         run.error = aborted ? undefined : message;

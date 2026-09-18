@@ -30,10 +30,10 @@ const UI_KEY = "background-tasks";
 const RESULT_STDOUT_MAX = 8 * 1024;
 const RESULT_STDERR_MAX = 4 * 1024;
 
-const SUBAGENT_NAMES = ["finder", "librarian", "oracle", "worker"] as const;
+const SUBAGENT_NAMES = ["mapper", "librarian", "oracle", "worker"] as const;
 type SubagentName = typeof SUBAGENT_NAMES[number];
 const SUBAGENT_CAPACITY: Record<SubagentName, number> = {
-  finder: 4,
+  mapper: 4,
   librarian: 2,
   oracle: 1,
   worker: 4,
@@ -134,7 +134,7 @@ function subagentParams(
     write_scope?: string[];
   },
 ) {
-  if (agent === "finder") return { query: params.task };
+  if (agent === "mapper") return { query: params.task };
   if (agent === "librarian") {
     return {
       query: params.task,
@@ -416,19 +416,19 @@ export default function tasksExtension(pi: ExtensionAPI) {
     name: "start_subagent",
     label: "Start Subagent",
     description:
-      "Start Finder, Librarian, Oracle, or Worker as a session-scoped background task and return immediately. Finder scouts the local workspace; Librarian researches GitHub; Oracle gives a read-only architecture/debugging second opinion; Worker implements a bounded change. The delegated scope is owned by that subagent until it settles. All profiles receive the configured Executor MCP tools. Completion is delivered automatically.",
+      "Start Mapper, Librarian, Oracle, or Worker as a session-scoped background task and return immediately. Routing: Mapper=where/what, Oracle=why/correctness/what should change, Worker=execution/implementation, Librarian=GitHub research. Mapper locates local workspace files, symbols, config, tests, dependencies, and explicit call/data-flow anchors with file:line evidence; Oracle provides read-only analysis of root cause, architecture, planning, tradeoffs, and review. Mapper must not diagnose, judge, compare designs, plan, or recommend fixes. The delegated scope is owned by that subagent until it settles. Mapper is limited to read/search tools; Worker is the only editing profile. Completion is delivered automatically.",
     promptSnippet: "Delegate bounded work with an explicit ownership transfer",
     promptGuidelines: [
       "Use start_subagent for delegated research, review, or implementation. Partition work into bounded, non-overlapping scopes before launching.",
       "Once accepted, the delegated scope is owned by that subagent until it settles. Continue only with clearly disjoint work; if none remains, end the turn and let automatic completion resume it.",
       "Reserve the final answer until every required delegated result is integrated. While required work is active, end the turn without an interim conclusion.",
       "Review and integrate the delegated result before doing any remaining work in its scope. Use task_status only when progress is needed to unblock disjoint current work.",
-      "For Finder, Librarian, and Oracle, express semantic ownership boundaries in the task text; write_scope is Worker-only. For Worker tasks, provide a narrow write_scope with no overlap with the coordinator or another Worker.",
+      "For Mapper, Librarian, and Oracle, express semantic ownership boundaries in the task text; write_scope is Worker-only. Route Mapper=where/what, Oracle=why/correctness/what should change, Worker=execution/implementation, and Librarian=GitHub research. For Worker tasks, provide a narrow write_scope with no overlap with the coordinator or another Worker.",
     ],
     executionMode: "parallel",
     parameters: Type.Object({
       agent: StringEnum(SUBAGENT_NAMES, {
-        description: "Subagent profile to run in the background.",
+        description: "Routing role: Mapper=where/what, Oracle=why/correctness/what should change, Worker=execution/implementation, Librarian=GitHub research.",
       }),
       task: Type.String({ description: "Self-contained task, constraints, relevant paths, and expected result." }),
       repos: Type.Optional(Type.Array(Type.String(), { maxItems: 30, description: "Librarian owner/repo filters." })),

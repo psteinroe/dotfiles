@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { ORACLE_SYSTEM_PROMPT } from "./adapter.ts";
 import {
   DelegateCapacity,
   DELEGATE_CONCURRENCY,
@@ -23,6 +24,13 @@ test("delegate routing keeps the coordinator out of routine implementation", () 
   });
   assert.equal(DELEGATE_POLICIES.oracle.tools.includes("bash"), false);
   assert.equal(DELEGATE_POLICIES.oracle.tools.includes("edit"), false);
+});
+
+test("Oracle is the default read-only analysis role", () => {
+  assert.match(ORACLE_SYSTEM_PROMPT, /default read-only analyst/);
+  assert.match(ORACLE_SYSTEM_PROMPT, /WHY, correctness, root cause, architecture, planning, tradeoffs, and review/);
+  assert.match(ORACLE_SYSTEM_PROMPT, /state what should change/);
+  assert.doesNotMatch(ORACLE_SYSTEM_PROMPT, /second opinion|do not use for routine work/i);
 });
 
 test("allows one oracle alongside four workers", () => {

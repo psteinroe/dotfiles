@@ -13,9 +13,9 @@ test("tracks progress, settlement, consumption, and cancellation", async () => {
   let cancelled = false;
   const task = registry.create({
     kind: "subagent",
-    title: "finder fixture",
+    title: "mapper fixture",
     cwd: "/tmp/project",
-    agent: "finder",
+    agent: "mapper",
     cancel: () => { cancelled = true; },
   });
   assert.equal(task.status, "starting");

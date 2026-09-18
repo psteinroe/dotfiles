@@ -8,7 +8,7 @@ Implemented on `feat/pi-background-tasks`. The task extension is the only Pi reg
 
 Use one session-scoped task control plane with two launch tools:
 
-- `start_subagent` starts Finder, Librarian, Oracle, or Worker.
+- `start_subagent` starts Mapper, Librarian, Oracle, or Worker.
 - `start_background_command` starts a long-running OS command.
 
 Both return a task handle immediately. They share `task_status`, `task_result`, `task_list`, `task_cancel`, completion delivery, UI, Herdr metadata, and shutdown semantics.
@@ -21,10 +21,12 @@ Keep execution engines separate. Child `AgentSession` lifecycle and terminal pro
 
 Input:
 
-- `agent`: `finder | librarian | oracle | worker`
+- `agent`: `mapper | librarian | oracle | worker`
 - `task`: self-contained task and completion condition
 - `repos`, `owners`, `max_search_results`: Librarian scope
 - `write_scope`: required Worker file or directory prefixes
+
+Routing is exact: **Mapper=where/what, Oracle=why/correctness/what should change, Worker=execution/implementation, Librarian=GitHub research.** Mapper only locates files, symbols, config, tests, dependencies, and explicit call/data-flow anchors with file:line evidence; Oracle is the default read-only analyst for diagnosis, correctness, architecture, planning, tradeoffs, review, and recommendations.
 
 The launch reserves the underlying profile capacity and returns `task-N`. Setup, prompting, provider failover, result extraction, and disposal continue asynchronously.
 
@@ -65,13 +67,13 @@ The coordinator should continue only disjoint work after launch rather than poll
 
 ## Subagent adapters
 
-The existing Finder, Librarian, Oracle, and Worker implementations remain policy owners. Their top-level `index.ts` entrypoints were renamed to `adapter.ts`, so Pi no longer auto-registers the blocking tools. `tasks/index.ts` captures their definitions and runs them behind task handles.
+The existing Mapper, Librarian, Oracle, and Worker implementations remain policy owners. The Mapper implementation remains in the internal `finder/` directory because the directory name adds no public surface. Their top-level `index.ts` entrypoints were renamed to `adapter.ts`, so Pi no longer auto-registers the blocking tools. `tasks/index.ts` captures their definitions and runs them behind task handles.
 
 Preserved policies:
 
 | Profile | Model | Thinking | Local tools | Turn limit | Capacity |
 | --- | --- | --- | --- | --- | --- |
-| Finder | Luna | medium | read, bash | unlimited | 4 |
+| Mapper | Luna | medium | read, grep, find, ls | 8 | 4 |
 | Librarian | Luna | high | read, bash | 10 | 2 |
 | Oracle | Sol | high | read, grep, find, ls, git_diff | 10 | 1 |
 | Worker | Luna | high | read, bash, edit, write, grep, find, ls | 50 | 4 |
@@ -80,17 +82,19 @@ Provider/account failover remains inside the child session and preserves convers
 
 ## Executor MCP
 
-All four profiles explicitly receive:
+Librarian, Oracle, and Worker explicitly receive:
 
 - `executor_execute`
 - `executor_skills`
 - `executor_resume`
 
+Mapper is intentionally excluded from Executor MCP and is limited to local `read`, `grep`, `find`, and `ls` tools.
+
 At launch, the parent discovers the MCP adapter source path from the registered Executor tools' `sourceInfo`. Child settings clear inherited package/extension lists and use an empty resource agent directory; the loader then loads that explicit MCP path plus inline child policies. An `extensionsOverride` removes any other discovered extension before binding. The child tool allowlist omits the generic `mcp` proxy and unrelated parent tools.
 
-A launch fails closed when any required Executor tool or a single common adapter source path is unavailable.
+A launch fails closed when any required Executor tool or a single common adapter source path is unavailable. Mapper launches do not require the Executor adapter.
 
-Oracle, Finder, and Librarian are instructed to use Executor for read-only operations. This is policy enforcement, not a hard capability boundary: `executor_execute` can reach mutating integrations. Hard enforcement requires a separately configured read-only Executor toolkit or credentials.
+Oracle and Librarian are instructed to use Executor for read-only operations. This is policy enforcement, not a hard capability boundary: `executor_execute` can reach mutating integrations. Hard enforcement requires a separately configured read-only Executor toolkit or credentials.
 
 ## Worker write ownership
 
@@ -133,7 +137,7 @@ agents/pi/extensions/
 │   ├── index.ts
 │   ├── registry.ts
 │   └── delivery.ts
-├── finder/adapter.ts
+├── finder/adapter.ts (internal Mapper adapter)
 ├── librarian/adapter.ts
 ├── delegates/adapter.ts
 ├── background-terminals/src/

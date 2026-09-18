@@ -68,6 +68,11 @@ test("subagent guidance makes delegated scope an ownership lease", async () => {
   assert.match(guidance, /disjoint work/i);
   assert.match(guidance, /end the turn/i);
   assert.match(guidance, /write_scope is Worker-only/i);
+  assert.match(start.description, /Mapper=where\/what/);
+  assert.match(start.description, /Oracle=why\/correctness\/what should change/);
+  assert.match(start.description, /Worker=execution\/implementation/);
+  assert.match(start.description, /Librarian=GitHub research/);
+  assert.match((start.parameters as any).properties.agent.description, /Mapper=where\/what/);
 
   const cancel = h.tools.get("task_cancel");
   assert.match(cancel.description, /requirements change/i);
@@ -106,7 +111,7 @@ test("rejects profile-incompatible fields and unsafe Worker scopes", async () =>
   await assert.rejects(
     h.tools.get("start_subagent").execute(
       "call",
-      { agent: "finder", task: "map", write_scope: ["src"] },
+      { agent: "mapper", task: "map", write_scope: ["src"] },
       undefined,
       undefined,
       ctx,
@@ -183,22 +188,20 @@ test("rejects a Worker while a background command is active", async () => {
   await emit(h.handlers, "session_shutdown", ctx);
 });
 
-test("subagent launch returns a handle before asynchronous setup failure", async () => {
+test("Mapper launch returns a handle without requiring Executor MCP", async () => {
   const h = harness();
   const ctx = context();
   await emit(h.handlers, "session_start", ctx);
   const launch = await h.tools.get("start_subagent").execute(
     "call",
-    { agent: "finder", task: "map the fixture" },
+    { agent: "mapper", task: "map the fixture" },
     undefined,
     undefined,
     ctx,
   );
   assert.match(launch.content[0].text, /Started task-1/);
-  assert.match(launch.content[0].text, /scope is now owned by the finder/i);
+  assert.match(launch.content[0].text, /scope is now owned by the mapper/i);
   assert.match(launch.content[0].text, /disjoint work/i);
   assert.match(launch.content[0].text, /end the turn/i);
-  await waitFor(() => h.messages.length === 1);
-  assert.match(h.messages[0].message.content, /Executor MCP tools are unavailable/);
   await emit(h.handlers, "session_shutdown", ctx);
 });
