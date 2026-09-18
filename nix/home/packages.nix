@@ -92,6 +92,7 @@ in
         postgresql
         just
         hugo
+        presenterm
         cmake
         ffmpeg
         imagemagick
@@ -111,7 +112,7 @@ in
         # LSPs
         lua-language-server
         vscode-langservers-extracted
-        typescript-go # tsgo - native TS language server
+        typescript # tsgo - native TS language server
         tailwindcss-language-server
         dockerfile-language-server
         yaml-language-server

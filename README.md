@@ -102,11 +102,12 @@ Local and remote helpers intentionally mirror each other where possible:
 
 For the full command list, run `devhelp`. Rebuilds invoke `pireload`, which reloads only idle Pi agents with no child processes. Working, blocked, and background-task sessions are reported and left untouched; retry from the `Safe Pi Reload` Herdr action or run `pireload` later.
 
-Pi also receives the `worktree-agents` skill on local and remote machines. When
-asked to delegate work into another branch, PR, or worktree, it routes creation
-through `hwtcreate`/`wtensure` and starts the agent in the matching Herdr
-workspace instead of using Herdr's default worktree layout. Agent launches keep
-the current workspace focused unless explicitly asked to switch.
+Pi also receives the `herdr` skill on local and remote machines. It activates
+only when the user explicitly asks Pi to control Herdr. Project workspace
+creation routes through `hwtcreate`/`wtensure` instead of Herdr's default
+worktree layout and keeps the current workspace focused unless asked to switch.
+Pi's internal subagents continue to use their normal runtime rather than Herdr
+workspaces.
 
 ## Git worktrees
 

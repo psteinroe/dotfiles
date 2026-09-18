@@ -75,5 +75,11 @@
     }
   ];
 
-  pi = [ ];
+  pi = [
+    {
+      name = "gh-stack";
+      path = "${inputs.gh-stack-skills}/skills/gh-stack";
+      repo = "github/gh-stack";
+    }
+  ];
 }

@@ -39,6 +39,11 @@
       flake = false;
     };
 
+    gh-stack-skills = {
+      url = "github:github/gh-stack";
+      flake = false;
+    };
+
     mattpocock-skills = {
       url = "github:mattpocock/skills";
       flake = false;

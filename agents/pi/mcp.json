@@ -3,6 +3,9 @@
         "autoAuth": true
     },
     "mcpServers": {
+        "foilwick": {
+            "url": "https://foilwick.com/api/mcp"
+        },
         "scryfall": {
             "command": "pnpx",
             "args": [
