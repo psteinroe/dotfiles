@@ -80,6 +80,30 @@ test("subagent guidance makes delegated scope an ownership lease", async () => {
   await emit(h.handlers, "session_shutdown", context());
 });
 
+test("live task widget omits elapsed time while explicit status computes it on demand", async () => {
+  const h = harness();
+  const ctx = context();
+  const widgets: unknown[] = [];
+  ctx.hasUI = true;
+  ctx.ui.setWidget = (_key: string, value: unknown) => widgets.push(value);
+  await emit(h.handlers, "session_start", ctx);
+  await h.tools.get("start_background_command").execute(
+    "call",
+    { command: "sleep 1", title: "timing fixture" },
+    undefined,
+    undefined,
+    ctx,
+  );
+
+  const activeWidget = [...widgets].reverse().find((value) => Array.isArray(value) && value.length > 0) as string[];
+  assert.ok(activeWidget, "active task widget was not rendered");
+  assert.doesNotMatch(activeWidget[0], /\s(?:\d+s|\d+m\d+s|\d+h\d+m)$/);
+
+  const status = await h.tools.get("task_status").execute("status", { id: "task-1" });
+  assert.match(status.content[0].text, /\s(?:\d+s|\d+m\d+s|\d+h\d+m)(?:\n|$)/);
+  await emit(h.handlers, "session_shutdown", ctx);
+});
+
 test("background command launch returns before completion and delivers once", async () => {
   const h = harness();
   const ctx = context();

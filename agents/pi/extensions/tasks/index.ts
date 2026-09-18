@@ -63,10 +63,10 @@ function glyph(status: TaskStatus): string {
   }
 }
 
-function taskLine(task: TaskSnapshot): string {
-  const age = formatElapsed(task.createdAt, task.settledAt);
+function taskLine(task: TaskSnapshot, includeElapsed = true): string {
   const role = task.agent ? ` ${task.agent}` : " command";
-  return `${glyph(task.status)} ${task.id} [${task.status}]${role} "${task.title}" ${age}`;
+  const elapsed = includeElapsed ? ` ${formatElapsed(task.createdAt, task.settledAt)}` : "";
+  return `${glyph(task.status)} ${task.id} [${task.status}]${role} "${task.title}"${elapsed}`;
 }
 
 function contentText(result: any): string {
@@ -253,6 +253,8 @@ export default function tasksExtension(pi: ExtensionAPI) {
   let uiCtx: ExtensionContext | undefined;
   let ownsHerdrMetadata = false;
   let shuttingDown = false;
+  let renderedStatusKey: string | undefined;
+  let renderedWidgetKey: string | undefined;
 
   const delivery = new TaskDelivery(
     async (tasks) => {
@@ -292,16 +294,25 @@ export default function tasksExtension(pi: ExtensionAPI) {
     if (!ownsHerdrMetadata || shuttingDown) return;
     void herdrMetadata.setActive(activeTasks().length > 0);
   };
-  const refreshUi = () => {
+  const refreshUi = (force = false) => {
     if (!uiCtx?.hasUI) return;
     const active = activeTasks();
-    uiCtx.ui.setStatus(
-      UI_KEY,
-      active.length
-        ? uiCtx.ui.theme.fg("warning", `● ${active.length} background task${active.length === 1 ? "" : "s"} · /tasks`)
-        : undefined,
-    );
-    uiCtx.ui.setWidget(UI_KEY, active.length ? active.map(taskLine) : undefined);
+    const status = active.length
+      ? uiCtx.ui.theme.fg("warning", `● ${active.length} background task${active.length === 1 ? "" : "s"} · /tasks`)
+      : undefined;
+    // Keep elapsed time on explicit task queries, not the live widget. This
+    // makes progress-event refreshes stable and lets us skip identical renders.
+    const widget = active.length ? active.map((task) => taskLine(task, false)) : undefined;
+    const statusKey = status ?? "";
+    const widgetKey = widget?.join("\n") ?? "";
+    if (force || statusKey !== renderedStatusKey) {
+      uiCtx.ui.setStatus(UI_KEY, status);
+      renderedStatusKey = statusKey;
+    }
+    if (force || widgetKey !== renderedWidgetKey) {
+      uiCtx.ui.setWidget(UI_KEY, widget);
+      renderedWidgetKey = widgetKey;
+    }
   };
 
   registry.onSettle((snapshot, consumed) => {
@@ -359,7 +370,7 @@ export default function tasksExtension(pi: ExtensionAPI) {
     ownsHerdrMetadata = ctx.mode === "tui";
     if (ctx.isIdle()) delivery.setIdle();
     else delivery.setBusy();
-    refreshUi();
+    refreshUi(true);
     refreshHerdrMetadata();
   });
   pi.on("agent_start", async () => delivery.setBusy());

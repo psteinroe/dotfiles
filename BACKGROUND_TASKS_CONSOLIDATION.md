@@ -50,7 +50,7 @@ The launch starts Bash on macOS/Linux or ComSpec on Windows with ignored stdin a
 - `task_cancel({ ids })` requests cancellation and returns without waiting for teardown.
 - `/tasks` lists tasks; `/tasks cancel <id>` requests cancellation.
 
-Task states are `starting`, `running`, `cancelling`, `done`, `failed`, and `cancelled`.
+Task states are `starting`, `running`, `cancelling`, `done`, `failed`, and `cancelled`. The live widget omits elapsed time and deduplicates unchanged renders; elapsed time is calculated only for explicit status/list/result output and completion details.
 
 ## Completion delivery
 
