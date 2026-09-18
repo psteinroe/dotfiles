@@ -28,7 +28,7 @@ Input:
 
 The launch reserves the underlying profile capacity and returns `task-N`. Setup, prompting, provider failover, result extraction, and disposal continue asynchronously.
 
-Acceptance transfers ownership of the delegated scope to the subagent until it settles. The coordinator works only on explicitly disjoint scope, or ends its turn so automatic completion can resume it. It reviews the result before doing any remaining work in the delegated scope. Cancellation is reserved for a user request, invalid or unsafe scope, a stuck task, or changed requirements; coordinator duplication does not make the task redundant.
+Acceptance transfers ownership of the delegated scope to the subagent until it settles. The coordinator works only on explicitly disjoint scope, or ends its turn so automatic completion can resume it. It reserves the final answer until every required delegated result is integrated, rather than emitting an interim conclusion while required work is active. It reviews the result before doing any remaining work in the delegated scope. Cancellation is reserved for a user request, invalid or unsafe scope, a stuck task, or changed requirements; coordinator duplication does not make the task redundant.
 
 ### `start_background_command`
 

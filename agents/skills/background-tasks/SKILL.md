@@ -22,7 +22,7 @@ Use `start_background_command` for dev servers, watchers, log tails, streaming b
 
 Before launching, partition work into bounded, non-overlapping scopes with explicit expected results. Independent launches may appear in one assistant response and run concurrently.
 
-After launch, exclude every delegated scope from coordinator work. Continue only with clearly disjoint work; if none remains, end the turn. When completion arrives, review and integrate the result before doing any remaining work in that scope.
+After launch, exclude every delegated scope from coordinator work. Continue only with clearly disjoint work; if none remains, end the turn. Reserve the final answer until every required delegated result is integrated; while required work is active, end the turn without an interim conclusion. When completion arrives, review and integrate the result before doing any remaining work in that scope.
 
 ## Observe and control
 

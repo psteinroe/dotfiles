@@ -421,6 +421,7 @@ export default function tasksExtension(pi: ExtensionAPI) {
     promptGuidelines: [
       "Use start_subagent for delegated research, review, or implementation. Partition work into bounded, non-overlapping scopes before launching.",
       "Once accepted, the delegated scope is owned by that subagent until it settles. Continue only with clearly disjoint work; if none remains, end the turn and let automatic completion resume it.",
+      "Reserve the final answer until every required delegated result is integrated. While required work is active, end the turn without an interim conclusion.",
       "Review and integrate the delegated result before doing any remaining work in its scope. Use task_status only when progress is needed to unblock disjoint current work.",
       "For Finder, Librarian, and Oracle, express semantic ownership boundaries in the task text; write_scope is Worker-only. For Worker tasks, provide a narrow write_scope with no overlap with the coordinator or another Worker.",
     ],
@@ -530,7 +531,7 @@ export default function tasksExtension(pi: ExtensionAPI) {
       return {
         content: [{
           type: "text" as const,
-          text: `Started ${task.id} "${title}". Its scope is now owned by the ${agent} until it settles. Continue only with disjoint work; if none remains, end the turn. Completion will be delivered automatically.`,
+          text: `Started ${task.id} "${title}". Its scope is now owned by the ${agent} until it settles. Continue only with disjoint work. If required work remains, reserve the final answer and end the turn; completion will resume it automatically.`,
         }],
         details: task,
       };
