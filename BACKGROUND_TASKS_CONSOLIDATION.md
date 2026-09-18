@@ -28,6 +28,8 @@ Input:
 
 The launch reserves the underlying profile capacity and returns `task-N`. Setup, prompting, provider failover, result extraction, and disposal continue asynchronously.
 
+Acceptance transfers ownership of the delegated scope to the subagent until it settles. The coordinator works only on explicitly disjoint scope, or ends its turn so automatic completion can resume it. It reviews the result before doing any remaining work in the delegated scope. Cancellation is reserved for a user request, invalid or unsafe scope, a stuck task, or changed requirements; coordinator duplication does not make the task redundant.
+
 ### `start_background_command`
 
 Input:
@@ -59,7 +61,7 @@ Settled tasks enter an idle-aware delivery queue. Delivery:
 5. acknowledges delivered tasks so bounded history can prune them;
 6. shuts down without delivering stale completions.
 
-The coordinator should continue useful work after launch rather than polling. Progress is stored in the task registry because a tool's `onUpdate` channel is finalized when the launch tool returns.
+The coordinator should continue only disjoint work after launch rather than polling; when no disjoint work remains, it should end the turn. Progress is stored in the task registry because a tool's `onUpdate` channel is finalized when the launch tool returns.
 
 ## Subagent adapters
 

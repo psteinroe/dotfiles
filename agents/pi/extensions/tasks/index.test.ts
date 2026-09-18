@@ -60,6 +60,21 @@ test("registers one consolidated task surface", async () => {
   await emit(h.handlers, "session_shutdown", context());
 });
 
+test("subagent guidance makes delegated scope an ownership lease", async () => {
+  const h = harness();
+  const start = h.tools.get("start_subagent");
+  const guidance = [start.description, start.promptSnippet, ...start.promptGuidelines].join("\n");
+  assert.match(guidance, /delegated scope.*owned by (?:that|the) subagent/i);
+  assert.match(guidance, /disjoint work/i);
+  assert.match(guidance, /end the turn/i);
+  assert.match(guidance, /write_scope is Worker-only/i);
+
+  const cancel = h.tools.get("task_cancel");
+  assert.match(cancel.description, /requirements change/i);
+  assert.match(cancel.description, /duplicat(?:e|ed|ion).*not.*reason/i);
+  await emit(h.handlers, "session_shutdown", context());
+});
+
 test("background command launch returns before completion and delivers once", async () => {
   const h = harness();
   const ctx = context();
@@ -180,6 +195,9 @@ test("subagent launch returns a handle before asynchronous setup failure", async
     ctx,
   );
   assert.match(launch.content[0].text, /Started task-1/);
+  assert.match(launch.content[0].text, /scope is now owned by the finder/i);
+  assert.match(launch.content[0].text, /disjoint work/i);
+  assert.match(launch.content[0].text, /end the turn/i);
   await waitFor(() => h.messages.length === 1);
   assert.match(h.messages[0].message.content, /Executor MCP tools are unavailable/);
   await emit(h.handlers, "session_shutdown", ctx);

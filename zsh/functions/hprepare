@@ -21,12 +21,12 @@ local repo_dir="$HOME/Developer/${repo}.git"
 local plain_repo_dir="$HOME/Developer/${repo}"
 local start_dir target_path label
 
-if [[ -d "$repo_dir" ]]; then
+if git -C "$repo_dir" rev-parse --git-dir >/dev/null 2>&1; then
   start_dir="$repo_dir"
-elif [[ -d "$plain_repo_dir" ]]; then
+elif git -C "$plain_repo_dir" rev-parse --git-dir >/dev/null 2>&1; then
   start_dir="$plain_repo_dir"
 else
-  echo "Repo not found: $repo_dir or $plain_repo_dir" >&2
+  echo "Git repo not found: $repo_dir or $plain_repo_dir" >&2
   return 1
 fi
 

@@ -416,12 +416,13 @@ export default function tasksExtension(pi: ExtensionAPI) {
     name: "start_subagent",
     label: "Start Subagent",
     description:
-      "Start Finder, Librarian, Oracle, or Worker as a session-scoped background task and return immediately. Finder scouts the local workspace; Librarian researches GitHub; Oracle gives a read-only architecture/debugging second opinion; Worker implements a bounded change. All profiles receive the configured Executor MCP tools. Use task_status only when progress is needed to unblock current work; completion is delivered automatically.",
-    promptSnippet: "Start a specialized subagent without blocking the coordinator",
+      "Start Finder, Librarian, Oracle, or Worker as a session-scoped background task and return immediately. Finder scouts the local workspace; Librarian researches GitHub; Oracle gives a read-only architecture/debugging second opinion; Worker implements a bounded change. The delegated scope is owned by that subagent until it settles. All profiles receive the configured Executor MCP tools. Completion is delivered automatically.",
+    promptSnippet: "Delegate bounded work with an explicit ownership transfer",
     promptGuidelines: [
-      "Use start_subagent for delegated research, review, or implementation that should continue while the coordinator talks or does other work.",
-      "After start_subagent returns, continue useful work instead of polling. Background completion is delivered automatically; use task_status only when current progress is needed to unblock work.",
-      "For Worker tasks, provide a narrow write_scope with no overlap with the coordinator or another Worker.",
+      "Use start_subagent for delegated research, review, or implementation. Partition work into bounded, non-overlapping scopes before launching.",
+      "Once accepted, the delegated scope is owned by that subagent until it settles. Continue only with clearly disjoint work; if none remains, end the turn and let automatic completion resume it.",
+      "Review and integrate the delegated result before doing any remaining work in its scope. Use task_status only when progress is needed to unblock disjoint current work.",
+      "For Finder, Librarian, and Oracle, express semantic ownership boundaries in the task text; write_scope is Worker-only. For Worker tasks, provide a narrow write_scope with no overlap with the coordinator or another Worker.",
     ],
     executionMode: "parallel",
     parameters: Type.Object({
@@ -529,7 +530,7 @@ export default function tasksExtension(pi: ExtensionAPI) {
       return {
         content: [{
           type: "text" as const,
-          text: `Started ${task.id} "${title}". Continue useful work; do not poll. Completion will be delivered automatically.`,
+          text: `Started ${task.id} "${title}". Its scope is now owned by the ${agent} until it settles. Continue only with disjoint work; if none remains, end the turn. Completion will be delivered automatically.`,
         }],
         details: task,
       };
@@ -642,7 +643,7 @@ export default function tasksExtension(pi: ExtensionAPI) {
     name: "task_cancel",
     label: "Cancel Tasks",
     description:
-      "Request cancellation of one or more background tasks and return immediately. Subagents are aborted; command process trees receive SIGTERM and escalate to SIGKILL if needed.",
+      "Request cancellation of one or more background tasks and return immediately. Use for a user request, invalid or unsafe scope, a stuck task, or a requirements change. Coordinator duplication is not a cancellation reason. Subagents are aborted; command process trees receive SIGTERM and escalate to SIGKILL if needed.",
     parameters: Type.Object({ ids: Type.Array(Type.String(), { minItems: 1 }) }, { additionalProperties: false }),
     async execute(_id, params: any) {
       const lines: string[] = [];

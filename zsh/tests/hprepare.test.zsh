@@ -66,6 +66,20 @@ session_plugins="$fixture/home/.config/herdr/sessions/example/plugins.json"
 [[ $(readlink "$session_plugins") == ../../plugins.json ]]
 [[ $(<"$session_plugins") == '[]' ]]
 
+# A sibling <repo>.git directory can be only a worktree container while the
+# valid primary worktree remains at <repo>. Prefer the path Git recognizes.
+split_path="$fixture/home/Developer/split"
+mkdir -p "$fixture/home/Developer/split.git" "$split_path"
+git -C "$split_path" init -q
+HOME="$fixture/home" \
+USER=test \
+HERDR_BIN="$fixture/herdr" \
+HERDR_TEST_COMMANDS="$fixture/herdr-commands" \
+HERDR_TEST_STATE="$fixture/herdr-state" \
+RDEV_DOTFILES="$fixture/dotfiles" \
+  run_hprepare split
+[[ "$PWD" == "${split_path:A}" ]]
+
 print incompatible > "$fixture/herdr-state"
 : > "$fixture/herdr-commands"
 HOME="$fixture/home" \
