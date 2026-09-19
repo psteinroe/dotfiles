@@ -122,7 +122,16 @@ if (( ! server_ready )); then
 fi
 
 export HERDR_SESSION="$repo"
-source "$dotfiles/zsh/functions/hsyncworktrees" --prune >/dev/null 2>&1 || true
+# Preparation is intentionally agent-first: remove only stale Herdr objects here.
+# The selected target below is the only workspace this command may ensure.
+source "$dotfiles/zsh/functions/hsyncworktrees" --prune-only >/dev/null 2>&1 || true
 source "$dotfiles/zsh/functions/_herdr_worktree_helpers" || return
 _h_repo_context || return
 _h_ensure_workspace "$target_path" "$label" 1 >/dev/null || return
+
+# The requested workspace is now ensured and focused. Trim only siblings that
+# pass the same strict live safety checks; cleanup must never make preparation
+# fail after the target opened successfully.
+if ! source "$dotfiles/zsh/functions/htrimworkspaces" --auto; then
+  echo "Warning: automatic Herdr workspace trim failed; leaving workspaces open." >&2
+fi

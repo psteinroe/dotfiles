@@ -1,11 +1,12 @@
 # Sync Herdr workspaces with existing Git worktrees for the current repo.
-# Usage: hsyncworktrees [--prune]
+# Usage: hsyncworktrees [--prune|--prune-only]
 #
-# Non-destructive: never deletes Git worktrees. With --prune, only closes Herdr
-# workspaces whose cwd is under this repo's worktree root and no longer exists
-# or is no longer registered with git worktree.
-if [[ $# -gt 1 || ( $# -eq 1 && "$1" != "--prune" ) ]]; then
-  echo "Usage: hsyncworktrees [--prune]" >&2
+# The default is the explicit, full sync escape hatch: expose every existing Git
+# worktree as a Herdr workspace. --prune keeps that behavior and then closes
+# stale workspaces. --prune-only only closes stale/missing Herdr workspaces and
+# never creates or focuses anything. None of these modes deletes Git worktrees.
+if [[ $# -gt 1 || ( $# -eq 1 && "$1" != "--prune" && "$1" != "--prune-only" ) ]]; then
+  echo "Usage: hsyncworktrees [--prune|--prune-only]" >&2
   return 1
 fi
 
@@ -16,7 +17,14 @@ _h_require_herdr || return
 _h_repo_context || return
 
 local prune=0
+local prune_only=0
 [[ "${1:-}" == "--prune" ]] && prune=1
+[[ "${1:-}" == "--prune-only" ]] && prune_only=1
+
+if (( prune_only )); then
+  _h_prune_missing_workspaces
+  return $?
+fi
 
 local wt_path label
 while IFS= read -r wt_path; do

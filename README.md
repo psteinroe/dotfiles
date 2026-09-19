@@ -36,7 +36,12 @@ flake configuration untrusted.
 
 ## Daily project workflow
 
-One project/repo maps to one Herdr named session. One Git worktree maps to one Herdr workspace.
+One project/repo maps to one Herdr named session. The active-workspace policy is
+agent-first: Herdr starts with its sidebar hidden and agent panel sorted by
+priority, and only the selected/requested Git worktree is opened as a workspace.
+Other worktrees remain available in Git but are not materialized in Herdr until
+opened explicitly. Use `prefix+b` to toggle the sidebar and `prefix+w` to pick a
+workspace; `alt+h`/`alt+l` switch workspaces and `alt+k`/`alt+j` switch agents.
 
 ```bash
 hdev dotfiles main       # local Herdr session/workspace
@@ -95,17 +100,36 @@ Local and remote helpers intentionally mirror each other where possible:
 | `hdev <repo> [branch\|pr]` | `rdev <repo> [branch\|pr]` | Open local/remote Herdr project session |
 | `wtclean` | `rwtclean <repo>` | Clean integrated/stale worktrees |
 | `wtforceclean` | `rwtforceclean <repo>` | Select and force-remove worktrees |
-| `hwtcreate <branch\|pr>` | `rhwtcreate <repo> <branch\|pr>` | Ensure worktree and focus/open Herdr workspace |
-| `hsyncworktrees [--prune]` | `rhsyncworktrees <repo> [--prune]` | Sync Git worktrees into Herdr workspaces |
+| `hwtcreate <branch\|pr>` | `rhwtcreate <repo> <branch\|pr>` | Ensure requested worktree and focus/open its workspace |
+| `htrimworkspaces [--apply\|--auto]` | — | Preview/confirm, or automatically close only strictly safe idle siblings |
+| `hsyncworktrees [--prune\|--prune-only]` | `rhsyncworktrees <repo> [--prune]` | Explicitly expose all worktrees, or prune stale Herdr workspaces |
 | — | `rauth [all\|gh\|pi\|mcp\|exa]` | Copy local GitHub/Pi/MCP/Exa auth to the remote |
 | — | `ssh rdev-exe` | Recovery path via exe.dev gateway |
 
-For the full command list, run `devhelp`. Rebuilds invoke `pireload`, which reloads only idle Pi agents with no child processes. Working, blocked, and background-task sessions are reported and left untouched; retry from the `Safe Pi Reload` Herdr action or run `pireload` later.
+For the full command list, run `devhelp`. Normal preparation and the worktree
+hook only prune stale/missing Herdr workspaces and open the requested target;
+there is no bulk workspace sync. `hsyncworktrees` without an option (or with
+`--prune`) is the manual **expose all worktrees** escape hatch, not normal
+maintenance. `--prune-only` is the safe cleanup mode. `htrimworkspaces` previews
+idle candidates and, with `--apply`, asks for confirmation while protecting
+focused workspaces, agents, non-shell processes, background/descendant processes,
+and uncertain inspections. Opening a worktree automatically runs the same strict
+cleanup for sibling workspaces: only shell-idle siblings can close; Git worktrees,
+focused workspaces, agents, active commands, background/descendant jobs, and
+uncertain states are preserved. Closing a Herdr workspace never deletes its Git
+worktree.
+
+Rebuilds invoke `pireload`, which reloads only idle Pi agents with no child
+processes. Working, blocked, and background-task sessions are reported and left
+untouched; retry from the `Safe Pi Reload` Herdr action or run `pireload` later.
 
 Pi also receives the `herdr` skill on local and remote machines. It activates
-only when the user explicitly asks Pi to control Herdr. Project workspace
-creation routes through `hwtcreate`/`wtensure` instead of Herdr's default
-worktree layout and keeps the current workspace focused unless asked to switch.
+only when the user explicitly asks Pi to control Herdr. Project workspace creation routes through `hwtcreate`/`wtensure` instead of
+Herdr's default worktree layout and keeps the current workspace focused unless
+asked to switch. The worktree manager's `t` action runs the interactive trim helper; opening an
+existing worktree also runs the non-interactive strict cleanup. Its `s` action is
+the explicit full-sync escape hatch. Closing a workspace preserves the underlying
+Git worktree.
 Pi's internal subagents continue to use their normal runtime rather than Herdr
 workspaces.
 

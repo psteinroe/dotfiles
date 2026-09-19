@@ -26,7 +26,7 @@ Treat any request to create, open, or work in a branch or PR as a workspace requ
 | Create or open a branch/PR workspace | `hwtcreate --no-focus <branch-or-pr-number>` |
 | Create/open and switch to it | `hwtcreate --focus <branch-or-pr-number>` |
 | Expose existing worktrees as workspaces | `hsyncworktrees` |
-| Remove stale workspace entries | `hsyncworktrees --prune`, only when requested |
+| Remove stale workspace entries | `hsyncworktrees --prune-only` |
 | Inspect/control panes, tabs, or agents | Follow `herdr --skill` |
 
 Invoke the zsh helpers explicitly from Pi's shell tool:
@@ -49,11 +49,11 @@ zsh -lc '
 ' _
 ```
 
-Append `--prune` after `_` only for requested cleanup. This closes stale Herdr workspaces; it does not delete Git worktrees.
+Append `--prune-only` after `_` for cleanup. This closes stale Herdr workspaces without exposing or creating workspaces, and does not delete Git worktrees. Use `--prune` only when explicitly asked to expose all worktrees and then prune stale entries.
 
 Helpers own worktree resolution, setup, and workspace reuse through `wtensure` and `wtsetup`, preserving the managed `~/Developer/<repo>.git/<worktree>` layout. On failure, report the error rather than bypassing them with raw `git worktree add`, `herdr worktree create`, or direct `herdr workspace create` commands.
 
-`hwtcreate` can fetch and update branches through `wtensure`, including rebasing clean divergent branches. Use live Herdr inspection for read-only requests; do not use creation helpers merely to inspect a workspace.
+`hwtcreate` can fetch and update branches through `wtensure`, including rebasing clean divergent branches. Opening or creating a worktree with focus automatically runs strict cleanup of sibling workspaces; `--no-focus` skips cleanup so the newly prepared idle workspace is not immediately removed. Cleanup closes only shell-idle siblings after repeated live validation, preserves Git worktrees, and leaves focused, agent-backed, active, background/descendant, and uncertain states untouched. Use live Herdr inspection for read-only requests; do not use creation helpers merely to inspect a workspace.
 
 ## 3. Continue in the resolved workspace
 

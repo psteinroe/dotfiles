@@ -33,4 +33,13 @@ fi
 local label="${WTENSURE_WORKTREE_NAME:-$(_h_worktree_label "$PWD")}"
 local wt_path="${WTENSURE_WORKTREE_PATH:-$PWD}"
 
-_h_ensure_workspace "$wt_path" "$label" "$focus"
+_h_ensure_workspace "$wt_path" "$label" "$focus" || return
+
+# Cleanup runs only after a requested worktree was focused. A --no-focus
+# workspace is intentionally prepared for later use and would otherwise look
+# like an idle cleanup candidate immediately after creation.
+if (( focus )); then
+  if ! source "$dotfiles/zsh/functions/htrimworkspaces" --auto; then
+    echo "Warning: automatic Herdr workspace trim failed; leaving workspaces open." >&2
+  fi
+fi

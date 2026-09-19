@@ -64,7 +64,11 @@ _ws_open_worktree() {
   local wt_path label
   wt_path="$(_ws_pick_worktree)" || return
   label="$(_h_worktree_label "$wt_path")"
-  _ws_focus_or_create_workspace "$wt_path" "$label"
+  _ws_focus_or_create_workspace "$wt_path" "$label" || return
+  cd "$wt_path" || return
+  if ! source "$WS_DOTFILES/zsh/functions/htrimworkspaces" --auto; then
+    echo "Warning: automatic Herdr workspace trim failed; leaving workspaces open." >&2
+  fi
   _ws_close_self
 }
 
@@ -90,7 +94,14 @@ _ws_create_worktree() {
 
 _ws_sync_worktrees() {
   cd "$WS_PROJECT_ROOT" || return
+  echo "Manual full sync: exposing every Git worktree as a Herdr workspace."
+  echo "This is an escape hatch, not normal maintenance."
   source "$WS_DOTFILES/zsh/functions/hsyncworktrees" --prune
+}
+
+_ws_trim_workspaces() {
+  cd "$WS_PROJECT_ROOT" || return
+  source "$WS_DOTFILES/zsh/functions/htrimworkspaces" --apply
 }
 
 _ws_clean_worktrees() {
@@ -145,9 +156,11 @@ while true; do
   _ws_print_table "$rows"
   echo
   echo "Actions:"
-  echo "  o  open/focus worktree       c  create/ensure worktree"
-  echo "  s  sync + prune stale        b  bootstrap panes"
-  echo "  x  hide current workspace    k  clean integrated/stale worktrees"
+  echo "  o  open/focus worktree (auto-trims safe idle siblings)"
+  echo "  c  create/ensure worktree"
+  echo "  t  trim idle workspaces      b  bootstrap panes"
+  echo "  s  expose all worktrees      x  hide current workspace"
+  echo "  k  clean integrated/stale worktrees"
   echo "  q  quit"
   echo
   printf '> '
@@ -155,6 +168,7 @@ while true; do
   case "$action" in
     o) _ws_open_worktree ;;
     c) _ws_create_worktree ;;
+    t) _ws_trim_workspaces; _ws_pause ;;
     s) _ws_sync_worktrees; _ws_pause ;;
     b) _ws_bootstrap_workspace ;;
     x) _ws_hide_workspace ;;

@@ -2,12 +2,12 @@ id = "psteinroe.worktree-sync"
 name = "Psteinroe Worktree Sync"
 version = "0.1.0"
 min_herdr_version = "0.7.0"
-description = "Make Herdr workspaces follow psteinroe dotfiles Git worktrees."
+description = "Keep selected Herdr workspaces aligned with dotfiles Git worktrees; expose all only on explicit request."
 platforms = ["linux", "macos"]
 
 [[actions]]
 id = "sync"
-title = "Sync Git worktrees into Herdr"
+title = "Expose all Git worktrees (manual escape hatch)"
 contexts = ["workspace"]
 command = ["zsh", "sync.sh"]
 

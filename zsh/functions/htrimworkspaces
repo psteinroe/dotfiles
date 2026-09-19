@@ -1,0 +1,348 @@
+# Preview and conservatively close idle Herdr workspaces for the current Git repo.
+# Usage: htrimworkspaces [--apply|--auto]
+#
+# This only closes Herdr workspaces. It never removes Git worktrees. Every
+# candidate is inspected again after confirmation (or immediately for --auto)
+# and immediately before close.
+if [[ $# -gt 1 || ( $# -eq 1 && "$1" != "--apply" && "$1" != "--auto" ) ]]; then
+  echo "Usage: htrimworkspaces [--apply|--auto]" >&2
+  return 1
+fi
+
+local apply=0 auto=0
+[[ "${1:-}" == "--apply" ]] && apply=1
+[[ "${1:-}" == "--auto" ]] && auto=1
+local dotfiles="${RDEV_DOTFILES:-$HOME/Developer/dotfiles}"
+source "$dotfiles/zsh/functions/_herdr_worktree_helpers" || return
+_h_require_herdr || return
+_h_repo_context || return
+
+if ! command -v jq >/dev/null 2>&1; then
+  echo "htrimworkspaces needs jq; refusing to inspect or close workspaces." >&2
+  return 1
+fi
+
+# ps has this format on both macOS and Linux.  Do not use pgrep/pstree: neither
+# is consistently available, and checking only the shell's direct children
+# misses grandchildren.  Any malformed row, a missing shell, or any descendant
+# is deliberately a reason to protect the workspace.
+_htrim_check_process_tree() {
+  local shell_pid="$1" process_table tree_result
+  [[ "$shell_pid" == <-> && "$shell_pid" -gt 0 ]] || return 1
+  if ! process_table="$(command ps -eo pid=,ppid= 2>/dev/null)"; then
+    return 1
+  fi
+
+  tree_result="$(print -r -- "$process_table" | awk -v target="$shell_pid" '
+    BEGIN { bad = 0; found = 0; duplicate = 0 }
+    NF == 0 { next }
+    NF != 2 || $1 !~ /^[0-9]+$/ || $2 !~ /^[0-9]+$/ { bad = 1; next }
+    { if ($1 in parent) duplicate = 1; parent[$1] = $2; if ($1 == target) found = 1 }
+    END {
+      if (bad || duplicate || !found) exit 2
+      descendant[target] = 1
+      changed = 1
+      first = ""
+      while (changed) {
+        changed = 0
+        for (pid in parent) {
+          if (!(pid in descendant) && (parent[pid] in descendant)) {
+            descendant[pid] = 1
+            if (first == "" && pid != target) first = pid
+            changed = 1
+          }
+        }
+      }
+      if (first != "") print "DESCENDANT\t" first
+      else print "CLEAN"
+    }
+  ' 2>/dev/null)" || return 1
+
+  [[ "$tree_result" == CLEAN ]] || return 2
+  return 0
+}
+
+# Set HTRIM_VALIDATE_REASON and return success only when every live safety
+# condition is true.  All API and process data in this function is fetched on
+# that invocation; callers must not substitute an earlier snapshot.
+_htrim_validate_candidate() {
+  local id="$1" expected_cwd="$2"
+  local live_json live_exists candidate_focus focused_id focus_id_state env_focus focus_state
+  local fresh_rows row_id row_cwd row_label row_matches=0
+  local fresh_paths wt_path path_match=0
+  local panes_json pane_id agent process_json shell_pid pids pid
+  local protected_reason=""
+
+  typeset -g HTRIM_VALIDATE_REASON=""
+
+  if ! live_json="$(herdr workspace list 2>/dev/null)" || \
+     ! print -r -- "$live_json" | jq -e '.result.workspaces | type == "array"' >/dev/null 2>&1; then
+    HTRIM_VALIDATE_REASON="workspace inspection failed"
+    return 1
+  fi
+
+  if ! live_exists="$(print -r -- "$live_json" | jq -r --arg id "$id" '
+    any(.result.workspaces[]?; (.workspace_id // .id // "") == $id)')"; then
+    HTRIM_VALIDATE_REASON="workspace inspection failed"
+    return 1
+  fi
+  [[ "$live_exists" == true ]] || {
+    HTRIM_VALIDATE_REASON="workspace is no longer live"
+    return 1
+  }
+
+  # The live list has no cwd in Herdr 0.9.0. Re-read persisted identity data
+  # and require exactly one matching row, rather than trusting the preview row.
+  if ! fresh_rows="$(_h_workspace_rows 2>/dev/null)"; then
+    HTRIM_VALIDATE_REASON="persisted workspace identity inspection failed"
+    return 1
+  fi
+  while IFS=$'\t' read -r row_id row_cwd row_label; do
+    [[ "$row_id" == "$id" ]] || continue
+    row_matches=$((row_matches + 1))
+    [[ "$row_cwd" == "$expected_cwd" ]] || {
+      HTRIM_VALIDATE_REASON="workspace identity changed"
+      return 1
+    }
+  done <<< "$fresh_rows"
+  (( row_matches == 1 )) || {
+    HTRIM_VALIDATE_REASON="workspace identity is no longer unambiguous"
+    return 1
+  }
+
+  if ! fresh_paths="$(_h_git_worktree_paths 2>/dev/null)"; then
+    HTRIM_VALIDATE_REASON="Git worktree inspection failed"
+    return 1
+  fi
+  while IFS= read -r wt_path; do
+    [[ -n "$wt_path" && "$wt_path" == "$expected_cwd" ]] && path_match=1
+  done <<< "$fresh_paths"
+  (( path_match )) || {
+    HTRIM_VALIDATE_REASON="workspace path is no longer a registered Git worktree"
+    return 1
+  }
+
+  if ! candidate_focus="$(print -r -- "$live_json" | jq -r --arg id "$id" '
+    first(.result.workspaces[]? | select((.workspace_id // .id // "") == $id) |
+      if has("focused") then
+        if (.focused | type) == "boolean" then (if .focused then "1" else "0" end) else "ambiguous" end
+      elif has("is_focused") then
+        if (.is_focused | type) == "boolean" then (if .is_focused then "1" else "0" end) else "ambiguous" end
+      elif has("active") then
+        if (.active | type) == "boolean" then (if .active then "1" else "0" end) else "ambiguous" end
+      else "missing" end) // "missing"
+  ' 2>/dev/null)"; then
+    HTRIM_VALIDATE_REASON="focus inspection failed or ambiguous"
+    return 1
+  fi
+  if ! focus_id_state="$(print -r -- "$live_json" | jq -r '
+    ([.result.focused_workspace_id, .result.current_workspace_id,
+      .focused_workspace_id, .current_workspace_id]
+     | map(select(. != null)) | .[0]) as $focus |
+    if $focus == null then "missing"
+    elif ($focus | type) == "string" and ($focus | length) > 0 then $focus
+    else "ambiguous" end
+  ' 2>/dev/null)"; then
+    HTRIM_VALIDATE_REASON="focus inspection failed or ambiguous"
+    return 1
+  fi
+  if [[ "$focus_id_state" == ambiguous ]]; then
+    HTRIM_VALIDATE_REASON="focus inspection ambiguous"
+    return 1
+  fi
+  focused_id=""
+  [[ "$focus_id_state" != missing ]] && focused_id="$focus_id_state"
+  env_focus="${HERDR_WORKSPACE_ID:-}"
+  focus_state="$candidate_focus"
+  if [[ "$focus_state" == missing ]]; then
+    if [[ -n "$focused_id" || -n "$env_focus" ]]; then
+      focus_state=0
+    else
+      HTRIM_VALIDATE_REASON="focus inspection ambiguous"
+      return 1
+    fi
+  fi
+  [[ "$focus_state" != ambiguous ]] || {
+    HTRIM_VALIDATE_REASON="focus inspection ambiguous"
+    return 1
+  }
+  if [[ "$focus_state" == 1 || "$id" == "$focused_id" || "$id" == "$env_focus" ]]; then
+    HTRIM_VALIDATE_REASON="focused"
+    return 1
+  fi
+
+  if ! panes_json="$(herdr pane list --workspace "$id" 2>/dev/null)" || \
+     ! print -r -- "$panes_json" | jq -e '
+       (.result.panes | type == "array" and length > 0) and
+       (all(.result.panes[]; ((.pane_id // .id) | type == "string" and length > 0)))
+     ' >/dev/null 2>&1; then
+    HTRIM_VALIDATE_REASON="pane inspection failed or ambiguous"
+    return 1
+  fi
+
+  while IFS=$'\t' read -r pane_id agent; do
+    if [[ -z "$pane_id" ]]; then
+      protected_reason="pane inspection ambiguous"
+      break
+    fi
+    if [[ "$agent" == 1 ]]; then
+      protected_reason="recognized agent in pane $pane_id"
+      break
+    fi
+
+    if ! process_json="$(herdr pane process-info --pane "$pane_id" 2>/dev/null)" || \
+       ! print -r -- "$process_json" | jq -e '
+         (.result.process_info.shell_pid | type == "number" and floor == . and . > 0) and
+         (.result.process_info.foreground_processes | type == "array" and length > 0) and
+         (all(.result.process_info.foreground_processes[];
+           (.pid | type == "number" and floor == . and . > 0)))
+       ' >/dev/null 2>&1; then
+      protected_reason="process inspection failed or ambiguous in pane $pane_id"
+      break
+    fi
+    shell_pid="$(print -r -- "$process_json" | jq -r '.result.process_info.shell_pid')"
+    pids="$(print -r -- "$process_json" | jq -r '.result.process_info.foreground_processes[].pid')"
+    while IFS= read -r pid; do
+      if [[ "$pid" != "$shell_pid" ]]; then
+        protected_reason="non-shell foreground process (PID $pid) in pane $pane_id"
+        break 2
+      fi
+    done <<< "$pids"
+
+    local process_tree_status
+    if _htrim_check_process_tree "$shell_pid"; then
+      process_tree_status=0
+    else
+      process_tree_status=$?
+    fi
+    if (( process_tree_status != 0 )); then
+      case $process_tree_status in
+        2) protected_reason="background or descendant process in pane $pane_id" ;;
+        *) protected_reason="process-table inspection failed or shell PID is absent in pane $pane_id" ;;
+      esac
+      break
+    fi
+  done < <(print -r -- "$panes_json" | jq -r '
+    .result.panes[] |
+    [(.pane_id // .id),
+     (if ((.agent? != null and .agent? != false and .agent? != "") or
+          (.agent_session.agent? != null and .agent_session.agent? != false and .agent_session.agent? != "") or
+          (.agent_name? != null and .agent_name? != false and .agent_name? != "") or
+          (.agent_session_id? != null and .agent_session_id? != false and .agent_session_id? != "")) then "1" else "0" end)] | @tsv
+  ')
+
+  if [[ -n "$protected_reason" ]]; then
+    HTRIM_VALIDATE_REASON="$protected_reason"
+    return 1
+  fi
+  return 0
+}
+
+local workspaces_json
+if ! workspaces_json="$(herdr workspace list 2>/dev/null)" || \
+   ! print -r -- "$workspaces_json" | jq -e '.result.workspaces | type == "array"' >/dev/null 2>&1; then
+  echo "Could not inspect Herdr workspaces; refusing to close anything." >&2
+  return 1
+fi
+
+# A workspace is eligible only when its identity cwd is exactly one of the
+# repository's registered Git worktree paths. The live API intentionally omits
+# cwd, so identity comes from persisted Herdr rows.
+local git_paths
+if ! git_paths="$(_h_git_worktree_paths)"; then
+  echo "Could not inspect Git worktrees; refusing to close anything." >&2
+  return 1
+fi
+local workspace_rows
+if ! workspace_rows="$(_h_workspace_rows 2>/dev/null)"; then
+  echo "Could not inspect persisted Herdr workspace paths; refusing to close anything." >&2
+  return 1
+fi
+
+local candidates=0 protected=0 skipped=0
+local -a candidate_ids candidate_labels candidate_paths
+local id cwd label live
+while IFS=$'\t' read -r id cwd label; do
+  [[ -n "$id" ]] || continue
+
+  live="$(print -r -- "$workspaces_json" | jq -r --arg id "$id" '
+    any(.result.workspaces[]?; (.workspace_id // .id // "") == $id)')"
+  if [[ "$live" != true ]]; then
+    skipped=$((skipped + 1))
+    continue
+  fi
+
+  local path_match=0 wt_path
+  while IFS= read -r wt_path; do
+    [[ -n "$wt_path" && "$cwd" == "$wt_path" ]] && path_match=1 && break
+  done <<< "$git_paths"
+  if (( ! path_match )); then
+    skipped=$((skipped + 1))
+    continue
+  fi
+
+  if ! _htrim_validate_candidate "$id" "$cwd"; then
+    if (( ! auto )); then
+      echo "PROTECTED $id (${label:-workspace}) — $HTRIM_VALIDATE_REASON"
+    fi
+    protected=$((protected + 1))
+  else
+    if (( ! auto )); then
+      echo "CANDIDATE $id (${label:-workspace}) — idle shell-only panes with no descendants"
+    fi
+    candidate_ids+=("$id")
+    candidate_labels+=("${label:-workspace}")
+    candidate_paths+=("$cwd")
+    candidates=$((candidates + 1))
+  fi
+done <<< "$workspace_rows"
+
+print "htrimworkspaces: $candidates candidate(s), $protected protected, $skipped skipped (outside this repository)"
+(( candidates > 0 )) || return 0
+(( apply || auto )) || return 0
+
+if (( apply )); then
+  local reply
+  if ! read "reply?Close these $candidates Herdr workspace(s)? [y/N] "; then
+    reply="n"
+  fi
+  if [[ "$reply" != [yY] ]]; then
+    echo "No workspaces closed."
+    return 0
+  fi
+fi
+
+# First pass: refresh every candidate as a group immediately after the user
+# confirms (or immediately for --auto). Nothing from preview is sufficient for
+# closing.
+local i close_id post_preview_skipped=0 immediate_skipped=0 closed=0
+for (( i = 1; i <= candidates; i++ )); do
+  close_id="${candidate_ids[$i]}"
+  if ! _htrim_validate_candidate "$close_id" "${candidate_paths[$i]}"; then
+    echo "SKIP $close_id (${candidate_labels[$i]}) — $HTRIM_VALIDATE_REASON"
+    candidate_ids[$i]=""
+    post_preview_skipped=$((post_preview_skipped + 1))
+  fi
+done
+
+# Second pass: refresh the candidate immediately before the close command. This
+# catches changes while another candidate was being checked or closed.
+for (( i = 1; i <= candidates; i++ )); do
+  close_id="${candidate_ids[$i]}"
+  [[ -n "$close_id" ]] || continue
+  if ! _htrim_validate_candidate "$close_id" "${candidate_paths[$i]}"; then
+    echo "SKIP $close_id (${candidate_labels[$i]}) — $HTRIM_VALIDATE_REASON"
+    immediate_skipped=$((immediate_skipped + 1))
+    continue
+  fi
+  if herdr workspace close "$close_id" >/dev/null 2>&1; then
+    echo "Closed Herdr workspace: $close_id (${candidate_labels[$i]}) — Git worktree preserved (${candidate_paths[$i]})"
+    closed=$((closed + 1))
+  else
+    echo "Could not close Herdr workspace: $close_id" >&2
+  fi
+done
+
+if (( auto )); then
+  print "htrimworkspaces --auto: closed $closed, skipped $((post_preview_skipped + immediate_skipped)) after preview (protected $protected)"
+fi

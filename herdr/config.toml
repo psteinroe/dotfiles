@@ -15,6 +15,12 @@ auto_switch = false
 [remote]
 manage_ssh_config = true
 
+[ui]
+# Start with navigation chrome out of the way; agent work remains the primary view.
+sidebar_start_collapsed = true
+sidebar_collapsed_mode = "hidden"
+agent_panel_sort = "priority"
+
 [ui.sound]
 enabled = false
 
@@ -31,6 +37,7 @@ remove_worktree = ""
 # Direct, home-row Herdr object navigation. Ctrl+h/j/k/l is reserved for pane
 # navigation; Option+j/k cycles agents and Option+h/l cycles workspaces.
 workspace_picker = "prefix+w"
+toggle_sidebar = "prefix+b"
 previous_workspace = "alt+h"
 next_workspace = "alt+l"
 previous_agent = "alt+k"

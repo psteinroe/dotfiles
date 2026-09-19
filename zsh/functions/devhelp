@@ -45,8 +45,9 @@ if [[ "$topic" == all || "$topic" == remote || "$topic" == worktree ]]; then
   _case_row "hdev / rdev <repo> [branch|pr]" "open Herdr project session"
   _case_row "wtclean / rwtclean <repo>" "clean integrated/stale worktrees"
   _case_row "wtforceclean / rwtforceclean <repo>" "select and force-remove worktrees"
-  _case_row "hwtcreate / rhwtcreate" "ensure worktree and focus/open Herdr workspace"
-  _case_row "hsyncworktrees / rhsyncworktrees" "sync Git worktrees into Herdr workspaces"
+  _case_row "hwtcreate / rhwtcreate" "ensure requested worktree and focus/open its workspace"
+  _case_row "htrimworkspaces" "preview/confirm, or --auto close only strictly safe idle siblings"
+  _case_row "hsyncworktrees / rhsyncworktrees" "manual escape hatch: expose all Git worktrees (or prune stale)"
   [[ "$topic" == all ]] && print
 fi
 
@@ -57,6 +58,8 @@ if [[ "$topic" == all || "$topic" == worktree ]]; then
   _case_row "wtcheckout <branch|pr>" "checkout an existing branch or PR into a worktree"
   _case_row "wtlist" "list/select existing worktrees"
   _case_row "wtensure <branch|pr>" "upsert worktree and cd into it"
+  _case_row "Agent-first policy" "navigation starts collapsed; opening auto-cleans safe shell-idle siblings"
+  _case_row "htrimworkspaces [--apply|--auto]" "preview/confirm, or auto-close strictly safe shell-idle siblings (Git stays)"
   [[ "$topic" == all ]] && print
 fi
 
