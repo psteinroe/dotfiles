@@ -1,10 +1,11 @@
 # From Mac: attach/create a Herdr session on the remote VM as the real dev user.
 # Usage: rherdr <repo> [worktree|branch|pr-number]
 #
-# This intentionally does not replace rdev. It is the safe Herdr-first remote
-# path while exe.dev SSH logs in as exedev and existing workflows sudo into
-# psteinroe. Native `herdr --remote rdev` would run as the SSH login user, so
-# this wrapper runs the remote Herdr TUI as psteinroe instead.
+# This intentionally does not replace rdev. It is the explicit direct/native
+# remote recovery and Moshi-style attach path while exe.dev SSH logs in as
+# exedev and existing workflows sudo into psteinroe. Native `herdr --remote
+# rdev` would run as the SSH login user, so this wrapper runs the remote Herdr
+# TUI as psteinroe instead.
 if [[ $# -lt 1 || $# -gt 2 ]]; then
   echo "Usage: rherdr <repo> [worktree|branch|pr-number]" >&2
   return 1

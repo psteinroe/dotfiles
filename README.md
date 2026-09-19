@@ -45,7 +45,7 @@ workspace; `alt+h`/`alt+l` switch workspaces and `alt+k`/`alt+j` switch agents.
 
 ```bash
 hdev dotfiles main       # local Herdr session/workspace
-rdev hellomateo main     # remote Herdr over Tailscale
+rdev hellomateo main     # prepare/register remote session, then return
 hellomateo main          # shortcut for hdev hellomateo main
 rhellomateo main         # shortcut for rdev hellomateo main
 ```
@@ -56,12 +56,21 @@ Remote defaults:
 - `rdev-exe` → exe.dev SSH fallback as `exedev`
 - Worktrees stay at `~/Developer/<repo>.git/<worktree>`
 
+There is one local Herdr client. `rdev <repo> [branch|pr]` SSHes to the remote,
+prepares the named session, and returns; it does not open a second remote TUI.
+Identity is the target plus session (`<host>` and `<repo>`), not the label.
+New profiles use the canonical `<host>/<repo>` label, while existing labels are
+preserved when their target/session profile is reused. Profiles are refreshed
+live in the Herdr client. `rherdr <repo> [branch|pr]` remains the explicit
+direct remote attach for recovery.
+
 ### Moshi mobile access
 
 Home Manager installs Mosh and a pinned `moshi-hook`, runs the hook as a
 persistent systemd user service, and exposes the managed Herdr sessions to
-Moshi. For the primary mobile connection, install Tailscale on the phone and
-use:
+Moshi. Moshi remains independent of the local Herdr client and connects
+directly to the named remote session. For the primary mobile connection,
+install Tailscale on the phone and use:
 
 - Host: `psteinroe-dev.tail6aabd2.ts.net`
 - Port: `22`
@@ -77,7 +86,7 @@ moshi-hook host setup \
 ```
 
 The exe.dev SSH configuration accepts the generated key from
-`~/.ssh/authorized_keys`, and the Mosh server is exposed on the non-interactive
+`~/.ssh/authorized_keys`, and the Mosh server is exposed on the non-TUI
 SSH path. Agent notification pairing remains a one-time secret-bearing step:
 
 ```bash
@@ -97,7 +106,7 @@ Local and remote helpers intentionally mirror each other where possible:
 | Local | Remote | Purpose |
 | --- | --- | --- |
 | `rebuild` | `rrebuild [host]` | Rebuild locally/remotely, then reload resources in idle Pi agents |
-| `hdev <repo> [branch\|pr]` | `rdev <repo> [branch\|pr]` | Open local/remote Herdr project session |
+| `hdev <repo> [branch\|pr]` | `rdev <repo> [branch\|pr]` | Open locally, or prepare/register remote session and return to the Herdr client |
 | `wtclean` | `rwtclean <repo>` | Clean integrated/stale worktrees |
 | `wtforceclean` | `rwtforceclean <repo>` | Select and force-remove worktrees |
 | `hwtcreate <branch\|pr>` | `rhwtcreate <repo> <branch\|pr>` | Ensure requested worktree and focus/open its workspace |
@@ -106,7 +115,11 @@ Local and remote helpers intentionally mirror each other where possible:
 | — | `rauth [all\|gh\|pi\|mcp\|exa]` | Copy local GitHub/Pi/MCP/Exa auth to the remote |
 | — | `ssh rdev-exe` | Recovery path via exe.dev gateway |
 
-For the full command list, run `devhelp`. Normal preparation and the worktree
+For the full command list, run `devhelp`. `rhwtcreate` and `rhsyncworktrees`
+use `rdev` preparation/registration without a second TUI when their remote
+session is absent. First-time machine add may perform SSH/bootstrap
+compatibility setup and prompt. `rherdr` is reserved for direct
+recovery/Moshi attachment. Normal preparation and the worktree
 hook only prune stale/missing Herdr workspaces and open the requested target;
 there is no bulk workspace sync. `hsyncworktrees` without an option (or with
 `--prune`) is the manual **expose all worktrees** escape hatch, not normal

@@ -1,4 +1,4 @@
-# Open a remote project as a native Herdr session over the primary SSH target.
+# Prepare/register a remote Herdr session over the primary SSH target, then return.
 # Usage: rdev <repo> [worktree|branch|pr-number]
 if [[ $# -lt 1 || $# -gt 2 ]]; then
   echo "Usage: rdev <repo> [worktree|branch|pr-number]" >&2
@@ -17,6 +17,7 @@ local dotfiles="${RDEV_REMOTE_DOTFILES:-${remote_home}/Developer/dotfiles}"
 
 local local_dotfiles="${LOCAL_DOTFILES:-$HOME/Developer/dotfiles}"
 source "$local_dotfiles/zsh/functions/_herdr_binary" || return
+source "$local_dotfiles/zsh/functions/_herdr_machine_helpers" || return
 local herdr_bin
 herdr_bin="$(_herdr_binary)" || return
 source "$local_dotfiles/zsh/functions/_rdev_title_helpers" 2>/dev/null || true
@@ -35,4 +36,9 @@ encoded=$(printf '%s' "$prepare_cmd" | base64 | tr -d '\n') || return
 runner="encoded=${(q)encoded}; cmd=\$(printf %s \"\$encoded\" | base64 -d); HOME=${(q)remote_home} USER=${(q)remote_user} LOGNAME=${(q)remote_user} PATH=${(q)remote_path} ${(q)remote_home}/.nix-profile/bin/zsh -lc \"\$cmd\""
 
 ssh -T "$host" "$runner" || return
-"$herdr_bin" --remote "$host" --remote-keybindings server --session "$repo"
+
+# hprepare starts the named remote server. Register it only after preparation
+# succeeds so a failed remote operation cannot mutate the local client.
+_herdr_machine_register "$host" "$repo" "$herdr_bin" || return
+local selected_label="$HERDR_MACHINE_LABEL"
+print -r -- "Remote session '$repo' is ready in your existing Herdr client (saved profile: $selected_label)."

@@ -26,11 +26,11 @@ esac
 
 if [[ "$topic" == all || "$topic" == remote || "$topic" == worktree ]]; then
   _case_header "Project shortcuts"
-  _case_row "hellomateo / rhellomateo" "open local/remote Herdr project session"
+  _case_row "hellomateo / rhellomateo" "open local; prepare/register remote Herdr session"
   _case_row "ceplatform / rceplatform" "ce-platform local/remote session"
   _case_row "radiomarl / rradiomarl" "radio-marl-app local/remote session"
   _case_row "ninjascale / rninjascale" "ninjascale local/remote session"
-  _case_row "dotfiles / rdotfiles" "open local/remote Herdr project session"
+  _case_row "dotfiles / rdotfiles" "open local; prepare/register remote Herdr session"
   _case_row "sbch / rsbch" "supabase-cache-helpers local/remote session"
   _case_row "pgls / rpgls" "postgres-language-server local/remote session"
   _case_row "pgconductor / rpgconductor" "postgres-conductor local/remote session"
@@ -42,12 +42,13 @@ if [[ "$topic" == all || "$topic" == remote || "$topic" == worktree ]]; then
   _case_header "Local / remote pairs"
   _case_row "rebuild / rrebuild [host]" "rebuild and safely reload idle Pi agents"
   _case_row "pireload" "reload resources in currently idle Herdr Pi agents"
-  _case_row "hdev / rdev <repo> [branch|pr]" "open Herdr project session"
+  _case_row "Herdr remote model" "one local client; one saved profile per remote named session"
+  _case_row "hdev / rdev <repo> [branch|pr]" "open locally; prepare/register remotely and return"
   _case_row "wtclean / rwtclean <repo>" "clean integrated/stale worktrees"
   _case_row "wtforceclean / rwtforceclean <repo>" "select and force-remove worktrees"
   _case_row "hwtcreate / rhwtcreate" "ensure requested worktree and focus/open its workspace"
   _case_row "htrimworkspaces" "preview/confirm, or --auto close only strictly safe idle siblings"
-  _case_row "hsyncworktrees / rhsyncworktrees" "manual escape hatch: expose all Git worktrees (or prune stale)"
+  _case_row "hsyncworktrees / rhsyncworktrees" "manual expose-all escape hatch; remote startup uses rdev without a second TUI"
   [[ "$topic" == all ]] && print
 fi
 
@@ -67,7 +68,8 @@ if [[ "$topic" == all || "$topic" == remote ]]; then
   _case_header "Remote-only helpers"
   _case_row "rauth [all|gh|pi|mcp|exa]" "copy GitHub/Pi/MCP/Exa auth to the remote"
   _case_row "rssh [dir]" "open a plain remote psteinroe shell"
-  _case_row "rpushdev [repo] [msg]" "commit/push current branch, then open it with rdev"
+  _case_row "rpushdev [repo] [msg]" "commit/push, then prepare/register with rdev and return"
+  _case_row "rherdr <repo> [branch|pr]" "direct remote recovery/Moshi attach (explicit TUI)"
   _case_row "ssh rdev-exe" "recovery path via exe.dev gateway"
   [[ "$topic" == all ]] && print
 fi

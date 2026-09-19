@@ -1,11 +1,12 @@
-# From Mac: commit/push current local branch, then attach that branch on the remote VM.
+# From Mac: commit/push current local branch, then prepare/register it remotely.
 # Usage: rpushdev [repo] [commit-message...]
 #
 # This is the "move this local work to remote" helper:
 #   1. detect current local branch
 #   2. commit dirty changes after confirmation
 #   3. push the branch to origin
-#   4. run `rdev <repo> <branch>` to open the remote Herdr workspace
+#   4. run `rdev <repo> <branch>` to prepare/register the remote session
+#      and return to the existing local Herdr client
 local repo="${1:-}"
 if [[ $# -gt 0 ]]; then
   shift

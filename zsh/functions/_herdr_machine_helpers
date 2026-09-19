@@ -1,0 +1,128 @@
+# Helpers for registering remote Herdr sessions in the local client.
+# Herdr 0.9.0 returns a bare array from `machine list --json`; each profile
+# includes id, label, target, session, enabled, and selected. Identity is the
+# target/session pair. HERDR_MACHINE_LABEL is the documented result variable.
+
+_herdr_machine_register() {
+  emulate -L zsh
+
+  if [[ $# -ne 3 ]]; then
+    print -u2 -r -- "herdr machine register: expected target, session, and Herdr binary"
+    return 1
+  fi
+
+  local target="$1"
+  local session="$2"
+  local herdr_bin="$3"
+  typeset -g HERDR_MACHINE_LABEL=''
+  local machine_json profile_count selected_id selected_label canonical_label
+  local -a enabled_ids disabled_ids
+  local allow_add=1
+
+  if ! command -v jq >/dev/null 2>&1; then
+    print -u2 -r -- "rdev: jq is required to inspect Herdr machine profiles"
+    return 1
+  fi
+
+  canonical_label="$target/$session"
+  while true; do
+    if ! machine_json=$("$herdr_bin" machine list --json); then
+      print -u2 -r -- "rdev: herdr machine list --json failed"
+      return 1
+    fi
+
+    # Validate the complete shape before querying it. In particular, selected
+    # is part of the Herdr 0.9.0 response and must not be silently discarded.
+    if ! jq -e '
+      type == "array" and
+      all(.[];
+        type == "object" and
+        (.id | type) == "string" and
+        (.label | type) == "string" and
+        (.target | type) == "string" and
+        (.session | type) == "string" and
+        (.enabled | type) == "boolean" and
+        (.selected | type) == "boolean"
+      )
+    ' <<< "$machine_json" >/dev/null 2>&1; then
+      print -u2 -r -- "rdev: herdr machine list --json returned malformed or unsupported profile data"
+      return 1
+    fi
+
+    enabled_ids=("${(@f)$(jq -r --arg target "$target" --arg session "$session" \
+      '.[] | select(.target == $target and .session == $session and .enabled == true) | .id' \
+      <<< "$machine_json")}")
+    disabled_ids=("${(@f)$(jq -r --arg target "$target" --arg session "$session" \
+      '.[] | select(.target == $target and .session == $session and .enabled == false) | .id' \
+      <<< "$machine_json")}")
+    enabled_ids=("${(@)enabled_ids:#}")
+    disabled_ids=("${(@)disabled_ids:#}")
+    profile_count=$(( ${#enabled_ids} + ${#disabled_ids} ))
+
+    if (( profile_count > 1 )); then
+      print -u2 -r -- "rdev: reconciling $profile_count Herdr profiles for $target/$session"
+    fi
+
+    if (( ${#enabled_ids} )); then
+      # Stable JSON order makes the first enabled profile deterministic.
+      selected_id="${enabled_ids[1]}"
+    elif (( ${#disabled_ids} )); then
+      selected_id="${disabled_ids[1]}"
+    else
+      if (( ! allow_add )); then
+        print -u2 -r -- "rdev: Herdr profile add did not produce a usable $target/$session profile"
+        return 1
+      fi
+
+      # Existing noncanonical labels are intentionally preserved, but the new
+      # canonical label cannot be owned by a different target/session.
+      if jq -e --arg label "$canonical_label" --arg target "$target" --arg session "$session" \
+        'any(.[]; .label == $label and (.target != $target or .session != $session))' \
+        <<< "$machine_json" >/dev/null 2>&1; then
+        print -u2 -r -- "rdev: cannot add $target/$session: canonical label $canonical_label already belongs to another target/session"
+        return 1
+      fi
+      if ! "$herdr_bin" machine add "$target" \
+          --label "$canonical_label" \
+          --remote-session "$session"; then
+        print -u2 -r -- "rdev: failed to add Herdr profile $canonical_label"
+        return 1
+      fi
+      # A concurrent add can create another enabled exact profile. Re-list and
+      # reconcile rather than trusting the add result or creating another one.
+      allow_add=0
+      continue
+    fi
+
+    selected_label=$(jq -r --arg id "$selected_id" \
+      '[.[] | select(.id == $id)][0].label // empty' <<< "$machine_json") || {
+      print -u2 -r -- "rdev: could not inspect selected Herdr machine profile"
+      return 1
+    }
+    [[ -n "$selected_label" ]] || {
+      print -u2 -r -- "rdev: selected Herdr profile $selected_id has no label"
+      return 1
+    }
+
+    # Keep the first enabled match (or the first disabled match when none is
+    # enabled), and disable every other enabled exact match.
+    local id
+    for id in "${enabled_ids[@]}"; do
+      [[ "$id" == "$selected_id" ]] && continue
+      if ! "$herdr_bin" machine disable "$id"; then
+        print -u2 -r -- "rdev: failed to disable duplicate Herdr profile $id for $target/$session"
+        return 1
+      fi
+    done
+
+    if (( ! ${#enabled_ids} )); then
+      if ! "$herdr_bin" machine enable "$selected_id"; then
+        print -u2 -r -- "rdev: failed to enable saved Herdr profile $selected_id"
+        return 1
+      fi
+    fi
+
+    typeset -g HERDR_MACHINE_LABEL="$selected_label"
+    return 0
+  done
+}
