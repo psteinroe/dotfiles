@@ -53,7 +53,7 @@ Append `--prune-only` after `_` for cleanup. This closes stale Herdr workspaces 
 
 Helpers own worktree resolution, setup, and workspace reuse through `wtensure` and `wtsetup`, preserving the managed `~/Developer/<repo>.git/<worktree>` layout. On failure, report the error rather than bypassing them with raw `git worktree add`, `herdr worktree create`, or direct `herdr workspace create` commands.
 
-`hwtcreate` can fetch and update branches through `wtensure`, including rebasing clean divergent branches. Opening or creating a worktree with focus automatically runs strict cleanup of sibling workspaces; `--no-focus` skips cleanup so the newly prepared idle workspace is not immediately removed. Cleanup closes only shell-idle siblings after repeated live validation, preserves Git worktrees, and leaves focused, agent-backed, active, background/descendant, and uncertain states untouched. Use live Herdr inspection for read-only requests; do not use creation helpers merely to inspect a workspace.
+`hwtcreate` can fetch and update branches through `wtensure`, including rebasing clean divergent branches. Opening or creating a worktree with focus automatically runs strict cleanup of sibling workspaces; `--no-focus` skips cleanup so the newly prepared idle workspace is not immediately removed. Cleanup closes only clean, shell-idle siblings after repeated live validation, preserves Git worktrees, and leaves focused, agent-backed, dirty, active, background/descendant, and uncertain states untouched. Use live Herdr inspection for read-only requests; do not use creation helpers merely to inspect a workspace.
 
 ## 3. Continue in the resolved workspace
 

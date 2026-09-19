@@ -50,6 +50,13 @@ case "$kind" in
   *) exit 2 ;;
 esac
 EOF
+cat > "$fixture/bin/git" <<'EOF'
+#!/bin/sh
+set -eu
+# htrimworkspaces only asks for `git -C <path> status --porcelain ...`.
+[ "$HTRIM_MODE" = dirty ] && printf '%s\n' ' M unfinished.txt'
+exit 0
+EOF
 cat > "$fixture/bin/ps" <<'EOF'
 #!/bin/sh
 set -eu
@@ -63,7 +70,7 @@ case "$HTRIM_MODE" in
   *) printf '500 1\n' ;;
 esac
 EOF
-chmod +x "$fixture/bin/herdr" "$fixture/bin/ps"
+chmod +x "$fixture/bin/herdr" "$fixture/bin/git" "$fixture/bin/ps"
 : > "$fixture/closes"
 
 run_trim() {
@@ -81,6 +88,12 @@ run_trim() {
     source "$repo_root/zsh/functions/htrimworkspaces" "$@"
   )
 }
+
+# Uncommitted/untracked work protects the workspace even when its shell is idle.
+dirty=$(run_trim dirty)
+[[ "$dirty" == *'0 candidate(s)'* ]]
+[[ "$dirty" == *'dirty Git worktree'* ]]
+[[ ! -s "$fixture/closes" ]]
 
 # A descendant of the pane shell protects the workspace.
 background=$(run_trim background)

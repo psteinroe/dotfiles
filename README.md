@@ -112,11 +112,12 @@ there is no bulk workspace sync. `hsyncworktrees` without an option (or with
 `--prune`) is the manual **expose all worktrees** escape hatch, not normal
 maintenance. `--prune-only` is the safe cleanup mode. `htrimworkspaces` previews
 idle candidates and, with `--apply`, asks for confirmation while protecting
-focused workspaces, agents, non-shell processes, background/descendant processes,
-and uncertain inspections. Opening a worktree automatically runs the same strict
-cleanup for sibling workspaces: only shell-idle siblings can close; Git worktrees,
-focused workspaces, agents, active commands, background/descendant jobs, and
-uncertain states are preserved. Closing a Herdr workspace never deletes its Git
+focused workspaces, agents, dirty Git worktrees, non-shell processes,
+background/descendant processes, and uncertain inspections. Opening a worktree
+automatically runs the same strict cleanup for sibling workspaces: only clean,
+shell-idle siblings can close; Git worktrees, focused workspaces, agents, dirty
+files, active commands, background/descendant jobs, and uncertain states are
+preserved. Closing a Herdr workspace never deletes its Git
 worktree.
 
 Rebuilds invoke `pireload`, which reloads only idle Pi agents with no child

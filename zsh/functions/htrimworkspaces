@@ -69,7 +69,7 @@ _htrim_validate_candidate() {
   local id="$1" expected_cwd="$2"
   local live_json live_exists candidate_focus focused_id focus_id_state env_focus focus_state
   local fresh_rows row_id row_cwd row_label row_matches=0
-  local fresh_paths wt_path path_match=0
+  local fresh_paths wt_path path_match=0 git_status
   local panes_json pane_id agent process_json shell_pid pids pid
   local protected_reason=""
 
@@ -121,6 +121,18 @@ _htrim_validate_candidate() {
     HTRIM_VALIDATE_REASON="workspace path is no longer a registered Git worktree"
     return 1
   }
+
+  # Dirty worktrees usually represent unfinished work. The files would survive
+  # workspace closure, but preserving their terminal context is the safer
+  # automatic policy. A failed Git inspection is uncertain and also protects.
+  if ! git_status="$(command git -C "$expected_cwd" status --porcelain --untracked-files=normal 2>/dev/null)"; then
+    HTRIM_VALIDATE_REASON="Git status inspection failed"
+    return 1
+  fi
+  if [[ -n "$git_status" ]]; then
+    HTRIM_VALIDATE_REASON="dirty Git worktree"
+    return 1
+  fi
 
   if ! candidate_focus="$(print -r -- "$live_json" | jq -r --arg id "$id" '
     first(.result.workspaces[]? | select((.workspace_id // .id // "") == $id) |
