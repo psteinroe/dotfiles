@@ -18,6 +18,9 @@ ALLOW_HOME_MANAGER_SKIP="${ALLOW_HOME_MANAGER_SKIP:-0}"
 # Set GITHUB_AUTH=1 on generic remotes if you want gh auth + SSH key upload.
 GITHUB_AUTH="${GITHUB_AUTH:-0}"
 PASSWORDLESS_SUDO="${PASSWORDLESS_SUDO:-1}"
+# The standalone Linux profile uses direct tailnet binding for T3 and does not
+# need Tailscale operator privileges. Set this only when opting into Serve.
+CONFIGURE_TAILSCALE_OPERATOR="${CONFIGURE_TAILSCALE_OPERATOR:-0}"
 
 log() {
   printf '\n=== %s ===\n' "$*"
@@ -109,9 +112,14 @@ if [ "$PASSWORDLESS_SUDO" = "1" ] && [ "$(id -u)" -eq 0 ]; then
 fi
 
 # Keep the managed user's systemd services running without an active SSH
-# login. This is required by long-lived remote services such as moshi-hook.
-if [ -d /exe.dev ] && command -v loginctl >/dev/null 2>&1; then
-  as_root loginctl enable-linger "$DEV_USER"
+# login. This is required by long-lived remote services such as moshi-hook and
+# T3 Code. On non-systemd hosts this is optional, so do not abort bootstrap.
+if [ -d /run/systemd/system ] && command -v loginctl >/dev/null 2>&1; then
+  if ! as_root loginctl enable-linger "$DEV_USER"; then
+    warn "Could not enable systemd lingering for ${DEV_USER}; continuing bootstrap."
+  fi
+else
+  warn "systemd was not detected; skipping user lingering for ${DEV_USER}."
 fi
 
 log "Installing Determinate Nix"
@@ -193,6 +201,41 @@ if [ "$RUN_HOME_MANAGER" = "1" ]; then
     warn "Home Manager switch failed. Re-run with ALLOW_HOME_MANAGER_SKIP=1 only if you intentionally want a partial bootstrap."
     exit 1
   fi
+fi
+
+if [ "$CONFIGURE_TAILSCALE_OPERATOR" = "1" ]; then
+  log "Configuring Tailscale operator"
+  tailscale_bin="$(as_dev 'command -v tailscale' 2>/dev/null || true)"
+  if [ -z "$tailscale_bin" ]; then
+    warn "Tailscale CLI is not available after Home Manager activation."
+    warn "Cannot enable the explicitly requested Tailscale Serve transport."
+    exit 1
+  else
+    tailscale_state="$(as_root "$tailscale_bin" status --json 2>/dev/null || true)"
+    if ! printf '%s\n' "$tailscale_state" | grep -Eq '"BackendState"[[:space:]]*:[[:space:]]*"Running"'; then
+      warn "Tailscale daemon is not running or this host is not enrolled."
+      warn "Enroll the host, then rerun with CONFIGURE_TAILSCALE_OPERATOR=1."
+      exit 1
+    else
+      operator_prefs="$(as_root "$tailscale_bin" debug prefs 2>/dev/null || true)"
+      current_operator="$({
+        printf '%s\n' "$operator_prefs" \
+          | sed -n 's/.*"OperatorUser"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p'
+      } || true)"
+
+      if [ -n "$current_operator" ] && [ "$current_operator" != "$DEV_USER" ]; then
+        warn "Tailscale operator is already ${current_operator}; refusing to replace it with ${DEV_USER}."
+        exit 1
+      elif [ "$current_operator" != "$DEV_USER" ] \
+        && ! as_root "$tailscale_bin" set --operator="$DEV_USER"; then
+        warn "Could not configure Tailscale operator=${DEV_USER}."
+        warn "Run: sudo tailscale set --operator=${DEV_USER}"
+        exit 1
+      fi
+    fi
+  fi
+else
+  echo "Tailscale operator setup is not needed for the direct-tailnet T3 transport."
 fi
 
 log "Done"

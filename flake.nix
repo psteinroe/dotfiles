@@ -14,6 +14,17 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    disko = {
+      url = "github:nix-community/disko";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    nixos-anywhere = {
+      url = "github:nix-community/nixos-anywhere";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.disko.follows = "disko";
+    };
+
     nix-homebrew.url = "github:zhaofengli/nix-homebrew";
 
     # Pi coding agent (from llm-agents.nix)
@@ -66,6 +77,7 @@
       hostname = "psteinroe";
       darwinSystem = "aarch64-darwin";
       linuxX86System = "x86_64-linux";
+      hetznerT3codeTransport = "tailscale-serve";
       darwinHomeDirectory = "/Users/${username}";
       darwinDotfilesPath = "${darwinHomeDirectory}/Developer/dotfiles";
       darwinSpecialArgs = {
@@ -83,6 +95,7 @@
           homeDirectory,
           isDarwin ? false,
           isLinux ? false,
+          t3codeTransport ? "tailscale-serve",
         }:
         home-manager.lib.homeManagerConfiguration {
           pkgs = import nixpkgs {
@@ -97,6 +110,7 @@
               homeDirectory
               isDarwin
               isLinux
+              t3codeTransport
               ;
             dotfilesPath = "${homeDirectory}/Developer/dotfiles";
           };
@@ -139,7 +153,54 @@
         system = linuxX86System;
         homeDirectory = "/home/${username}";
         isLinux = true;
+        # Generic/standalone Linux includes exe.dev, whose Tailscale Serve path
+        # currently drops large post-quantum TLS handshakes. Bind directly to
+        # its tailnet address instead; traffic remains private to Tailscale.
+        t3codeTransport = "tailscale-direct";
       };
+
+      nixosConfigurations.hetzner-dev = nixpkgs.lib.nixosSystem {
+        system = linuxX86System;
+        specialArgs = {
+          inherit inputs self username;
+          t3codeTransport = hetznerT3codeTransport;
+          system = linuxX86System;
+          homeDirectory = "/home/${username}";
+          dotfilesPath = self;
+          isDarwin = false;
+          isLinux = true;
+        };
+        modules = [
+          inputs.disko.nixosModules.disko
+          ./nix/nixos/hosts/hetzner-dev
+          home-manager.nixosModules.home-manager
+          {
+            nixpkgs.overlays = [ rust-overlay.overlays.default ];
+            home-manager = {
+              useGlobalPkgs = true;
+              useUserPackages = true;
+              backupFileExtension = "hm-backup";
+              extraSpecialArgs = {
+                inherit inputs username;
+                system = linuxX86System;
+                homeDirectory = "/home/${username}";
+                dotfilesPath = self;
+                isDarwin = false;
+                isLinux = true;
+                t3codeTransport = hetznerT3codeTransport;
+              };
+              users.${username} = import ./nix/home;
+            };
+          }
+        ];
+      };
+
+      apps = nixpkgs.lib.genAttrs [ darwinSystem linuxX86System ] (system: {
+        nixos-anywhere = {
+          type = "app";
+          program = "${inputs.nixos-anywhere.packages.${system}.default}/bin/nixos-anywhere";
+        };
+      });
 
       # Expose the package set
       darwinPackages = self.darwinConfigurations.${hostname}.pkgs;

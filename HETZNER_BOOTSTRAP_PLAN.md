@@ -1,5 +1,9 @@
 # Hetzner Remote Dev Plan — Bootstrap Script
 
+> **Legacy design:** use the declarative NixOS profile and current runbook in
+> `docs/hetzner-nixos.md` for the prepared exe.dev replacement. This Ubuntu/
+> Debian bootstrap plan is retained only as design history.
+
 ## Goal
 
 Run the existing remote-dev workflow on a normal Hetzner Linux server while keeping the user-facing commands unchanged:

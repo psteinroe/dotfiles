@@ -3,7 +3,7 @@
 local host="${1:-${RDEV_HOST:-rdev}}"
 local remote_user="${RDEV_REMOTE_USER:-psteinroe}"
 local remote_home="${RDEV_HOME:-/home/${remote_user}}"
-local remote_path="${remote_home}/.local/bin:${remote_home}/.nix-profile/bin:/nix/var/nix/profiles/default/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+local remote_path="${remote_home}/.local/bin:/etc/profiles/per-user/${remote_user}/bin:${remote_home}/.nix-profile/bin:/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 local dotfiles="${RDEV_REMOTE_DOTFILES:-${remote_home}/Developer/dotfiles}"
 
 if [[ $# -gt 1 ]]; then
@@ -16,5 +16,5 @@ fi
 local remote_cmd="set -e; cd ${(q)dotfiles} || exit 1; git fetch --prune origin; upstream=\$(git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || printf 'origin/main'); git reset --hard \"\$upstream\"; git clean -fd; export DOTFILES_DIR=${(q)dotfiles}; source ${(q)dotfiles}/zsh/functions/rebuild"
 local encoded
 encoded=$(printf '%s' "$remote_cmd" | base64 | tr -d '\n') || return
-local runner="encoded=${(q)encoded}; cmd=\$(printf %s \"\$encoded\" | base64 -d); sudo -u ${(q)remote_user} HOME=${(q)remote_home} USER=${(q)remote_user} LOGNAME=${(q)remote_user} PATH=${(q)remote_path} ${(q)remote_home}/.nix-profile/bin/zsh -lc \"\$cmd\""
+local runner="encoded=${(q)encoded}; cmd=\$(printf %s \"\$encoded\" | base64 -d); PATH=${(q)remote_path}; export PATH; zsh_bin=\$(command -v zsh) || exit 127; if [ \"\$(id -un)\" = ${(q)remote_user} ]; then exec env HOME=${(q)remote_home} USER=${(q)remote_user} LOGNAME=${(q)remote_user} PATH=${(q)remote_path} \"\$zsh_bin\" -lc \"\$cmd\"; else exec sudo -u ${(q)remote_user} env HOME=${(q)remote_home} USER=${(q)remote_user} LOGNAME=${(q)remote_user} PATH=${(q)remote_path} \"\$zsh_bin\" -lc \"\$cmd\"; fi"
 ssh -tt "$host" "$runner"

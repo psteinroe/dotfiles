@@ -1,5 +1,10 @@
 # Hetzner Remote Dev Plan — NixOS
 
+> **Implemented/superseded:** the checked-in profile and current operational
+> runbook live in `nix/nixos/`, `bootstrap-hetzner-nixos.sh`, and
+> `docs/hetzner-nixos.md`. This document is retained as design history and must
+> not be used as installation instructions.
+
 ## Goal
 
 Run the remote-dev machine on Hetzner as a fully declarative NixOS host while preserving the same local workflow:

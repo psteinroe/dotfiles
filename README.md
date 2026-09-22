@@ -12,8 +12,11 @@ Cross-platform Nix + Home Manager dev environment.
 # macOS fresh install
 curl -fsSL https://raw.githubusercontent.com/psteinroe/dotfiles/main/bootstrap.sh | bash
 
-# Linux remote fresh install
+# Generic/exe.dev Linux remote fresh install
 curl -fsSL https://raw.githubusercontent.com/psteinroe/dotfiles/main/bootstrap-remote.sh | bash
+
+# Prepared Hetzner NixOS replacement (review before destructive use)
+# See docs/hetzner-nixos.md and ./bootstrap-hetzner-nixos.sh
 
 # Update an existing machine
 rebuild
@@ -34,6 +37,52 @@ The bootstrap and nix-darwin configuration manage Determinate Nix's
 `llm-agents.nix` packages such as Pi, tuicr, and Herdr while leaving arbitrary
 flake configuration untrusted.
 
+### T3 Code remote access
+
+Linux Home Manager declaratively owns the pinned T3 Code package and its
+`systemd --user` service; T3 owns mutable pairing/provider state in `~/.t3`.
+It does not use T3 Connect or Tailscale Funnel. Nix Darwin installs the
+`t3-code` desktop app on the Mac.
+
+The standalone Linux profile used by exe.dev binds port 3773 only to the
+machine's dynamic `100.x` Tailscale address. Traffic is private and encrypted
+by Tailscale, but it intentionally has no second HTTPS layer. This avoids a
+Tailscale Serve/netstack failure on exe.dev where the default 1.5-KiB
+post-quantum TLS ClientHello stalls; TLS 1.2 and TLS 1.3 forced to X25519 both
+succeed, as does the same default TLS handshake to a normal Go server over the
+same tailnet path. The prepared Hetzner NixOS profile uses private Tailscale
+Serve HTTPS, subject to the TLS 1.3 acceptance check in
+[`docs/hetzner-nixos.md`](docs/hetzner-nixos.md).
+
+```bash
+systemctl --user status t3code
+journalctl --user -u t3code -f
+systemctl --user restart t3code
+```
+
+The Mac and phone must be connected to the existing tailnet. Generate a fresh
+one-time link on the host for each client, then open it in the Mac app or scan
+it with the mobile app:
+
+```bash
+# Current exe.dev direct-tailnet transport
+ssh -t rdev 't3 pair'
+
+# Future Hetzner private HTTPS transport
+ssh -t rdev-hetzner 't3 pair --tailscale'
+```
+
+Pairing tokens are never stored in Nix. Manage or revoke paired sessions under
+**Settings → Connections** or with `t3 auth --help`. Update the server only by
+changing the pinned Nix version; do not use `t3 update` or
+`t3 service install`. Before switching Home Manager, stop the service and make
+a versioned backup of `~/.t3`, then start it again after the switch. A Home
+Manager rollback restores the binary and unit, but a database-migrating
+downgrade also requires the matching state backup. Removing `~/.t3` is a full
+reset that requires pairing every client again. When switching exe.dev from
+Serve to direct mode, remove any stale mapping with
+`tailscale serve --https=443 off`.
+
 ## Daily project workflow
 
 One project/repo maps to one Herdr named session. The active-workspace policy is
@@ -52,9 +101,14 @@ rhellomateo main         # shortcut for rdev hellomateo main
 
 Remote defaults:
 
-- `rdev` → Tailscale SSH as `psteinroe`
-- `rdev-exe` → exe.dev SSH fallback as `exedev`
+- `rdev` → current exe.dev machine over Tailscale as `psteinroe`
+- `rdev-hetzner` → prepared NixOS replacement's future MagicDNS name
+- `rdev-exe` → exe.dev public SSH fallback as `exedev`
 - Worktrees stay at `~/Developer/<repo>.git/<worktree>`
+
+The full Hetzner install, validation, cutover, and recovery runbook is in
+[`docs/hetzner-nixos.md`](docs/hetzner-nixos.md). `rdev` is not switched until
+the new host passes those checks.
 
 There is one local Herdr client. `rdev <repo> [branch|pr]` SSHes to the remote,
 prepares the named session, and returns; it does not open a second remote TUI.
@@ -112,7 +166,8 @@ Local and remote helpers intentionally mirror each other where possible:
 | `hwtcreate <branch\|pr>` | `rhwtcreate <repo> <branch\|pr>` | Ensure requested worktree and focus/open its workspace |
 | `htrimworkspaces [--apply\|--auto]` | — | Preview/confirm, or automatically close only strictly safe idle siblings |
 | `hsyncworktrees [--prune\|--prune-only]` | `rhsyncworktrees <repo> [--prune]` | Explicitly expose all worktrees, or prune stale Herdr workspaces |
-| — | `rauth [all\|gh\|pi\|mcp\|exa]` | Copy local GitHub/Pi/MCP/Exa auth to the remote |
+| — | `rauth [all\|gh\|pi\|mcp\|exa\|aws]` | Copy local GitHub/Pi/MCP/Exa/AWS auth to the remote |
+| — | `ssh rdev-hetzner` | Test the prepared Hetzner NixOS replacement before cutover |
 | — | `ssh rdev-exe` | Recovery path via exe.dev gateway |
 
 For the full command list, run `devhelp`. `rhwtcreate` and `rhsyncworktrees`

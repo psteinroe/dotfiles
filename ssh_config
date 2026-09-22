@@ -16,8 +16,18 @@ Host rdev-exe
   ControlPath ~/.ssh/cm-%r@%h:%p
   ControlPersist 10m
 
+Host rdev-hetzner
+  HostName psteinroe-dev-hetzner.tail6aabd2.ts.net
+  User psteinroe
+  IdentitiesOnly yes
+  IdentityFile ~/.ssh/id_ed25519
+  ControlMaster auto
+  ControlPath ~/.ssh/cm-%r@%h:%p
+  ControlPersist 10m
+
+# Keep rdev on exe.dev until the prepared Hetzner host passes cutover checks.
 Host rdev
-  HostName 100.73.58.101
+  HostName psteinroe-dev.tail6aabd2.ts.net
   User psteinroe
   IdentitiesOnly yes
   IdentityFile ~/.ssh/id_ed25519

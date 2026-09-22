@@ -28,7 +28,7 @@ let
     '';
   };
 
-  managedUserPath = "${homeDirectory}/.local/bin:${homeDirectory}/.nix-profile/bin:/nix/var/nix/profiles/default/bin:/usr/local/bin:/usr/bin:/bin";
+  managedUserPath = "${homeDirectory}/.local/bin:/etc/profiles/per-user/${username}/bin:${homeDirectory}/.nix-profile/bin:/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin:/usr/local/bin:/usr/bin:/bin";
 
   # exe.dev's public SSH gateway always enters the stock image as `exedev`,
   # while the managed development environment and Herdr sessions belong to
@@ -193,8 +193,8 @@ in
       set -g extended-keys on
       set -g extended-keys-format csi-u
       set -g default-terminal "tmux-256color"
-      set -g default-shell "/home/psteinroe/.nix-profile/bin/zsh"
-      set -g default-command "/home/psteinroe/.nix-profile/bin/zsh -l"
+      set -g default-shell "${pkgs.zsh}/bin/zsh"
+      set -g default-command "${pkgs.zsh}/bin/zsh -l"
       set -as terminal-overrides ',xterm-256color:RGB,screen-256color:RGB,tmux-256color:RGB'
       set -as terminal-features ',xterm-256color:RGB,tmux-256color:RGB'
     '';

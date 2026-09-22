@@ -30,6 +30,11 @@ test("Oracle is the default read-only analysis role", () => {
   assert.match(ORACLE_SYSTEM_PROMPT, /default read-only analyst/);
   assert.match(ORACLE_SYSTEM_PROMPT, /WHY, correctness, root cause, architecture, planning, tradeoffs, and review/);
   assert.match(ORACLE_SYSTEM_PROMPT, /state what should change/);
+  assert.match(ORACLE_SYSTEM_PROMPT, /evidence-proportional and scoped to the request/);
+  assert.match(ORACLE_SYSTEM_PROMPT, /simplest direct change/);
+  assert.match(ORACLE_SYSTEM_PROMPT, /only for a concrete failure mode/);
+  assert.match(ORACLE_SYSTEM_PROMPT, /low-probability risks when their impact is high/);
+  assert.match(ORACLE_SYSTEM_PROMPT, /decisive recommendation rather than cataloging possibilities/);
   assert.doesNotMatch(ORACLE_SYSTEM_PROMPT, /second opinion|do not use for routine work/i);
 });
 

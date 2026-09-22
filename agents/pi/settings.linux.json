@@ -14,7 +14,6 @@
     "shellCommandPrefix": "fpath=($HOME/Developer/dotfiles/zsh/functions $fpath); autoload -Uz gpr",
     "packages": [
         "git:github.com/nicobailon/pi-mcp-adapter@v2.8.0",
-        "git:github.com/davebcn87/pi-autoresearch",
         "npm:pi-multi-account"
     ],
     "lastChangelogVersion": "0.75.3",

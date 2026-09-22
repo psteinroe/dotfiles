@@ -15,7 +15,6 @@
   "packages": [
     "git:github.com/HazAT/pi-ghostty",
     "git:github.com/nicobailon/pi-mcp-adapter@v2.8.0",
-    "git:github.com/davebcn87/pi-autoresearch",
     "npm:pi-multi-account"
   ],
   "lastChangelogVersion": "0.85.1",

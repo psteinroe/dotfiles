@@ -1,5 +1,5 @@
 # Copy local development auth credentials to a remote machine.
-# Usage: rauth [--host host] [--user user] [--home home] [all|gh[:host]|pi[:provider[,provider]|all]|mcp[:all|server[,server]]|exa|codex]...
+# Usage: rauth [--host host] [--user user] [--home home] [all|gh[:host]|pi[:provider[,provider]|all]|mcp[:all|server[,server]]|exa|aws|codex]...
 # Defaults to: rauth all
 
 _rauth_usage() {
@@ -7,7 +7,7 @@ _rauth_usage() {
 Usage: rauth [--host host] [--user user] [--home home] [spec ...]
 
 Specs:
-  all                         copy gh, all Pi providers, all MCP OAuth, and Exa
+  all                         copy gh, Pi, MCP, Exa, and AWS auth
   gh[:github-host]            copy GitHub CLI auth (default: github.com)
   pi                          copy default Pi provider auth (default: openai-codex)
   pi:provider[,provider...]   copy selected Pi providers from ~/.pi/agent/auth.json
@@ -16,6 +16,7 @@ Specs:
   mcp                         copy all Pi MCP OAuth credentials
   mcp:server[,server...]      copy selected ~/.pi/agent/mcp-oauth/<server> dirs
   exa                         copy Exa API key to ~/.config/exa/api_key
+  aws                         copy AWS config and cached sessions to ~/.aws
 
 Options:
   --host host                 SSH host (default: rdev)
@@ -316,6 +317,32 @@ chmod 600 "$HOME/.config/exa/api_key"
   print -r -- "Copied Exa API key to $host:$remote_user:$remote_home/.config/exa/api_key"
 }
 
+_rauth_copy_aws() {
+  local local_aws_dir="$HOME/.aws"
+  [[ -d "$local_aws_dir" ]] || { echo "AWS auth directory not found: $local_aws_dir" >&2; return 1; }
+
+  local remote_cmd='set -euo pipefail
+umask 077
+tmp=$(mktemp -d)
+trap '\''rm -rf "$tmp"'\'' EXIT
+tar -xzf - -C "$tmp"
+if [ ! -d "$tmp/.aws" ]; then
+  echo "Archive did not contain .aws directory" >&2
+  exit 1
+fi
+rm -rf "$HOME/.aws"
+mkdir -p "$HOME/.aws"
+cp -R "$tmp/.aws/." "$HOME/.aws/"
+chmod -R go-rwx "$HOME/.aws"
+find "$HOME/.aws" -type d -exec chmod 700 {} +
+find "$HOME/.aws" -type f -exec chmod 600 {} +
+'
+  local runner
+  runner=$(_rauth_runner "$remote_cmd") || return
+  COPYFILE_DISABLE=1 tar --no-xattrs -czf - -C "$HOME" .aws | ssh "$host" "$runner" || return
+  print -r -- "Copied AWS auth to $host:$remote_user:$remote_home/.aws"
+}
+
 local spec name arg
 for spec in "${specs[@]}"; do
   case "$spec" in
@@ -324,6 +351,7 @@ for spec in "${specs[@]}"; do
       _rauth_copy_pi all || return
       _rauth_copy_mcp all || return
       _rauth_copy_exa || return
+      _rauth_copy_aws || return
       ;;
     gh|github)
       _rauth_copy_gh github.com || return
@@ -354,6 +382,9 @@ for spec in "${specs[@]}"; do
       ;;
     exa)
       _rauth_copy_exa || return
+      ;;
+    aws)
+      _rauth_copy_aws || return
       ;;
     *)
       echo "Unknown rauth spec: $spec" >&2

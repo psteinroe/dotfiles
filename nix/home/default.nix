@@ -14,5 +14,6 @@
     ./agents.nix
   ]
   ++ lib.optional isDarwin ./darwin.nix
-  ++ lib.optional isLinux ./linux.nix;
+  ++ lib.optional isLinux ./linux.nix
+  ++ lib.optional isLinux ./t3code.nix;
 }
