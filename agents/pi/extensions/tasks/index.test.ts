@@ -21,13 +21,13 @@ function harness() {
   return { handlers, tools, messages };
 }
 
-async function emit(handlers: Map<string, Handler[]>, name: string, context: any) {
-  for (const handler of handlers.get(name) ?? []) await handler({ type: name }, context);
+async function emit(handlers: Map<string, Handler[]>, name: string, context: any, reason?: string) {
+  for (const handler of handlers.get(name) ?? []) await handler({ type: name, reason }, context);
 }
 
-async function waitFor(predicate: () => boolean) {
+async function waitFor(predicate: () => boolean | Promise<boolean>) {
   const deadline = Date.now() + 2_000;
-  while (!predicate()) {
+  while (!(await predicate())) {
     if (Date.now() > deadline) throw new Error("Timed out waiting for task completion");
     await new Promise((resolve) => setTimeout(resolve, 5));
   }
@@ -53,6 +53,7 @@ test("registers one consolidated task surface", async () => {
     "task_list",
     "task_result",
     "task_status",
+    "task_steer",
   ]);
   for (const legacy of ["bg_start", "bg_status", "bg_list", "bg_kill", "finder", "librarian", "oracle", "worker"]) {
     assert.equal(h.tools.has(legacy), false);
@@ -128,6 +129,74 @@ test("background command launch returns before completion and delivers once", as
   await emit(h.handlers, "session_shutdown", ctx);
 });
 
+test("reload keeps a running command, its handle and completion delivery", async () => {
+  const first = harness();
+  const ctx = context();
+  await emit(first.handlers, "session_start", ctx, "startup");
+  await first.tools.get("start_background_command").execute(
+    "call", { command: "sleep 0.7; printf survived-reload", title: "reload fixture" },
+    undefined, undefined, ctx,
+  );
+  await emit(first.handlers, "session_shutdown", ctx, "reload");
+  const second = harness();
+  await emit(second.handlers, "session_start", ctx, "reload");
+  const status = await second.tools.get("task_status").execute("status", { id: "task-1" });
+  assert.match(status.content[0].text, /reload fixture/);
+  await waitFor(() => second.messages.length === 1);
+  assert.match(second.messages[0].message.content, /survived-reload/);
+  assert.equal(first.messages.length, 0);
+  await emit(second.handlers, "session_shutdown", ctx, "quit");
+});
+
+test("reload retains a settled completion waiting for idle delivery", async () => {
+  const first = harness();
+  const ctx = context();
+  await emit(first.handlers, "session_start", ctx, "startup");
+  await first.tools.get("start_background_command").execute(
+    "call", { command: "printf queued", title: "queued fixture" },
+    undefined, undefined, ctx,
+  );
+  await waitFor(async () => {
+    const result = await first.tools.get("task_status").execute("status", { id: "task-1" });
+    return result.details.status === "done";
+  });
+  await emit(first.handlers, "session_shutdown", ctx, "reload");
+  const second = harness();
+  await emit(second.handlers, "session_start", ctx, "reload");
+  await waitFor(() => second.messages.length === 1);
+  assert.match(second.messages[0].message.content, /queued/);
+  assert.equal(first.messages.length, 0);
+  await emit(second.handlers, "session_shutdown", ctx, "quit");
+});
+
+test("reload preserves task IDs and real shutdown still cancels processes", async () => {
+  const first = harness();
+  const ctx = context();
+  await emit(first.handlers, "session_start", ctx, "startup");
+  await first.tools.get("start_background_command").execute(
+    "call", { command: "sleep 30", title: "long-lived fixture" },
+    undefined, undefined, ctx,
+  );
+  await emit(first.handlers, "session_shutdown", ctx, "reload");
+  const second = harness();
+  await emit(second.handlers, "session_start", ctx, "reload");
+  const running = await second.tools.get("task_status").execute("status", { id: "task-1" });
+  assert.match(running.content[0].text, /\[running\]/);
+  const next = await second.tools.get("start_background_command").execute(
+    "call", { command: "printf second", title: "second fixture" },
+    undefined, undefined, ctx,
+  );
+  assert.match(next.content[0].text, /Started task-2/);
+  await emit(second.handlers, "session_shutdown", ctx, "quit");
+  const stopped = await second.tools.get("task_status").execute("status", { id: "task-1" });
+  assert.doesNotMatch(stopped.content[0].text, /\[running\]/);
+  const nextSession = harness();
+  await emit(nextSession.handlers, "session_start", ctx, "new");
+  const list = await nextSession.tools.get("task_list").execute();
+  assert.match(list.content[0].text, /No background tasks/);
+  await emit(nextSession.handlers, "session_shutdown", ctx, "quit");
+});
+
 test("rejects profile-incompatible fields and unsafe Worker scopes", async () => {
   const h = harness();
   const ctx = context();
@@ -152,6 +221,29 @@ test("rejects profile-incompatible fields and unsafe Worker scopes", async () =>
     ),
     /entire repository/,
   );
+  await emit(h.handlers, "session_shutdown", ctx);
+});
+
+test("task_steer validates target, instruction, and child readiness", async () => {
+  const h = harness();
+  const ctx = context();
+  await emit(h.handlers, "session_start", ctx);
+  const steer = h.tools.get("task_steer");
+  await assert.rejects(steer.execute("call", { id: "missing", message: "focus" }), /No task missing/);
+  await h.tools.get("start_background_command").execute(
+    "call", { command: "sleep 1", title: "fixture" }, undefined, undefined, ctx,
+  );
+  await assert.rejects(steer.execute("call", { id: "task-1", message: "focus" }), /background command/);
+  await h.tools.get("start_subagent").execute(
+    "call", { agent: "mapper", task: "map fixture" }, undefined, undefined, ctx,
+  );
+  await assert.rejects(steer.execute("call", { id: "task-2", message: "  " }), /message must not be empty/);
+  await assert.rejects(
+    steer.execute("call", { id: "task-2", message: "focus" }),
+    /not currently processing a prompt/,
+  );
+  await h.tools.get("task_cancel").execute("call", { ids: ["task-2"] });
+  await assert.rejects(steer.execute("call", { id: "task-2", message: "focus" }), /only running subagents/);
   await emit(h.handlers, "session_shutdown", ctx);
 });
 

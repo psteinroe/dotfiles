@@ -5,7 +5,7 @@ import { promptSubagentWithFailover } from "./subagent-failover.ts";
 type Session = Parameters<typeof promptSubagentWithFailover>[0];
 type Options = Parameters<typeof promptSubagentWithFailover>[2];
 const models = ["openai-codex", "openai-codex-account-2", "openai-codex-account-3"]
-  .map((provider) => ({ provider, id: "gpt-5.6-luna" })) as Options["models"];
+  .map((provider) => ({ provider, id: "gpt-6-luna" })) as Options["models"];
 const assistant = (stopReason: string, content: unknown[] = [], errorMessage?: string) =>
   ({ role: "assistant", stopReason, content, errorMessage });
 const success = () => assistant("stop", [{ type: "text", text: "done" }]);

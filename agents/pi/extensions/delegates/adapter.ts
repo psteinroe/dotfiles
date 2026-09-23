@@ -20,6 +20,7 @@ import {
   extractLatestAssistantText,
   shutdownAndDisposeChildSession,
   trackSubagentEvents,
+  type SubagentSessionRegistration,
 } from "../shared/subagent-runtime.ts";
 import {
   DelegateCapacity,
@@ -156,7 +157,7 @@ function createDelegateRenderers(name: DelegateName) {
   });
 }
 
-export default function delegatesExtension(pi: ExtensionAPI) {
+export default function delegatesExtension(pi: ExtensionAPI, registerSession?: SubagentSessionRegistration) {
   const activeSessions = createActiveSubagentSessionRegistry();
   const capacity: Record<DelegateName, DelegateCapacity> = {
     oracle: new DelegateCapacity(DELEGATE_CONCURRENCY.oracle),
@@ -166,6 +167,7 @@ export default function delegatesExtension(pi: ExtensionAPI) {
   async function runDelegate(options: {
     name: DelegateName;
     task: string;
+    taskId: string;
     signal?: AbortSignal;
     onUpdate?: AgentToolUpdateCallback<DelegateDetails>;
     ctx: ExtensionContext;
@@ -186,6 +188,7 @@ export default function delegatesExtension(pi: ExtensionAPI) {
     let stopTracking: (() => void) | undefined;
     let removeAbortListener: (() => void) | undefined;
     let removeActiveSession: (() => void) | undefined;
+    let removeSteering: (() => void) | undefined;
 
     const buildDetails = (): DelegateDetails => ({
       status: run.status,
@@ -218,6 +221,7 @@ export default function delegatesExtension(pi: ExtensionAPI) {
       emitUpdate();
       session = child;
       removeActiveSession = activeSessions.add(child);
+      removeSteering = registerSession?.(options.taskId, child);
       const tracker = trackSubagentEvents(child, {
         run,
         maxTurns: policy.maxTurns,
@@ -302,6 +306,7 @@ export default function delegatesExtension(pi: ExtensionAPI) {
     } finally {
       removeAbortListener?.();
       stopTracking?.();
+      removeSteering?.();
       removeActiveSession?.();
       if (session) await shutdownAndDisposeChildSession(session);
       releaseCapacity();
@@ -327,9 +332,10 @@ export default function delegatesExtension(pi: ExtensionAPI) {
           "Self-contained question, including relevant paths, constraints, and the decision or review needed",
       }),
     }),
-    async execute(_toolCallId, params, signal, onUpdate, ctx) {
+    async execute(toolCallId, params, signal, onUpdate, ctx) {
       const result = await runDelegate({
         name: "oracle",
+        taskId: toolCallId,
         task: params.task,
         signal,
         onUpdate,
@@ -365,9 +371,10 @@ export default function delegatesExtension(pi: ExtensionAPI) {
         description: "Canonical Worker write paths supplied by the background task coordinator.",
       })),
     }),
-    async execute(_toolCallId, params, signal, onUpdate, ctx) {
+    async execute(toolCallId, params, signal, onUpdate, ctx) {
       const result = await runDelegate({
         name: "worker",
+        taskId: toolCallId,
         task: params.task,
         signal,
         onUpdate,

@@ -9,6 +9,7 @@ import { Type } from "typebox";
 import installDelegates from "../delegates/adapter.ts";
 import installFinder from "../finder/adapter.ts";
 import installLibrarian from "../librarian/adapter.ts";
+import type { SubagentSessionRegistration } from "../shared/subagent-runtime.ts";
 import {
   formatBytes,
   formatElapsed,
@@ -19,6 +20,7 @@ import {
 } from "../background-terminals/src/manager.ts";
 import { HerdrBackgroundMetadata } from "../background-terminals/src/herdr-metadata.ts";
 import { TaskDelivery } from "./delivery.ts";
+import { TaskSteering } from "./steering.ts";
 import {
   TaskRegistry,
   type TaskSnapshot,
@@ -26,6 +28,10 @@ import {
 } from "./registry.ts";
 
 const RESULT_MESSAGE_TYPE = "background-task-result";
+const RUNTIME_KEY = Symbol.for("dotfiles.pi.background-tasks.runtime");
+
+type ReloadableRuntime = { bind(pi: ExtensionAPI): void };
+const runtimeSlot = globalThis as typeof globalThis & { [RUNTIME_KEY]?: ReloadableRuntime };
 const UI_KEY = "background-tasks";
 const RESULT_STDOUT_MAX = 8 * 1024;
 const RESULT_STDERR_MAX = 4 * 1024;
@@ -214,7 +220,7 @@ function taskDetail(task: TaskSnapshot, expanded = false): string {
   ].filter(Boolean).join("\n");
 }
 
-function collectSubagentTools(pi: ExtensionAPI) {
+function collectSubagentTools(pi: ExtensionAPI, registerSession: SubagentSessionRegistration) {
   const tools = new Map<string, ToolDefinition>();
   const shutdownHandlers: EventHandler[] = [];
   const scopedPi = new Proxy(pi as any, {
@@ -234,9 +240,9 @@ function collectSubagentTools(pi: ExtensionAPI) {
     },
   }) as ExtensionAPI;
 
-  installFinder(scopedPi);
-  installLibrarian(scopedPi);
-  installDelegates(scopedPi);
+  installFinder(scopedPi, registerSession);
+  installLibrarian(scopedPi, registerSession);
+  installDelegates(scopedPi, registerSession);
 
   for (const name of SUBAGENT_NAMES) {
     if (!tools.has(name)) throw new Error(`Subagent adapter did not register ${name}`);
@@ -244,12 +250,49 @@ function collectSubagentTools(pi: ExtensionAPI) {
   return { tools, shutdownHandlers };
 }
 
-export default function tasksExtension(pi: ExtensionAPI) {
+export default function tasksExtension(initialPi: ExtensionAPI) {
+  // /reload replaces extension instances, not the Pi process or session. Keep
+  // the task engines and their callbacks alive, and bind their registrations to
+  // the new ExtensionAPI. A real session shutdown still tears everything down.
+  if (runtimeSlot[RUNTIME_KEY]) {
+    runtimeSlot[RUNTIME_KEY].bind(initialPi);
+    return;
+  }
+  let currentPi = initialPi;
+  const registrations: Array<(pi: ExtensionAPI) => void> = [];
+  const pi = new Proxy(initialPi, {
+    get(_target, property) {
+      if (property === "on") return (name: any, handler: any) => {
+        const register = (target: ExtensionAPI) => target.on(name, handler);
+        registrations.push(register);
+        register(currentPi);
+      };
+      if (property === "registerTool") return (definition: any) => {
+        const register = (target: ExtensionAPI) => target.registerTool(definition);
+        registrations.push(register);
+        register(currentPi);
+      };
+      if (property === "registerCommand") return (name: any, definition: any) => {
+        const register = (target: ExtensionAPI) => target.registerCommand(name, definition);
+        registrations.push(register);
+        register(currentPi);
+      };
+      const value = (currentPi as any)[property];
+      return typeof value === "function" ? value.bind(currentPi) : value;
+    },
+  }) as ExtensionAPI;
+  const runtime: ReloadableRuntime = {
+    bind(nextPi) {
+      currentPi = nextPi;
+      for (const register of registrations) register(nextPi);
+    },
+  };
   const registry = new TaskRegistry();
   const terminalManager = new TerminalManager();
   const terminalTaskIds = new Map<string, string>();
   const herdrMetadata = new HerdrBackgroundMetadata();
-  const subagents = collectSubagentTools(pi);
+  const steering = new TaskSteering();
+  const subagents = collectSubagentTools(pi, (id, session) => steering.register(id, session));
   let uiCtx: ExtensionContext | undefined;
   let ownsHerdrMetadata = false;
   let shuttingDown = false;
@@ -407,14 +450,18 @@ export default function tasksExtension(pi: ExtensionAPI) {
   });
 
   pi.on("session_shutdown", async (event, ctx) => {
-    delivery.shutdown();
-    shuttingDown = true;
+    delivery.setBusy();
     uiCtx?.ui.setStatus(UI_KEY, undefined);
     uiCtx?.ui.setWidget(UI_KEY, undefined);
     uiCtx = undefined;
+    if (event.reason === "reload") return;
+    delivery.shutdown();
+    shuttingDown = true;
+    if (runtimeSlot[RUNTIME_KEY] === runtime) delete runtimeSlot[RUNTIME_KEY];
     // Registry cancellation owns the first teardown request. The terminal pass
     // is a bounded safety net after command cancellation has settled.
     await registry.shutdown();
+    steering.clear();
     await terminalManager.disposeAll();
     terminalTaskIds.clear();
     await Promise.allSettled([
@@ -604,6 +651,36 @@ export default function tasksExtension(pi: ExtensionAPI) {
   });
 
   pi.registerTool({
+    name: "task_steer",
+    label: "Steer Subagent",
+    description:
+      "Send a new instruction to a running subagent by task ID. The instruction is delivered after its current turn's tool calls, not immediately and not as a replacement for its original task. Cannot steer commands, cancelled or completed tasks, or a child that is not yet processing a prompt.",
+    promptSnippet: "Steer a running subagent with an additional instruction",
+    promptGuidelines: [
+      "Use task_steer to send a changed requirement to an active subagent without restarting it. The original role, Worker write scope, and turn budget remain unchanged.",
+    ],
+    parameters: Type.Object({
+      id: Type.String({ description: "ID of a running subagent task." }),
+      message: Type.String({ description: "New instruction for that subagent; does not change its write scope or turn budget." }),
+    }, { additionalProperties: false }),
+    async execute(_id, params: any) {
+      const task = registry.get(params.id);
+      if (!task) throw new Error(`No task ${params.id}. Use task_list to see known tasks.`);
+      if (task.kind !== "subagent") throw new Error(`${params.id} is a background command, not a subagent.`);
+      if (task.status !== "starting" && task.status !== "running") {
+        throw new Error(`${params.id} is ${task.status}; only running subagents can be steered.`);
+      }
+      const message = typeof params.message === "string" ? params.message.trim() : "";
+      if (!message) throw new Error("message must not be empty");
+      await steering.steer(params.id, message);
+      return {
+        content: [{ type: "text" as const, text: `Queued steering for ${params.id}. It will be delivered after the current turn's tool calls.` }],
+        details: { id: params.id },
+      };
+    },
+  });
+
+  pi.registerTool({
     name: "task_status",
     label: "Task Status",
     description:
@@ -689,4 +766,5 @@ export default function tasksExtension(pi: ExtensionAPI) {
       ctx.ui.notify(tasks.length ? tasks.map(taskLine).join("\n") : "No background tasks.", "info");
     },
   });
+  runtimeSlot[RUNTIME_KEY] = runtime;
 }

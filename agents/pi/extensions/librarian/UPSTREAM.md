@@ -7,6 +7,6 @@ The behavior source is upstream [`extensions/librarian-core.ts`](https://github.
 Local changes:
 
 - ported the public schema, prompts, normalization, isolated workspace, and read/bash research behavior into a local adapter;
-- replaced upstream model selection with the fixed `openai-codex/gpt-5.6-luna` high policy;
+- replaced upstream model selection with the fixed `openai-codex/gpt-6-luna` high policy;
 - replaced the upstream child resource loading and progress/session handling with the shared local runtime, progress renderer, and child-only subdirectory-context extension;
 - omitted upstream model-selection, release, package, and installation automation.

@@ -17,6 +17,9 @@ import { createToolCallTimeoutGuard } from "./tool-call-timeout.ts";
 export { bindChildSessionExtensions, shutdownAndDisposeChildSession } from "./child-session.ts";
 export type { DisposableChildSession } from "./child-session.ts";
 
+/** Expose a live child to the task coordinator without transferring its lifecycle ownership. */
+export type SubagentSessionRegistration = (taskId: string, session: AgentSession) => () => void;
+
 function assistantMessageText(message: AssistantMessage): string {
   return message.content
     .filter((part) => part.type === "text")

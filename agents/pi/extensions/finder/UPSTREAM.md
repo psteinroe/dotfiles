@@ -8,7 +8,7 @@ Local changes:
 
 - retained the internal Finder-derived schema surface while exposing the profile publicly as Mapper;
 - redesigned the prompt and tools for strictly WHERE/WHAT mapping with file:line evidence and Oracle routing for analysis;
-- replaced upstream model selection with the local fixed `openai-codex/gpt-5.6-luna` medium policy;
+- replaced upstream model selection with the local fixed `openai-codex/gpt-6-luna` medium policy;
 - adapted child-session lifecycle, progress tracking/rendering, cancellation, and shutdown cleanup to the local shared APIs;
 - installed the vendored subdirectory-context extension only in Mapper's isolated child loader;
 - omitted upstream model-selection and release/package automation.

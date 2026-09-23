@@ -15,6 +15,7 @@ import {
   extractLatestAssistantText,
   shutdownAndDisposeChildSession,
   trackSubagentEvents,
+  type SubagentSessionRegistration,
 } from "../shared/subagent-runtime.ts";
 import {
   createSubagentModelPlan,
@@ -34,7 +35,7 @@ import { FinderParams } from "./finder-core.ts";
 import { buildFinderSystemPrompt, buildFinderUserPrompt } from "./finder-prompts.md.ts";
 
 const FINDER_PROVIDER = "openai-codex";
-const FINDER_MODEL_ID = "gpt-5.6-luna";
+const FINDER_MODEL_ID = "gpt-6-luna";
 const FINDER_THINKING = "medium" as const;
 const FINDER_MAX_TURNS = 8;
 const FINDER_MODEL = `${FINDER_PROVIDER}/${FINDER_MODEL_ID}`;
@@ -133,7 +134,7 @@ async function createFinderSession(
   };
 }
 
-export default function finderExtension(pi: ExtensionAPI) {
+export default function finderExtension(pi: ExtensionAPI, registerSession?: SubagentSessionRegistration) {
   const activeSessions = createActiveSubagentSessionRegistry();
   const sharedRenderers = createSubagentRenderers<FinderDetails>({
     agentLabel: "mapper",
@@ -164,7 +165,7 @@ export default function finderExtension(pi: ExtensionAPI) {
       );
     },
     async execute(
-      _toolCallId,
+      toolCallId,
       params,
       signal,
       onUpdate,
@@ -202,6 +203,7 @@ export default function finderExtension(pi: ExtensionAPI) {
       let stopTracking: (() => void) | undefined;
       let removeAbortListener: (() => void) | undefined;
       let removeActiveSession: (() => void) | undefined;
+      let removeSteering: (() => void) | undefined;
 
       try {
         const created = await createFinderSession(ctx);
@@ -209,6 +211,7 @@ export default function finderExtension(pi: ExtensionAPI) {
         currentModel = `${created.models[0].provider}/${created.models[0].id}`;
         session = child;
         removeActiveSession = activeSessions.add(child);
+        removeSteering = registerSession?.(toolCallId, child);
 
         const tracker = trackSubagentEvents(child, {
           run,
@@ -263,6 +266,7 @@ export default function finderExtension(pi: ExtensionAPI) {
       } finally {
         removeAbortListener?.();
         stopTracking?.();
+        removeSteering?.();
         removeActiveSession?.();
         if (session) await shutdownAndDisposeChildSession(session);
       }

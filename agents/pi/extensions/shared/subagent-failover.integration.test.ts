@@ -27,8 +27,8 @@ import {
 import { shutdownAndDisposeChildSession } from "./child-session.ts";
 import { Type } from "typebox";
 
-const MODEL_ID = "gpt-5.6-luna";
-const ORACLE_MODEL_ID = "gpt-5.6-sol";
+const MODEL_ID = "gpt-6-luna";
+const ORACLE_MODEL_ID = "gpt-6-sol";
 const PRIMARY = "openai-codex";
 const ALIAS = "openai-codex-account-1";
 const API = "openai-responses" as Api;
@@ -45,11 +45,11 @@ type Call = {
 };
 
 const EXECUTOR_TOOLS = ["executor_execute", "executor_resume", "executor_skills"];
-const EXPECTED: Record<Role, { model: string; thinking: "medium" | "high"; tools: string[] }> = {
+const EXPECTED: Record<Role, { model: string; thinking: "medium" | "high" | "xhigh"; tools: string[] }> = {
   mapper: { model: MODEL_ID, thinking: "medium", tools: ["find", "grep", "ls", "read"] },
   librarian: { model: MODEL_ID, thinking: "high", tools: ["bash", ...EXECUTOR_TOOLS, "read"] },
   worker: { model: MODEL_ID, thinking: "high", tools: ["bash", "edit", ...EXECUTOR_TOOLS, "find", "grep", "ls", "read", "write"] },
-  oracle: { model: ORACLE_MODEL_ID, thinking: "high", tools: [...EXECUTOR_TOOLS, "find", "git_diff", "grep", "ls", "read"] },
+  oracle: { model: ORACLE_MODEL_ID, thinking: "xhigh", tools: [...EXECUTOR_TOOLS, "find", "git_diff", "grep", "ls", "read"] },
 };
 
 function model(provider: string, id = MODEL_ID): Model<Api> {

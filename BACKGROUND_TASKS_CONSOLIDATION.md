@@ -11,7 +11,7 @@ Use one session-scoped task control plane with two launch tools:
 - `start_subagent` starts Mapper, Librarian, Oracle, or Worker.
 - `start_background_command` starts a long-running OS command.
 
-Both return a task handle immediately. They share `task_status`, `task_result`, `task_list`, `task_cancel`, completion delivery, UI, Herdr metadata, and shutdown semantics.
+Both return a task handle immediately. They share `task_status`, `task_result`, `task_list`, `task_cancel`, completion delivery, UI, Herdr metadata, and shutdown semantics. `task_steer` additionally sends instructions to a running subagent.
 
 Keep execution engines separate. Child `AgentSession` lifecycle and terminal process-tree lifecycle have different setup, cancellation, output, and cleanup requirements.
 
@@ -45,6 +45,7 @@ The launch starts Bash on macOS/Linux or ComSpec on Windows with ignored stdin a
 ### Management
 
 - `task_status({ id })` returns current progress without consuming completion.
+- `task_steer({ id, message })` queues an instruction for a running subagent after its current turn's tool calls. It does not replace the original task or change role, write scope, or turn budget; it rejects commands, settled/cancelling tasks, and children not yet processing a prompt.
 - `task_result({ id })` returns immediately; a settled result is acknowledged and removed from automatic delivery.
 - `task_list()` returns all tracked session tasks.
 - `task_cancel({ ids })` requests cancellation and returns without waiting for teardown.
@@ -114,7 +115,9 @@ The scope remains a coordination lease rather than an OS sandbox: arbitrary Work
 
 Tasks are in-memory and session-scoped.
 
-On session shutdown or reload:
+On `/reload`, the in-process task runtime is rebound to Pi's new extension instance: existing task IDs, live subagents and commands, pending completions, Worker leases, and Herdr metadata remain intact. Delivery pauses during the handoff and resumes on `session_start`. The existing task tool implementation remains in memory until the session ends; changes to the task extension itself require a fresh Pi session to take effect.
+
+On actual session shutdown (quit, new, resume, fork):
 
 1. completion delivery closes;
 2. every subagent abort controller is signalled;
@@ -123,7 +126,7 @@ On session shutdown or reload:
 5. child sessions dispose idempotently;
 6. Herdr background metadata clears.
 
-No task is promised to survive Pi exit or reload. Librarian workspaces remain inspectable during the session and are removed on session shutdown.
+No task is promised to survive Pi process exit or a session switch. Librarian workspaces remain inspectable during the session and are removed on session shutdown.
 
 POSIX commands run in their own process group and receive a cryptographically random private containment token. Teardown scans for that token and, on macOS, also retains same-UID descendants discovered through PPID traversal before signalling. This covers normal long-lived subprocess trees that reparent or create a new session, including the tested Python `start_new_session` case and detached native descendants observed before shutdown.
 

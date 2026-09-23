@@ -39,13 +39,13 @@ export const DELEGATE_CONCURRENCY: Record<DelegateName, number> = {
 
 export const DELEGATE_POLICIES: Record<DelegateName, DelegatePolicy> = {
   oracle: {
-    model: "gpt-5.6-sol",
-    thinking: "high",
+    model: "gpt-6-sol",
+    thinking: "xhigh",
     maxTurns: 10,
     tools: ["read", "grep", "find", "ls", "git_diff"],
   },
   worker: {
-    model: "gpt-5.6-luna",
+    model: "gpt-6-luna",
     thinking: "high",
     maxTurns: 50,
     tools: ["read", "bash", "edit", "write", "grep", "find", "ls"],

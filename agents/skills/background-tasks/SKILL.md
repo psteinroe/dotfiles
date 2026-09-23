@@ -28,6 +28,7 @@ After launch, exclude every delegated scope from coordinator work. Continue only
 
 - `task_list` — inventory of session tasks
 - `task_status` — current progress when it unblocks immediate work
+- `task_steer({ id, message })` — add an instruction to a running subagent at its next turn boundary; its role, write scope, and turn budget stay fixed. Retry if the child has not started processing yet.
 - `task_result` — collect a settled result explicitly
 - `task_cancel` — request cancellation without waiting for teardown; use it only for a user request, invalid or unsafe scope, a stuck task, or changed requirements
 
@@ -35,6 +36,6 @@ Completion is delivered automatically when the coordinator is idle. End the turn
 
 ## Lifecycle
 
-Tasks are session-scoped. Session shutdown or reload aborts subagents and terminates command process trees. A task cannot be promised to survive Pi exit.
+Tasks survive `/reload` in the same Pi process and session, including reloads sent by `rebuild`/`rrebuild`. They remain available under their original IDs and deliver completions to the reloaded runtime. Exiting Pi or switching sessions (`/new`, `/resume`, `/fork`) aborts subagents and terminates command process trees. Tasks do not survive Pi process exit.
 
 Librarian, Oracle, and Worker receive the configured Executor MCP direct tools. Mapper is deliberately limited to the local read/search tools (`read`, `grep`, `find`, `ls`) and receives no Executor MCP tools. Oracle's read-only behavior remains a policy constraint because Executor itself can expose mutating integrations.

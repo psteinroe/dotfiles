@@ -21,6 +21,7 @@ import {
   extractLatestAssistantText,
   shutdownAndDisposeChildSession,
   trackSubagentEvents,
+  type SubagentSessionRegistration,
 } from "../shared/subagent-runtime.ts";
 import {
   createSubagentModelPlan,
@@ -48,7 +49,7 @@ import { buildLibrarianSystemPrompt, buildLibrarianUserPrompt } from "./prompt.t
 import { createTurnBudgetExtension } from "./turn-budget.ts";
 
 const LIBRARIAN_MODEL_PROVIDER = "openai-codex";
-const LIBRARIAN_MODEL_ID = "gpt-5.6-luna";
+const LIBRARIAN_MODEL_ID = "gpt-6-luna";
 const LIBRARIAN_THINKING = "high" as const;
 
 function createDetails(
@@ -93,7 +94,7 @@ function errorResult(message: string, workspace: string, task = "") {
   };
 }
 
-export default function librarianExtension(pi: ExtensionAPI) {
+export default function librarianExtension(pi: ExtensionAPI, registerSession?: SubagentSessionRegistration) {
   const activeSessions = createActiveSubagentSessionRegistry();
   const temporaryWorkspaces = new Set<string>();
 
@@ -129,7 +130,7 @@ export default function librarianExtension(pi: ExtensionAPI) {
       const scope = theme.fg("muted", `repos:${repos} owners:${owners}`);
       return new Text(preview ? `${scope} · ${preview}` : scope, 0, 0);
     },
-    async execute(_toolCallId, params, signal, onUpdate, ctx: ExtensionContext) {
+    async execute(toolCallId, params, signal, onUpdate, ctx: ExtensionContext) {
       const normalized = normalizeLibrarianParams(params);
       if ("error" in normalized) {
         return errorResult(normalized.error, ctx.cwd);
@@ -175,6 +176,7 @@ export default function librarianExtension(pi: ExtensionAPI) {
       let stopTracking: (() => void) | undefined;
       let removeAbortListener: (() => void) | undefined;
       let removeActiveSession: (() => void) | undefined;
+      let removeSteering: (() => void) | undefined;
       let aborted = false;
 
       try {
@@ -224,6 +226,7 @@ export default function librarianExtension(pi: ExtensionAPI) {
         assertExecutorMcpToolsRegistered(session);
         currentModel = `${plan.models[0].provider}/${plan.models[0].id}`;
         removeActiveSession = activeSessions.add(session);
+        removeSteering = registerSession?.(toolCallId, session);
 
         const tracker = trackSubagentEvents(session, {
           run,
@@ -270,6 +273,7 @@ export default function librarianExtension(pi: ExtensionAPI) {
       } finally {
         removeAbortListener?.();
         stopTracking?.();
+        removeSteering?.();
         removeActiveSession?.();
         if (session) await shutdownAndDisposeChildSession(session);
       }
