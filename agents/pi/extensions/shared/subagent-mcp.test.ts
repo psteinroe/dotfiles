@@ -6,6 +6,7 @@ import test from "node:test";
 import {
   EXECUTOR_MCP_TOOLS,
   isolateExecutorMcpExtension,
+  isolateSubagentExtensions,
   resolveExecutorMcpExtensionPath,
 } from "./subagent-mcp.ts";
 
@@ -50,6 +51,30 @@ test("keeps only the Executor adapter and explicit inline child policies", () =>
     assert.deepEqual(
       isolateExecutorMcpExtension(executorPath)(base).extensions.map((item: any) => item.path),
       [executorPath, "<inline:1>"],
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("allows multiple reviewed child extensions without reopening global discovery", () => {
+  const root = mkdtempSync(join(tmpdir(), "subagent-extension-filter-"));
+  const executorPath = join(root, "executor.ts");
+  const lifecyclePath = join(root, "claude-bridge.ts");
+  const unrelatedPath = join(root, "unrelated.ts");
+  for (const extensionPath of [executorPath, lifecyclePath, unrelatedPath]) {
+    writeFileSync(extensionPath, "export default function () {}\n");
+  }
+  try {
+    const extension = (path: string) => ({ path, resolvedPath: path });
+    const base = {
+      extensions: [extension(executorPath), extension(lifecyclePath), extension(unrelatedPath), extension("<inline:1>")],
+      errors: [],
+      runtime: {},
+    } as any;
+    assert.deepEqual(
+      isolateSubagentExtensions([executorPath, lifecyclePath])(base).extensions.map((item: any) => item.path),
+      [executorPath, lifecyclePath, "<inline:1>"],
     );
   } finally {
     rmSync(root, { recursive: true, force: true });

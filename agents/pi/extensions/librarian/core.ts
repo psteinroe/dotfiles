@@ -25,6 +25,7 @@ export const LibrarianParams = Type.Object({
       maxItems: 30,
     }),
   ),
+  model: Type.Optional(Type.String({ description: "Exact provider/model override." })),
   maxSearchResults: Type.Optional(
     Type.Number({
       description: `Maximum GitHub search hits per query (1-100, default ${DEFAULT_MAX_SEARCH_RESULTS})`,
@@ -48,6 +49,7 @@ export interface NormalizedLibrarianParams {
   query: string;
   repos: string[];
   owners: string[];
+  model?: string;
   maxSearchResults: number;
 }
 
@@ -76,12 +78,17 @@ export function normalizeLibrarianParams(params: unknown):
   const input = params as Record<string, unknown> | null | undefined;
   const query = typeof input?.query === "string" ? input.query.trim() : "";
   if (!query) return { error: "Invalid parameters: expected `query` to be a non-empty string." };
+  if (input?.model !== undefined && typeof input.model !== "string") {
+    return { error: "Invalid parameters: expected `model` to be an exact provider/model string." };
+  }
+  const model = typeof input?.model === "string" ? input.model.trim() : undefined;
 
   return {
     value: {
       query,
       repos: asStringArray(input?.repos),
       owners: asStringArray(input?.owners),
+      ...(model !== undefined ? { model } : {}),
       maxSearchResults: clampNumber(
         input?.maxSearchResults,
         1,

@@ -61,19 +61,25 @@ export function resolveExecutorMcpExtensionPath(pi: Pick<ExtensionAPI, "getAllTo
   return extensionPath;
 }
 
-export function isolateExecutorMcpExtension(executorPath: string) {
-  const canonicalPath = fs.realpathSync.native(executorPath);
+export function isolateSubagentExtensions(allowedPaths: string[]) {
+  const canonicalPaths = new Set(
+    allowedPaths.map((extensionPath) => fs.realpathSync.native(extensionPath)),
+  );
   return (base: LoadExtensionsResult): LoadExtensionsResult => ({
     ...base,
     extensions: base.extensions.filter((extension) => {
       if (extension.path.startsWith("<inline:")) return true;
       try {
-        return fs.realpathSync.native(extension.resolvedPath) === canonicalPath;
+        return canonicalPaths.has(fs.realpathSync.native(extension.resolvedPath));
       } catch {
         return false;
       }
     }),
   });
+}
+
+export function isolateExecutorMcpExtension(executorPath: string) {
+  return isolateSubagentExtensions([executorPath]);
 }
 
 export function assertExecutorMcpToolsRegistered(session: {

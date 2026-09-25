@@ -166,7 +166,7 @@ Local and remote helpers intentionally mirror each other where possible:
 | `hwtcreate <branch\|pr>` | `rhwtcreate <repo> <branch\|pr>` | Ensure requested worktree and focus/open its workspace |
 | `htrimworkspaces [--apply\|--auto]` | — | Preview/confirm, or automatically close only strictly safe idle siblings |
 | `hsyncworktrees [--prune\|--prune-only]` | `rhsyncworktrees <repo> [--prune]` | Explicitly expose all worktrees, or prune stale Herdr workspaces |
-| — | `rauth [all\|gh\|pi\|mcp\|exa\|aws]` | Copy local GitHub/Pi/MCP/Exa/AWS auth to the remote |
+| — | `rauth [all\|gh\|pi\|claude\|mcp\|exa\|aws]` | Copy local GitHub/Pi/Claude Bridge/MCP/Exa/AWS auth to the remote |
 | — | `ssh rdev-hetzner` | Test the prepared Hetzner NixOS replacement before cutover |
 | — | `ssh rdev-exe` | Recovery path via exe.dev gateway |
 

@@ -28,7 +28,7 @@ import { shutdownAndDisposeChildSession } from "./child-session.ts";
 import { Type } from "typebox";
 
 const MODEL_ID = "gpt-6-luna";
-const ORACLE_MODEL_ID = "gpt-6-sol";
+const ORACLE_MODEL_ID = "gpt-6-astra";
 const PRIMARY = "openai-codex";
 const ALIAS = "openai-codex-account-1";
 const API = "openai-responses" as Api;
@@ -102,7 +102,12 @@ function fixtureStream(
   workspace: string,
 ): (fixtureModel: Model<Api>, context: Context, options?: StreamOptions & { reasoning?: string }) => AssistantMessageEventStream {
   return (fixtureModel, context, options) => {
-    const system = context.systemPrompt ?? "";
+    // Pi 0.86+ carries the rendered system prompt in transcript messages;
+    // retain the legacy field too so this fixture covers both host formats.
+    const system = [
+      context.systemPrompt ?? "",
+      JSON.stringify(context.messages.filter((message) => message.role === "system")),
+    ].join("\n");
     const role: Role = system.includes("Mapper")
       ? "mapper"
       : system.includes("Librarian")
@@ -115,7 +120,13 @@ function fixtureStream(
       role,
       model: fixtureModel.id,
       reasoning: options?.reasoning,
-      tools: (context.tools ?? []).map((tool) => tool.name),
+      tools: (
+        context.tools?.length
+          ? context.tools
+          : context.messages
+            .filter((message) => message.role === "system")
+            .flatMap((message) => message.toolsAdded ?? [])
+      ).map((tool) => tool.name),
       context: structuredClone(context.messages),
     });
 

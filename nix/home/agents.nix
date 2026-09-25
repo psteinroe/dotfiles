@@ -109,6 +109,7 @@ in
         link_optional_path "${agentsDir}/pi/SYSTEM.md" "$HOME/.pi/agent/SYSTEM.md"
         link_optional_path "${piSettings}" "$HOME/.pi/agent/settings.json"
         link_optional_path "${agentsDir}/pi/provider-failover.json" "$HOME/.pi/agent/provider-failover.json"
+        link_optional_path "${agentsDir}/pi/claude-bridge.json" "$HOME/.pi/agent/claude-bridge.json"
         link_optional_path "${agentsDir}/pi/models.json" "$HOME/.pi/agent/models.json"
         link_optional_path "${agentsDir}/pi/mcp.json" "$HOME/.pi/agent/mcp.json"
         link_optional_path "${agentsDir}/pi/themes" "$HOME/.pi/agent/themes"

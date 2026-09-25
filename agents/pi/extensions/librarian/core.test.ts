@@ -38,4 +38,10 @@ test("normalizes query, scopes, and search limit like upstream", () => {
   assert.deepEqual(normalizeLibrarianParams({ query: "  " }), {
     error: "Invalid parameters: expected `query` to be a non-empty string.",
   });
+  assert.deepEqual(normalizeLibrarianParams({ query: "x", model: "   " }), {
+    value: { query: "x", repos: [], owners: [], model: "", maxSearchResults: DEFAULT_MAX_SEARCH_RESULTS },
+  });
+  assert.deepEqual(normalizeLibrarianParams({ query: "x", model: 42 }), {
+    error: "Invalid parameters: expected `model` to be an exact provider/model string.",
+  });
 });

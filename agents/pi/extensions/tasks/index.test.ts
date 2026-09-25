@@ -74,6 +74,8 @@ test("subagent guidance makes delegated scope an ownership lease", async () => {
   assert.match(start.description, /Worker=execution\/implementation/);
   assert.match(start.description, /Librarian=GitHub research/);
   assert.match((start.parameters as any).properties.agent.description, /Mapper=where\/what/);
+  assert.match((start.parameters as any).properties.model.description, /provider\/model/);
+  assert.match(start.description, /role default/);
 
   const cancel = h.tools.get("task_cancel");
   assert.match(cancel.description, /requirements change/i);
@@ -86,7 +88,9 @@ test("live task widget omits elapsed time while explicit status computes it on d
   const ctx = context();
   const widgets: unknown[] = [];
   ctx.hasUI = true;
-  ctx.ui.setWidget = (_key: string, value: unknown) => widgets.push(value);
+  ctx.ui.setWidget = ((...args: unknown[]) => {
+    widgets.push(args[1]);
+  }) as typeof ctx.ui.setWidget;
   await emit(h.handlers, "session_start", ctx);
   await h.tools.get("start_background_command").execute(
     "call",
@@ -211,6 +215,18 @@ test("rejects profile-incompatible fields and unsafe Worker scopes", async () =>
     ),
     /write_scope applies only to Worker/,
   );
+  for (const model of ["claude-opus-4-6", "   ", "claude-bridge/", "/claude-opus-4-6"]) {
+    await assert.rejects(
+      h.tools.get("start_subagent").execute(
+        "call",
+        { agent: "mapper", task: "map", model },
+        undefined,
+        undefined,
+        ctx,
+      ),
+      /provider\/model/,
+    );
+  }
   await assert.rejects(
     h.tools.get("start_subagent").execute(
       "call",

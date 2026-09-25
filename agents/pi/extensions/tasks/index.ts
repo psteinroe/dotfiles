@@ -9,6 +9,7 @@ import { Type } from "typebox";
 import installDelegates from "../delegates/adapter.ts";
 import installFinder from "../finder/adapter.ts";
 import installLibrarian from "../librarian/adapter.ts";
+import { parseExactSubagentModelRef } from "../shared/subagent-models.ts";
 import type { SubagentSessionRegistration } from "../shared/subagent-runtime.ts";
 import {
   formatBytes,
@@ -137,10 +138,12 @@ function subagentParams(
     repos?: string[];
     owners?: string[];
     max_search_results?: number;
+    model?: string;
     write_scope?: string[];
   },
 ) {
-  if (agent === "mapper") return { query: params.task };
+  const model = params.model ? { model: params.model } : {};
+  if (agent === "mapper") return { query: params.task, ...model };
   if (agent === "librarian") {
     return {
       query: params.task,
@@ -149,6 +152,7 @@ function subagentParams(
       ...(params.max_search_results !== undefined
         ? { maxSearchResults: params.max_search_results }
         : {}),
+      ...model,
     };
   }
   if (agent === "worker" && params.write_scope?.length) {
@@ -161,9 +165,10 @@ function subagentParams(
         "Structured edit/write calls are blocked outside this scope. Shell commands must also keep their writes inside it. The coordinator may continue read-only work while you run.",
       ].join("\n"),
       writeScope: params.write_scope,
+      ...model,
     };
   }
-  return { task: params.task };
+  return { task: params.task, ...model };
 }
 
 function section(
@@ -474,7 +479,7 @@ export default function tasksExtension(initialPi: ExtensionAPI) {
     name: "start_subagent",
     label: "Start Subagent",
     description:
-      "Start Mapper, Librarian, Oracle, or Worker as a session-scoped background task and return immediately. Routing: Mapper=where/what, Oracle=why/correctness/what should change, Worker=execution/implementation, Librarian=GitHub research. Mapper locates local workspace files, symbols, config, tests, dependencies, and explicit call/data-flow anchors with file:line evidence; Oracle provides read-only analysis of root cause, architecture, planning, tradeoffs, and review. Mapper must not diagnose, judge, compare designs, plan, or recommend fixes. The delegated scope is owned by that subagent until it settles. Mapper is limited to read/search tools; Worker is the only editing profile. Completion is delivered automatically.",
+      "Start Mapper, Librarian, Oracle, or Worker as a session-scoped background task and return immediately. Routing: Mapper=where/what, Oracle=why/correctness/what should change, Worker=execution/implementation, Librarian=GitHub research. Mapper locates local workspace files, symbols, config, tests, dependencies, and explicit call/data-flow anchors with file:line evidence; Oracle provides read-only analysis of root cause, architecture, planning, tradeoffs, and review. Mapper must not diagnose, judge, compare designs, plan, or recommend fixes. The delegated scope is owned by that subagent until it settles. Mapper is limited to read/search tools; Worker is the only editing profile. Omit model to use the role default, or provide an exact provider/model override. Completion is delivered automatically.",
     promptSnippet: "Delegate bounded work with an explicit ownership transfer",
     promptGuidelines: [
       "Use start_subagent for delegated research, review, or implementation. Partition work into bounded, non-overlapping scopes before launching.",
@@ -492,6 +497,10 @@ export default function tasksExtension(initialPi: ExtensionAPI) {
       repos: Type.Optional(Type.Array(Type.String(), { maxItems: 30, description: "Librarian owner/repo filters." })),
       owners: Type.Optional(Type.Array(Type.String(), { maxItems: 30, description: "Librarian owner/org filters." })),
       max_search_results: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })),
+      model: Type.Optional(Type.String({
+        description: "Optional exact provider/model override, for example claude-bridge/claude-opus-4-6.",
+        minLength: 3,
+      })),
       write_scope: Type.Optional(Type.Array(Type.String(), {
         minItems: 1,
         description: "Worker-only files or directory prefixes exclusively owned while the task runs.",
@@ -502,6 +511,9 @@ export default function tasksExtension(initialPi: ExtensionAPI) {
       const agent = params.agent as SubagentName;
       const taskText = typeof params.task === "string" ? params.task.trim() : "";
       if (!taskText) throw new Error("task must not be empty");
+      const model = params.model === undefined
+        ? undefined
+        : parseExactSubagentModelRef(String(params.model));
       const hasLibrarianFields = params.repos !== undefined
         || params.owners !== undefined
         || params.max_search_results !== undefined;
@@ -553,6 +565,7 @@ export default function tasksExtension(initialPi: ExtensionAPI) {
           repos: params.repos,
           owners: params.owners,
           max_search_results: params.max_search_results,
+          model,
           write_scope: normalizedScope,
         }),
         controller.signal,
@@ -721,7 +734,7 @@ export default function tasksExtension(initialPi: ExtensionAPI) {
       return {
         content: [{
           type: "text" as const,
-          text: tasks.length ? tasks.map(taskLine).join("\n") : "No background tasks.",
+          text: tasks.length ? tasks.map((task) => taskLine(task)).join("\n") : "No background tasks.",
         }],
         details: { count: tasks.length, active: activeTasks().length },
       };
@@ -763,7 +776,7 @@ export default function tasksExtension(initialPi: ExtensionAPI) {
         return;
       }
       const tasks = registry.list();
-      ctx.ui.notify(tasks.length ? tasks.map(taskLine).join("\n") : "No background tasks.", "info");
+      ctx.ui.notify(tasks.length ? tasks.map((task) => taskLine(task)).join("\n") : "No background tasks.", "info");
     },
   });
   runtimeSlot[RUNTIME_KEY] = runtime;

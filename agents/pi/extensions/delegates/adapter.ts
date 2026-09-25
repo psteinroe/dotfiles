@@ -36,13 +36,16 @@ import { createTurnBudgetExtension } from "../shared/turn-budget.ts";
 import {
   createSubagentModelPlan,
   createSubagentSettings,
+  parseExactSubagentModelRef,
+  reloadSubagentResources,
+  resolveSubagentLifecycleExtensionPaths,
   type Model,
 } from "../shared/subagent-models.ts";
 import { promptSubagentWithFailover } from "../shared/subagent-failover.ts";
 import {
   assertExecutorMcpToolsRegistered,
   EXECUTOR_MCP_TOOLS,
-  isolateExecutorMcpExtension,
+  isolateSubagentExtensions,
   isolatedSubagentResourceDir,
   resolveExecutorMcpExtensionPath,
 } from "../shared/subagent-mcp.ts";
@@ -96,20 +99,23 @@ async function createIsolatedSession(options: {
   name: DelegateName;
   ctx: ExtensionContext;
   executorMcpExtensionPath: string;
+  modelRef?: string;
   writeScope?: string[];
 }): Promise<{ session: AgentSession; models: Model[] }> {
-  const { name, ctx, executorMcpExtensionPath, writeScope } = options;
+  const { name, ctx, executorMcpExtensionPath, modelRef, writeScope } = options;
   const policy = DELEGATE_POLICIES[name];
-  const plan = await createSubagentModelPlan(ctx, policy.model);
+  const plan = await createSubagentModelPlan(ctx, modelRef ?? policy.model);
 
   const agentDir = getAgentDir();
+  const lifecycleExtensionPaths = resolveSubagentLifecycleExtensionPaths(plan, agentDir);
+  const allowedExtensionPaths = [executorMcpExtensionPath, ...lifecycleExtensionPaths];
   const settingsManager = createSubagentSettings(ctx.cwd, agentDir);
   const loader = new DefaultResourceLoader({
     cwd: ctx.cwd,
     agentDir: isolatedSubagentResourceDir(),
     settingsManager,
-    additionalExtensionPaths: [executorMcpExtensionPath],
-    extensionsOverride: isolateExecutorMcpExtension(executorMcpExtensionPath),
+    additionalExtensionPaths: allowedExtensionPaths,
+    extensionsOverride: isolateSubagentExtensions(allowedExtensionPaths),
     extensionFactories: [
       createTurnBudgetExtension(policy.maxTurns),
       ...(name === "worker" && writeScope?.length
@@ -123,7 +129,7 @@ async function createIsolatedSession(options: {
     noContextFiles: true,
     systemPrompt: name === "oracle" ? ORACLE_SYSTEM_PROMPT : WORKER_SYSTEM_PROMPT,
   });
-  await loader.reload();
+  await reloadSubagentResources(loader);
 
   const { session } = await createAgentSession({
     cwd: ctx.cwd,
@@ -171,11 +177,14 @@ export default function delegatesExtension(pi: ExtensionAPI, registerSession?: S
     signal?: AbortSignal;
     onUpdate?: AgentToolUpdateCallback<DelegateDetails>;
     ctx: ExtensionContext;
+    model?: string;
     writeScope?: string[];
   }) {
     const releaseCapacity = capacity[options.name].acquire();
     const policy = DELEGATE_POLICIES[options.name];
-    let model = `openai-codex/${policy.model}`;
+    let model = options.model === undefined
+      ? policy.model
+      : parseExactSubagentModelRef(options.model);
     const run: DelegateRunDetails = {
       status: "running",
       task: options.task,
@@ -214,6 +223,7 @@ export default function delegatesExtension(pi: ExtensionAPI, registerSession?: S
         name: options.name,
         ctx: options.ctx,
         executorMcpExtensionPath,
+        modelRef: options.model,
         writeScope: options.writeScope,
       });
       const child = created.session;
@@ -317,7 +327,7 @@ export default function delegatesExtension(pi: ExtensionAPI, registerSession?: S
     name: "oracle",
     label: "Ask Oracle",
     description:
-      "Ask Oracle, the default read-only Sol high analyst for WHY, correctness, root cause, architecture, planning, tradeoffs, review, and what should change. Provide a self-contained question with relevant paths and constraints. Use Mapper only for WHERE/WHAT location and evidence.",
+      "Ask Oracle, the default read-only Astra xhigh analyst for WHY, correctness, root cause, architecture, planning, tradeoffs, review, and what should change. Provide a self-contained question with relevant paths and constraints. Use Mapper only for WHERE/WHAT location and evidence.",
     promptSnippet: "Ask Oracle for default read-only WHY/correctness/what-should-change analysis",
     promptGuidelines: [
       "Use oracle by default for WHY, correctness, root cause, architecture, planning, tradeoffs, review, or what should change; give it a self-contained question with relevant paths and constraints.",
@@ -331,6 +341,7 @@ export default function delegatesExtension(pi: ExtensionAPI, registerSession?: S
         description:
           "Self-contained question, including relevant paths, constraints, and the decision or review needed",
       }),
+      model: Type.Optional(Type.String({ description: "Exact provider/model override." })),
     }),
     async execute(toolCallId, params, signal, onUpdate, ctx) {
       const result = await runDelegate({
@@ -340,6 +351,7 @@ export default function delegatesExtension(pi: ExtensionAPI, registerSession?: S
         signal,
         onUpdate,
         ctx,
+        model: params.model,
       });
       return {
         content: [{ type: "text", text: result.text }],
@@ -367,6 +379,7 @@ export default function delegatesExtension(pi: ExtensionAPI, registerSession?: S
         description:
           "Self-contained task with relevant paths, constraints, and the expected validation or result",
       }),
+      model: Type.Optional(Type.String({ description: "Exact provider/model override." })),
       writeScope: Type.Optional(Type.Array(Type.String(), {
         description: "Canonical Worker write paths supplied by the background task coordinator.",
       })),
@@ -379,6 +392,7 @@ export default function delegatesExtension(pi: ExtensionAPI, registerSession?: S
         signal,
         onUpdate,
         ctx,
+        model: params.model,
         writeScope: params.writeScope,
       });
       return {

@@ -15,11 +15,15 @@
   "packages": [
     "git:github.com/HazAT/pi-ghostty",
     "git:github.com/nicobailon/pi-mcp-adapter@v2.8.0",
-    "npm:pi-multi-account"
+    "npm:pi-multi-account",
+    {
+      "source": "npm:pi-claude-bridge@0.8.0",
+      "extensions": []
+    }
   ],
-  "lastChangelogVersion": "0.85.1",
+  "lastChangelogVersion": "0.87.1",
   "theme": "gruvbox-high-contrast",
-  "defaultProvider": "openai-codex",
-  "defaultModel": "gpt-5.6-sol",
+  "defaultProvider": "claude-bridge",
+  "defaultModel": "claude-opus-5-5",
   "defaultThinkingLevel": "high"
 }

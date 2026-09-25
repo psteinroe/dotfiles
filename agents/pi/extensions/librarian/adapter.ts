@@ -26,12 +26,15 @@ import {
 import {
   createSubagentModelPlan,
   createSubagentSettings,
+  parseExactSubagentModelRef,
+  reloadSubagentResources,
+  resolveSubagentLifecycleExtensionPaths,
 } from "../shared/subagent-models.ts";
 import { promptSubagentWithFailover } from "../shared/subagent-failover.ts";
 import {
   assertExecutorMcpToolsRegistered,
   EXECUTOR_MCP_TOOLS,
-  isolateExecutorMcpExtension,
+  isolateSubagentExtensions,
   isolatedSubagentResourceDir,
   resolveExecutorMcpExtensionPath,
 } from "../shared/subagent-mcp.ts";
@@ -51,12 +54,13 @@ import { createTurnBudgetExtension } from "./turn-budget.ts";
 const LIBRARIAN_MODEL_PROVIDER = "openai-codex";
 const LIBRARIAN_MODEL_ID = "gpt-6-luna";
 const LIBRARIAN_THINKING = "high" as const;
+const LIBRARIAN_MODEL = `${LIBRARIAN_MODEL_PROVIDER}/${LIBRARIAN_MODEL_ID}`;
 
 function createDetails(
   run: LibrarianRunDetails,
   workspace: string,
   metadata: LibrarianMetadata,
-  model = `${LIBRARIAN_MODEL_PROVIDER}/${LIBRARIAN_MODEL_ID}`,
+  model = LIBRARIAN_MODEL,
 ): LibrarianDetails {
   return {
     status: run.status,
@@ -136,18 +140,22 @@ export default function librarianExtension(pi: ExtensionAPI, registerSession?: S
         return errorResult(normalized.error, ctx.cwd);
       }
 
-      const { query, repos, owners, maxSearchResults } = normalized.value;
+      const { query, repos, owners, model: requestedModel, maxSearchResults } = normalized.value;
       let plan: Awaited<ReturnType<typeof createSubagentModelPlan>>;
       let executorMcpExtensionPath: string;
+      let selectedModel = LIBRARIAN_MODEL;
       try {
+        selectedModel = requestedModel === undefined
+          ? LIBRARIAN_MODEL
+          : parseExactSubagentModelRef(requestedModel);
         executorMcpExtensionPath = resolveExecutorMcpExtensionPath(pi);
-        plan = await createSubagentModelPlan(ctx, LIBRARIAN_MODEL_ID);
+        plan = await createSubagentModelPlan(ctx, selectedModel);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         return errorResult(message, ctx.cwd, query);
       }
       const metadata: LibrarianMetadata = { repos, owners, maxSearchResults };
-      let currentModel = `${LIBRARIAN_MODEL_PROVIDER}/${LIBRARIAN_MODEL_ID}`;
+      let currentModel = selectedModel;
       const workspaceBase = "/tmp/pi-librarian";
       await fs.mkdir(workspaceBase, { recursive: true });
       const workspace = await fs.mkdtemp(path.join(workspaceBase, "run-"));
@@ -186,13 +194,15 @@ export default function librarianExtension(pi: ExtensionAPI, registerSession?: S
           maxSearchResults || DEFAULT_MAX_SEARCH_RESULTS,
         );
         const agentDir = getAgentDir();
+        const lifecycleExtensionPaths = resolveSubagentLifecycleExtensionPaths(plan, agentDir);
+        const allowedExtensionPaths = [executorMcpExtensionPath, ...lifecycleExtensionPaths];
         const settingsManager = createSubagentSettings(workspace, agentDir);
         const resourceLoader = new DefaultResourceLoader({
           cwd: workspace,
           agentDir: isolatedSubagentResourceDir(),
           settingsManager,
-          additionalExtensionPaths: [executorMcpExtensionPath],
-          extensionsOverride: isolateExecutorMcpExtension(executorMcpExtensionPath),
+          additionalExtensionPaths: allowedExtensionPaths,
+          extensionsOverride: isolateSubagentExtensions(allowedExtensionPaths),
           noSkills: true,
           noPromptTemplates: true,
           noThemes: true,
@@ -205,7 +215,7 @@ export default function librarianExtension(pi: ExtensionAPI, registerSession?: S
           systemPromptOverride: () => systemPrompt,
           skillsOverride: () => ({ skills: [], diagnostics: [] }),
         });
-        await resourceLoader.reload();
+        await reloadSubagentResources(resourceLoader);
 
         if (signal?.aborted) {
           aborted = true;

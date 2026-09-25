@@ -66,7 +66,7 @@ fi
 
 if [[ "$topic" == all || "$topic" == remote ]]; then
   _case_header "Remote-only helpers"
-  _case_row "rauth [all|gh|pi|mcp|exa|aws]" "copy GitHub/Pi/MCP/Exa/AWS auth to the remote"
+  _case_row "rauth [all|gh|pi|claude|mcp|exa|aws]" "copy GitHub/Pi/Claude Bridge/MCP/Exa/AWS auth to the remote"
   _case_row "rssh [dir]" "open a plain remote psteinroe shell"
   _case_row "rpushdev [repo] [msg]" "commit/push, then prepare/register with rdev and return"
   _case_row "rherdr <repo> [branch|pr]" "direct remote recovery/Moshi attach (explicit TUI)"

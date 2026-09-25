@@ -1,0 +1,12 @@
+{
+  "askClaude": {
+    "enabled": false,
+    "allowFullMode": false
+  },
+  "provider": {
+    "plan": "pro",
+    "longContextExtraUsage": false,
+    "strictMcpConfig": true,
+    "autoMemoryEnabled": false
+  }
+}

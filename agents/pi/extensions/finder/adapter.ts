@@ -20,10 +20,16 @@ import {
 import {
   createSubagentModelPlan,
   createSubagentSettings,
+  parseExactSubagentModelRef,
+  reloadSubagentResources,
+  resolveSubagentLifecycleExtensionPaths,
   type Model,
 } from "../shared/subagent-models.ts";
 import { promptSubagentWithFailover } from "../shared/subagent-failover.ts";
-import { isolatedSubagentResourceDir } from "../shared/subagent-mcp.ts";
+import {
+  isolateSubagentExtensions,
+  isolatedSubagentResourceDir,
+} from "../shared/subagent-mcp.ts";
 import { createTurnBudgetExtension } from "../shared/turn-budget.ts";
 import {
   createSubagentRenderers,
@@ -87,17 +93,20 @@ function resultFor(
 
 async function createFinderSession(
   ctx: ExtensionContext,
+  modelRef = FINDER_MODEL,
 ): Promise<{
   session: AgentSession;
   models: Model[];
 }> {
-  const plan = await createSubagentModelPlan(ctx, FINDER_MODEL_ID);
+  const plan = await createSubagentModelPlan(ctx, modelRef);
   const agentDir = getAgentDir();
+  const lifecycleExtensionPaths = resolveSubagentLifecycleExtensionPaths(plan, agentDir);
   const settingsManager = createSubagentSettings(ctx.cwd, agentDir);
   const resourceLoader = new DefaultResourceLoader({
     cwd: ctx.cwd,
     agentDir: isolatedSubagentResourceDir(),
     settingsManager,
+    additionalExtensionPaths: lifecycleExtensionPaths,
     extensionFactories: [
       subdirContextExtension,
       createTurnBudgetExtension(FINDER_MAX_TURNS),
@@ -105,17 +114,14 @@ async function createFinderSession(
     ],
     // Keep child loading limited to the inline Mapper policy extensions; do not
     // inherit arbitrary workspace or user extensions that could add tools.
-    extensionsOverride: (base) => ({
-      ...base,
-      extensions: base.extensions.filter((extension) => extension.path.startsWith("<inline:")),
-    }),
+    extensionsOverride: isolateSubagentExtensions(lifecycleExtensionPaths),
     noSkills: true,
     noPromptTemplates: true,
     noThemes: true,
     noContextFiles: true,
     systemPrompt: buildFinderSystemPrompt(),
   });
-  await resourceLoader.reload();
+  await reloadSubagentResources(resourceLoader);
 
   const { session } = await createAgentSession({
     cwd: ctx.cwd,
@@ -173,6 +179,10 @@ export default function finderExtension(pi: ExtensionAPI, registerSession?: Suba
     ) {
       const rawQuery = (params as { query?: unknown }).query;
       const query = typeof rawQuery === "string" ? rawQuery.trim() : "";
+      const rawModel = (params as { model?: unknown }).model;
+      const requestedModel = rawModel === undefined
+        ? undefined
+        : parseExactSubagentModelRef(String(rawModel));
       const run: FinderDetails["run"] = {
         status: "running",
         task: query,
@@ -206,7 +216,7 @@ export default function finderExtension(pi: ExtensionAPI, registerSession?: Suba
       let removeSteering: (() => void) | undefined;
 
       try {
-        const created = await createFinderSession(ctx);
+        const created = await createFinderSession(ctx, requestedModel || undefined);
         const child = created.session;
         currentModel = `${created.models[0].provider}/${created.models[0].id}`;
         session = child;

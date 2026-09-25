@@ -156,7 +156,7 @@ is_safe() {
 is_critical() {
   awk -v l="$current_load" -v m="$current_memory" -v c="$current_cpu_psi" -v p="$current_memory_psi" \
     -v cl="$critical_load" -v cm="$critical_memory_mib" -v cc="$critical_cpu_psi" -v cp="$critical_memory_psi" \
-    'BEGIN { exit !(l > cl || m < cm || c > cc || p > cp) }'
+    'BEGIN { exit !((l > cl && c > cc) || m < cm || p > cp) }'
 }
 
 for target in "${agents[@]}"; do
