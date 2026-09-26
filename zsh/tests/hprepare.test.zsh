@@ -47,7 +47,7 @@ case "$*" in
   "session stop example")
     printf '%s\n' stopped > "$HERDR_TEST_STATE"
     ;;
-  server)
+  "--session example remote-client-bridge")
     [ "$state" = stopped ] || exit 1
     printf '%s\n' running > "$HERDR_TEST_STATE"
     ;;
@@ -137,7 +137,7 @@ RDEV_DOTFILES="$fixture/dotfiles" \
   run_hprepare example
 
 stop_line=$(grep -n '^session stop example$' "$fixture/herdr-commands" | cut -d: -f1)
-start_line=$(grep -n '^server$' "$fixture/herdr-commands" | cut -d: -f1)
+start_line=$(grep -n '^--session example remote-client-bridge$' "$fixture/herdr-commands" | cut -d: -f1)
 [[ -n "$stop_line" && -n "$start_line" ]]
 (( stop_line < start_line ))
 [[ $(<"$fixture/herdr-state") == running ]]

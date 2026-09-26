@@ -105,7 +105,10 @@ local server_ready=0
 if HERDR_SESSION="$repo" "$herdr_bin" workspace list >/dev/null 2>&1; then
   server_ready=1
 else
-  HERDR_SESSION="$repo" nohup "$herdr_bin" server >/tmp/herdr-${repo}.log 2>&1 &!
+  # The bridge starts a detached (setsid) daemon and exits on stdin EOF. Saved
+  # SSH machines refuse servers that are not session leaders, so a plain
+  # backgrounded `herdr server` cannot be registered by rdev.
+  "$herdr_bin" --session "$repo" remote-client-bridge </dev/null >/tmp/herdr-${repo}.log 2>&1
   local i
   for i in {1..30}; do
     if HERDR_SESSION="$repo" "$herdr_bin" workspace list >/dev/null 2>&1; then
