@@ -42,6 +42,9 @@
       "orbstack"
       "spotify"
       "steam"
+      "battle-net"
+      # Installs the Riot Client too; there is no standalone Riot Client cask.
+      "league-of-legends"
       "google-chrome"
       "font-fira-code-nerd-font"
       {
