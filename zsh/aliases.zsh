@@ -19,6 +19,9 @@ rdotfiles() { rdev dotfiles "$@"; }
 hellomateo() { hdev hellomateo "$@"; }
 rhellomateo() { rdev hellomateo "$@"; }
 
+hops() { hdev operations-platform "$@"; }
+rhops() { rdev operations-platform "$@"; }
+
 ceplatform() { hdev ce-platform "$@"; }
 rceplatform() { rdev ce-platform "$@"; }
 

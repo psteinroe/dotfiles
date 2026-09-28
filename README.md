@@ -97,6 +97,7 @@ hdev dotfiles main       # local Herdr session/workspace
 rdev hellomateo main     # prepare/register remote session, then return
 hellomateo main          # shortcut for hdev hellomateo main
 rhellomateo main         # shortcut for rdev hellomateo main
+rhops main               # shortcut for rdev operations-platform main
 ```
 
 Remote defaults:
@@ -153,7 +154,7 @@ The public exe.dev route remains an SSH-only fallback: connect to
 not proxy Mosh UDP traffic. Global Herdr and `moshi-hook` bridges transparently
 run those integrations as `psteinroe` on that fallback connection.
 
-Project shortcuts follow the same local/remote pattern: `dotfiles` / `rdotfiles`, `hellomateo` / `rhellomateo`, `ceplatform` / `rceplatform`, `radiomarl` / `rradiomarl`, `ninjascale` / `rninjascale`, `sbch` / `rsbch`, `pgls` / `rpgls`, `pgconductor` / `rpgconductor`, `pgstream` / `rpgstream`, `hpgstream` / `rhpgstream`, and `toolshed` / `rtoolshed`.
+Project shortcuts follow the same local/remote pattern: `dotfiles` / `rdotfiles`, `hellomateo` / `rhellomateo`, `hops` / `rhops`, `ceplatform` / `rceplatform`, `radiomarl` / `rradiomarl`, `ninjascale` / `rninjascale`, `sbch` / `rsbch`, `pgls` / `rpgls`, `pgconductor` / `rpgconductor`, `pgstream` / `rpgstream`, `hpgstream` / `rhpgstream`, and `toolshed` / `rtoolshed`.
 
 Local and remote helpers intentionally mirror each other where possible:
 

@@ -21,8 +21,9 @@ const CLAUDE_BRIDGE_PROVIDER = "claude-bridge";
 const ACCOUNT_PROVIDER = /^openai-codex-account-(\d+)$/u;
 const CLAUDE_BRIDGE_WRAPPER = ["extensions", "claude-bridge.ts"] as const;
 const CLAUDE_BRIDGE_PACKAGE_ENTRY = [
-  "npm",
-  "node_modules",
+  "git",
+  "github.com",
+  "elidickinson",
   "pi-claude-bridge",
   "src",
   "index.ts",
@@ -156,7 +157,7 @@ export function resolveSubagentLifecycleExtensionPaths(
   }
   throw new Error(
     `Claude Bridge managed wrapper or package source is unavailable (${wrapperPath}, ${packageEntry}). `
-    + "Deploy the managed extension and install npm:pi-claude-bridge@0.8.0 before selecting a claude-bridge model.",
+    + "Deploy the managed extension and install git:github.com/elidickinson/pi-claude-bridge before selecting a claude-bridge model.",
   );
 }
 

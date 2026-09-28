@@ -11,8 +11,9 @@ import {
 
 const CLAUDE_BRIDGE_PROVIDER = "claude-bridge";
 const BRIDGE_ENTRY_PARTS = [
-  "npm",
-  "node_modules",
+  "git",
+  "github.com",
+  "elidickinson",
   "pi-claude-bridge",
   "src",
   "index.ts",
@@ -89,7 +90,7 @@ export default async function claudeBridgeProvider(pi: ExtensionAPI): Promise<vo
   const entryPath = resolveManagedClaudeBridgeEntry();
   if (!existsSync(entryPath)) {
     throw new Error(
-      `Claude Bridge extension source is unavailable at ${entryPath}. Install the configured npm:pi-claude-bridge@0.8.0 package before selecting a claude-bridge model.`,
+      `Claude Bridge extension source is unavailable at ${entryPath}. Install the configured git:github.com/elidickinson/pi-claude-bridge package before selecting a claude-bridge model.`,
     );
   }
 

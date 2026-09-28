@@ -17,7 +17,7 @@
     "git:github.com/nicobailon/pi-mcp-adapter@v2.8.0",
     "npm:pi-multi-account",
     {
-      "source": "npm:pi-claude-bridge@0.8.0",
+      "source": "git:github.com/elidickinson/pi-claude-bridge@227f5eb4450a070dfbc083a7fe75b8b35366b941",
       "extensions": []
     }
   ],
