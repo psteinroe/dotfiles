@@ -21,6 +21,12 @@ PASSWORDLESS_SUDO="${PASSWORDLESS_SUDO:-1}"
 # The standalone Linux profile uses direct tailnet binding for T3 and does not
 # need Tailscale operator privileges. Set this only when opting into Serve.
 CONFIGURE_TAILSCALE_OPERATOR="${CONFIGURE_TAILSCALE_OPERATOR:-0}"
+# Protect standalone Linux remotes from becoming unresponsive under memory
+# pressure. The earlyoom binary comes from Home Manager; root-owned host state
+# is provisioned below because standalone Home Manager cannot manage it.
+CONFIGURE_MEMORY_GUARD="${CONFIGURE_MEMORY_GUARD:-1}"
+MEMORY_GUARD_ONLY="${MEMORY_GUARD_ONLY:-0}"
+MEMORY_GUARD_SWAP_GIB="${MEMORY_GUARD_SWAP_GIB:-8}"
 
 log() {
   printf '\n=== %s ===\n' "$*"
@@ -82,9 +88,172 @@ as_dev_tty() {
   fi
 }
 
+configure_memory_guard() {
+  if [ ! -d /run/systemd/system ] || ! command -v systemctl >/dev/null 2>&1; then
+    warn "systemd was not detected; skipping the memory-pressure guard."
+    return
+  fi
+
+  case "$MEMORY_GUARD_SWAP_GIB" in
+    ''|0*|*[!0-9]*)
+      warn "MEMORY_GUARD_SWAP_GIB must be a positive integer, got: ${MEMORY_GUARD_SWAP_GIB}"
+      exit 1
+      ;;
+  esac
+
+  local earlyoom_bin
+  earlyoom_bin="$(as_dev 'earlyoom_path=$(command -v earlyoom 2>/dev/null || true); if [ -n "$earlyoom_path" ]; then readlink -f "$earlyoom_path"; fi')"
+  case "$earlyoom_bin" in
+    /nix/store/*-earlyoom-*/bin/earlyoom) ;;
+    *)
+      warn "A Nix-managed earlyoom binary was not found after Home Manager activation."
+      warn "Expected /nix/store/*-earlyoom-*/bin/earlyoom, got: ${earlyoom_bin:-<empty>}"
+      exit 1
+      ;;
+  esac
+  if [ ! -x "$earlyoom_bin" ]; then
+    warn "Nix-managed earlyoom binary is not executable: ${earlyoom_bin}"
+    exit 1
+  fi
+
+  for command_name in blkid fallocate mkswap swapon sysctl; do
+    if ! command -v "$command_name" >/dev/null 2>&1; then
+      warn "Required host command is unavailable: ${command_name}"
+      exit 1
+    fi
+  done
+
+  log "Configuring ${MEMORY_GUARD_SWAP_GIB} GiB swapfile"
+  local swapfile=/swapfile
+  local fstab_entry='/swapfile none swap sw,nofail 0 0'
+  local fstab_swap_count
+  fstab_swap_count="$(awk '$0 !~ /^[[:space:]]*#/ && $1 == "/swapfile" { count++ } END { print count + 0 }' /etc/fstab)"
+  if [ "$fstab_swap_count" -gt 1 ]; then
+    warn "Multiple /swapfile entries already exist in /etc/fstab."
+    exit 1
+  elif [ "$fstab_swap_count" -eq 1 ] && ! grep -Fxq "$fstab_entry" /etc/fstab; then
+    warn "A conflicting /swapfile entry already exists in /etc/fstab."
+    exit 1
+  fi
+
+  if [ -L "$swapfile" ]; then
+    warn "Refusing to replace swapfile symlink: ${swapfile}"
+    exit 1
+  fi
+
+  local expected_swap_bytes=$((MEMORY_GUARD_SWAP_GIB * 1024 * 1024 * 1024))
+  local created_swapfile=0
+  if [ -e "$swapfile" ]; then
+    if [ ! -f "$swapfile" ]; then
+      warn "Refusing to replace non-regular swap path: ${swapfile}"
+      exit 1
+    fi
+
+    local actual_swap_bytes
+    actual_swap_bytes="$(stat -c %s "$swapfile")"
+    if [ "$actual_swap_bytes" -ne "$expected_swap_bytes" ]; then
+      warn "Existing ${swapfile} is ${actual_swap_bytes} bytes; expected ${expected_swap_bytes}."
+      warn "Refusing to resize an existing swapfile automatically."
+      exit 1
+    fi
+
+    if ! as_root blkid -p -s TYPE -o value "$swapfile" 2>/dev/null | grep -qx swap; then
+      warn "Existing ${swapfile} does not contain a swap signature; refusing to overwrite it."
+      exit 1
+    fi
+  else
+    local available_kib required_kib
+    available_kib="$(df -Pk / | awk 'NR == 2 { print $4 }')"
+    required_kib=$(((MEMORY_GUARD_SWAP_GIB + 4) * 1024 * 1024))
+    if [ "$available_kib" -lt "$required_kib" ]; then
+      warn "Not enough free disk for swap plus a 4 GiB reserve."
+      exit 1
+    fi
+
+    if ! as_root fallocate -l "${MEMORY_GUARD_SWAP_GIB}G" "$swapfile"; then
+      as_root rm -f "$swapfile"
+      warn "Could not allocate ${swapfile}."
+      exit 1
+    fi
+    as_root chmod 0600 "$swapfile"
+    if ! as_root mkswap "$swapfile"; then
+      as_root rm -f "$swapfile"
+      warn "Could not initialize ${swapfile}; removed the incomplete file."
+      exit 1
+    fi
+    created_swapfile=1
+  fi
+  as_root chmod 0600 "$swapfile"
+
+  if ! swapon --show=NAME --noheadings --raw | grep -Fxq "$swapfile"; then
+    if ! as_root swapon "$swapfile"; then
+      if [ "$created_swapfile" -eq 1 ]; then
+        as_root rm -f "$swapfile"
+      fi
+      warn "Could not activate ${swapfile}; it was not added to /etc/fstab."
+      exit 1
+    fi
+  fi
+
+  if [ "$fstab_swap_count" -eq 0 ]; then
+    printf '%s\n' "$fstab_entry" | as_root tee -a /etc/fstab >/dev/null
+  fi
+
+  log "Configuring memory-pressure policy"
+  local sysctl_config earlyoom_unit
+  sysctl_config="$(mktemp)"
+  earlyoom_unit="$(mktemp)"
+  cat >"$sysctl_config" <<'EOF'
+# Managed by psteinroe/dotfiles bootstrap-remote.sh.
+vm.swappiness=10
+EOF
+  as_root install -m 0644 "$sysctl_config" /etc/sysctl.d/99-rdev-memory-pressure.conf
+  rm -f "$sysctl_config"
+  as_root sysctl -p /etc/sysctl.d/99-rdev-memory-pressure.conf
+
+  local earlyoom_store earlyoom_gcroot
+  earlyoom_store="${earlyoom_bin%/bin/earlyoom}"
+  earlyoom_gcroot=/nix/var/nix/gcroots/rdev-earlyoom
+  if as_root test -e "$earlyoom_gcroot" && ! as_root test -L "$earlyoom_gcroot"; then
+    warn "Refusing to replace non-symlink Nix GC root: ${earlyoom_gcroot}"
+    exit 1
+  fi
+  as_root mkdir -p /nix/var/nix/gcroots
+  as_root ln -sfn "$earlyoom_store" "$earlyoom_gcroot"
+
+  cat >"$earlyoom_unit" <<EOF
+# Managed by psteinroe/dotfiles bootstrap-remote.sh.
+[Unit]
+Description=Early OOM daemon for remote development workloads
+Documentation=https://github.com/rfjakob/earlyoom
+After=local-fs.target swap.target
+
+[Service]
+Type=simple
+ExecStart=${earlyoom_bin} -m 10,5 -s 100,100 -r 60 --prefer '^(tsc|tsgo|vitest|esbuild)\$' --avoid '^(herdr|pi|sshd|sshd-session|sshd-auth|tailscaled|dockerd|containerd|postgres|node-MainThread)\$'
+Restart=on-failure
+RestartSec=5s
+OOMScoreAdjust=-1000
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  as_root install -m 0644 "$earlyoom_unit" /etc/systemd/system/earlyoom.service
+  rm -f "$earlyoom_unit"
+  as_root systemctl daemon-reload
+  as_root systemctl enable earlyoom.service
+  as_root systemctl restart earlyoom.service
+}
+
 if [ "$(uname -s)" != "Linux" ]; then
   echo "bootstrap-remote.sh is for Linux remotes only. Use bootstrap.sh on macOS." >&2
   exit 1
+fi
+
+if [ "$MEMORY_GUARD_ONLY" = "1" ]; then
+  configure_memory_guard
+  log "Memory-pressure guard updated"
+  exit 0
 fi
 
 log "Preparing base OS packages"
@@ -201,6 +370,12 @@ if [ "$RUN_HOME_MANAGER" = "1" ]; then
     warn "Home Manager switch failed. Re-run with ALLOW_HOME_MANAGER_SKIP=1 only if you intentionally want a partial bootstrap."
     exit 1
   fi
+fi
+
+if [ "$CONFIGURE_MEMORY_GUARD" = "1" ]; then
+  configure_memory_guard
+else
+  echo "Memory-pressure guard setup disabled (CONFIGURE_MEMORY_GUARD=${CONFIGURE_MEMORY_GUARD})."
 fi
 
 if [ "$CONFIGURE_TAILSCALE_OPERATOR" = "1" ]; then

@@ -37,6 +37,47 @@ The bootstrap and nix-darwin configuration manage Determinate Nix's
 `llm-agents.nix` packages such as Pi, tuicr, and Herdr while leaving arbitrary
 flake configuration untrusted.
 
+### exe.dev memory-pressure guard
+
+The generic Linux bootstrap configures the current Ubuntu-based exe.dev host
+with an 8 GiB `/swapfile`, `vm.swappiness=10`, and a root systemd earlyoom
+service. Home Manager supplies the earlyoom binary from Nix; the bootstrap
+owns the root-only swap, sysctl, and systemd integration that standalone Home
+Manager cannot manage.
+
+Earlyoom starts selecting a victim when its userspace available-memory metric
+falls below 10%, and escalates below 5%. This metric is not a fixed percentage
+of physical RAM. Compiler and test process names are preferred as victims, but
+any eligible process can still be selected. Remote-access infrastructure and
+persistent agents are avoided when another suitable process is available.
+Avoidance is a bias, not an absolute guarantee. A build may be killed to keep
+SSH and Herdr responsive.
+
+The swapfile resides on the current unencrypted root filesystem, so swapped
+memory can persist on disk. This setup is specific to generic/exe.dev Linux
+hosts and is separate from the `hetzner-dev` NixOS configuration.
+
+Set `CONFIGURE_MEMORY_GUARD=0` when running `bootstrap-remote.sh` to skip this
+host-level setup. Reapply only the idempotent host configuration—without the
+bootstrap's package, Git, or Home Manager steps—with:
+
+```bash
+MEMORY_GUARD_ONLY=1 ./bootstrap-remote.sh
+```
+
+The guard refuses to overwrite a conflicting `/swapfile` or `/etc/fstab`
+entry.
+
+Verify the active configuration with:
+
+```bash
+swapon --show --bytes
+sysctl vm.swappiness
+systemctl status earlyoom
+systemctl cat earlyoom
+journalctl -u earlyoom -b
+```
+
 ### T3 Code remote access
 
 Linux Home Manager declaratively owns the pinned T3 Code package and its

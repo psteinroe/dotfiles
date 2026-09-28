@@ -141,7 +141,10 @@ in
         diffnav # GitHub-like diff pager for git/gh PR diffs
 
       ]
-      ++ lib.optional isLinux tmux
+      ++ lib.optionals isLinux [
+        earlyoom
+        tmux
+      ]
       ++ optionalPackage tuicr
       ++ optionalPackage herdr
       ++ optionalPackage piAgent;
