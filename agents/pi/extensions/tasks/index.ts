@@ -337,7 +337,6 @@ export default function tasksExtension(initialPi: ExtensionAPI) {
 
   const activeTasks = () => registry.list().filter((task) =>
     task.status === "starting" || task.status === "running" || task.status === "cancelling");
-  const activeBackgroundCommand = () => activeTasks().find((task) => task.kind === "command");
   const refreshHerdrMetadata = () => {
     if (!ownsHerdrMetadata || shuttingDown) return;
     void herdrMetadata.setActive(activeTasks().length > 0);
@@ -526,14 +525,6 @@ export default function tasksExtension(initialPi: ExtensionAPI) {
       if (agent === "worker" && (!Array.isArray(params.write_scope) || params.write_scope.length === 0)) {
         throw new Error("Worker tasks require a non-empty write_scope so background edits cannot overlap.");
       }
-      if (agent === "worker") {
-        const command = activeBackgroundCommand();
-        if (command) {
-          throw new Error(
-            `Cannot start Worker while background command ${command.id} (${command.title}) is active.`,
-          );
-        }
-      }
       const activeForProfile = activeTasks().filter((task) => task.agent === agent).length;
       if (activeForProfile >= SUBAGENT_CAPACITY[agent]) {
         throw new Error(
@@ -627,12 +618,6 @@ export default function tasksExtension(initialPi: ExtensionAPI) {
     }, { additionalProperties: false }),
     async execute(_toolCallId, params: any, signal, _onUpdate, ctx) {
       if (signal?.aborted) throw new Error("Background command launch was cancelled before acceptance.");
-      const worker = registry.firstActiveWorker();
-      if (worker) {
-        throw new Error(
-          `Cannot start background command while Worker ${worker.id} (${worker.title}) is active.`,
-        );
-      }
       const cwd = path.resolve(ctx.cwd, params.working_dir ?? ".");
       const terminal = terminalManager.start({ command: params.command, title: params.title, cwd });
       let task: TaskSnapshot;

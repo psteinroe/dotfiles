@@ -16,7 +16,7 @@ Use `start_subagent` for specialized agent work. Route exactly: **Mapper=where/w
 - `oracle` — the default read-only analyst for WHY, correctness, root cause, architecture, planning, tradeoffs, review, and what should change
 - `worker` — bounded implementation and validation
 
-Express Mapper, Librarian, and Oracle ownership boundaries in their task text; `write_scope` is Worker-only. Worker launches require a narrow `write_scope`. Treat it as a coordination lease until the task settles or is cancelled. Structured Worker writes are gated to the scope, and the coordinator stays read-only while the Worker runs. Do not overlap Workers with unrestricted background commands; each launcher rejects the other while active. Worker shell effects remain policy-constrained rather than sandboxed.
+Express Mapper, Librarian, and Oracle ownership boundaries in their task text; `write_scope` is Worker-only. Worker launches require a narrow `write_scope`. Treat it as a coordination lease until the task settles or is cancelled. Structured Worker writes are gated to the scope, and the coordinator stays read-only while the Worker runs. Worker shell effects remain policy-constrained rather than sandboxed.
 
 Use `start_background_command` for dev servers, watchers, log tails, streaming builds, and long test suites. Use `bash` for commands that normally finish in seconds. Commands receive no stdin.
 

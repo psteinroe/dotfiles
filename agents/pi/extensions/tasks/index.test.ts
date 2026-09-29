@@ -263,7 +263,7 @@ test("task_steer validates target, instruction, and child readiness", async () =
   await emit(h.handlers, "session_shutdown", ctx);
 });
 
-test("rejects a background command while a Worker is active", async () => {
+test("allows a background command while a Worker is active", async () => {
   const h = harness();
   const ctx = context();
   await emit(h.handlers, "session_start", ctx);
@@ -278,21 +278,19 @@ test("rejects a background command while a Worker is active", async () => {
     undefined,
     ctx,
   );
-  await assert.rejects(
-    h.tools.get("start_background_command").execute(
-      "call",
-      { command: "sleep 1", title: "blocked" },
-      undefined,
-      undefined,
-      ctx,
-    ),
-    /Worker .* is active/,
+  const commandLaunch = await h.tools.get("start_background_command").execute(
+    "call",
+    { command: "sleep 1", title: "concurrent" },
+    undefined,
+    undefined,
+    ctx,
   );
-  await workerLaunch;
+  assert.match((await workerLaunch).content[0].text, /Started task-1/);
+  assert.match(commandLaunch.content[0].text, /Started task-2/);
   await emit(h.handlers, "session_shutdown", ctx);
 });
 
-test("rejects a Worker while a background command is active", async () => {
+test("allows a Worker while a background command is active", async () => {
   const h = harness();
   const ctx = context();
   await emit(h.handlers, "session_start", ctx);
@@ -303,20 +301,18 @@ test("rejects a Worker while a background command is active", async () => {
     undefined,
     ctx,
   );
-  await assert.rejects(
-    h.tools.get("start_subagent").execute(
-      "call",
-      {
-        agent: "worker",
-        task: "must be excluded by the command",
-        write_scope: ["agents/pi/extensions/tasks/index.ts"],
-      },
-      undefined,
-      undefined,
-      ctx,
-    ),
-    /background command .* is active/,
+  const workerLaunch = await h.tools.get("start_subagent").execute(
+    "call",
+    {
+      agent: "worker",
+      task: "run beside the command",
+      write_scope: ["agents/pi/extensions/tasks/index.ts"],
+    },
+    undefined,
+    undefined,
+    ctx,
   );
+  assert.match(workerLaunch.content[0].text, /Started task-2/);
   await emit(h.handlers, "session_shutdown", ctx);
 });
 
