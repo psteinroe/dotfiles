@@ -23,8 +23,6 @@ import {
   type SubagentSessionRegistration,
 } from "../shared/subagent-runtime.ts";
 import {
-  DelegateCapacity,
-  DELEGATE_CONCURRENCY,
   DELEGATE_POLICIES,
   gitDiffArgs,
   truncateDelegateOutput,
@@ -165,10 +163,6 @@ function createDelegateRenderers(name: DelegateName) {
 
 export default function delegatesExtension(pi: ExtensionAPI, registerSession?: SubagentSessionRegistration) {
   const activeSessions = createActiveSubagentSessionRegistry();
-  const capacity: Record<DelegateName, DelegateCapacity> = {
-    oracle: new DelegateCapacity(DELEGATE_CONCURRENCY.oracle),
-    worker: new DelegateCapacity(DELEGATE_CONCURRENCY.worker),
-  };
 
   async function runDelegate(options: {
     name: DelegateName;
@@ -180,7 +174,6 @@ export default function delegatesExtension(pi: ExtensionAPI, registerSession?: S
     model?: string;
     writeScope?: string[];
   }) {
-    const releaseCapacity = capacity[options.name].acquire();
     const policy = DELEGATE_POLICIES[options.name];
     let model = options.model === undefined
       ? policy.model
@@ -319,7 +312,6 @@ export default function delegatesExtension(pi: ExtensionAPI, registerSession?: S
       removeSteering?.();
       removeActiveSession?.();
       if (session) await shutdownAndDisposeChildSession(session);
-      releaseCapacity();
     }
   }
 
@@ -332,7 +324,7 @@ export default function delegatesExtension(pi: ExtensionAPI, registerSession?: S
     promptGuidelines: [
       "Use oracle by default for WHY, correctness, root cause, architecture, planning, tradeoffs, review, or what should change; give it a self-contained question with relevant paths and constraints.",
       "Use Mapper for WHERE/WHAT only: locating files, symbols, config, tests, dependencies, and explicit call/data-flow anchors with file:line evidence.",
-      "Run at most one oracle at a time; it may run alongside independent workers.",
+      "Independent oracle calls may run concurrently and alongside independent workers.",
     ],
     executionMode: "parallel",
     ...createDelegateRenderers("oracle"),
@@ -369,7 +361,7 @@ export default function delegatesExtension(pi: ExtensionAPI, registerSession?: S
     promptSnippet: "Delegate bounded implementation, testing, or CI diagnosis to a fresh Luna worker",
     promptGuidelines: [
       "Use worker for bounded implementation, tests, routine refactors, or CI diagnosis; include relevant paths, constraints, and a checkable completion condition.",
-      "Launch up to four independent worker calls in the same response when they have disjoint file ownership; Pi runs those calls concurrently.",
+      "Launch independent worker calls in the same response when they have disjoint file ownership; Pi runs those calls concurrently.",
       "Review worker changes and test evidence before committing or pushing.",
     ],
     executionMode: "parallel",

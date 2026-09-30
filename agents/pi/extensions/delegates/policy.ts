@@ -7,36 +7,6 @@ export interface DelegatePolicy {
   readonly tools: readonly string[];
 }
 
-export class DelegateCapacity {
-  private activeCount = 0;
-  private readonly maximum: number;
-
-  constructor(maximum: number) {
-    this.maximum = maximum;
-  }
-
-  acquire(): () => void {
-    if (this.activeCount >= this.maximum) {
-      throw new Error(
-        `At most ${this.maximum} delegates can run concurrently. Wait for one to finish.`,
-      );
-    }
-    this.activeCount++;
-
-    let active = true;
-    return () => {
-      if (!active) return;
-      active = false;
-      this.activeCount--;
-    };
-  }
-}
-
-export const DELEGATE_CONCURRENCY: Record<DelegateName, number> = {
-  oracle: 1,
-  worker: 4,
-};
-
 export const DELEGATE_POLICIES: Record<DelegateName, DelegatePolicy> = {
   oracle: {
     model: "openai-codex/gpt-6-astra",

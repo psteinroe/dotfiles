@@ -2,8 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { ORACLE_SYSTEM_PROMPT } from "./adapter.ts";
 import {
-  DelegateCapacity,
-  DELEGATE_CONCURRENCY,
   DELEGATE_POLICIES,
   gitDiffArgs,
   truncateDelegateOutput,
@@ -36,21 +34,6 @@ test("Oracle is the default read-only analysis role", () => {
   assert.match(ORACLE_SYSTEM_PROMPT, /low-probability risks when their impact is high/);
   assert.match(ORACLE_SYSTEM_PROMPT, /decisive recommendation rather than cataloging possibilities/);
   assert.doesNotMatch(ORACLE_SYSTEM_PROMPT, /second opinion|do not use for routine work/i);
-});
-
-test("allows one oracle alongside four workers", () => {
-  const oracleCapacity = new DelegateCapacity(DELEGATE_CONCURRENCY.oracle);
-  const workerCapacity = new DelegateCapacity(DELEGATE_CONCURRENCY.worker);
-  const releaseOracle = oracleCapacity.acquire();
-  const releaseWorkers = Array.from({ length: 4 }, () => workerCapacity.acquire());
-
-  assert.throws(() => oracleCapacity.acquire(), /At most 1 delegate/);
-  assert.throws(() => workerCapacity.acquire(), /At most 4 delegates/);
-
-  releaseOracle();
-  releaseWorkers.forEach((release) => release());
-  oracleCapacity.acquire()();
-  workerCapacity.acquire()();
 });
 
 test("git diff targets use fixed non-shell argv", () => {

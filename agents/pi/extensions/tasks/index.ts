@@ -39,12 +39,6 @@ const RESULT_STDERR_MAX = 4 * 1024;
 
 const SUBAGENT_NAMES = ["mapper", "librarian", "oracle", "worker"] as const;
 type SubagentName = typeof SUBAGENT_NAMES[number];
-const SUBAGENT_CAPACITY: Record<SubagentName, number> = {
-  mapper: 4,
-  librarian: 2,
-  oracle: 1,
-  worker: 4,
-};
 
 type ToolDefinition = {
   name: string;
@@ -524,12 +518,6 @@ export default function tasksExtension(initialPi: ExtensionAPI) {
       }
       if (agent === "worker" && (!Array.isArray(params.write_scope) || params.write_scope.length === 0)) {
         throw new Error("Worker tasks require a non-empty write_scope so background edits cannot overlap.");
-      }
-      const activeForProfile = activeTasks().filter((task) => task.agent === agent).length;
-      if (activeForProfile >= SUBAGENT_CAPACITY[agent]) {
-        throw new Error(
-          `At most ${SUBAGENT_CAPACITY[agent]} ${agent} task${SUBAGENT_CAPACITY[agent] === 1 ? "" : "s"} can run concurrently.`,
-        );
       }
       const normalizedScope = agent === "worker"
         ? registry.assertWriteScopeAvailable(ctx.cwd, params.write_scope)
