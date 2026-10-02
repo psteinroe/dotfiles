@@ -12,5 +12,4 @@ export const FinderParams = Type.Object({
       "- Personal: 'Locate my latest trip itinerary PDF and adjacent booking files, returning candidate paths and evidence.'",
     ].join("\n"),
   }),
-  model: Type.Optional(Type.String({ description: "Exact provider/model override." })),
 });

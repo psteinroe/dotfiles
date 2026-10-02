@@ -269,13 +269,27 @@ export function createActiveSubagentSessionRegistry(): ActiveSubagentSessionRegi
 }
 
 /** Bind extensions, guard every child tool call, and make preparation failures terminal. */
+const childToolTimeoutGuards = new WeakMap<AgentSession, ReturnType<typeof createToolCallTimeoutGuard>>();
+
+export function guardReadyChildTools(session: AgentSession): void {
+  childToolTimeoutGuards.get(session)?.apply(session);
+}
+
 export async function bindAndPrepareChildSession(
   session: AgentSession,
   options: { toolCallTimeoutMs?: number } = {},
 ): Promise<AgentSession> {
   try {
     await bindChildSessionExtensions(session);
-    createToolCallTimeoutGuard(options.toolCallTimeoutMs).apply(session);
+    const guard = createToolCallTimeoutGuard(options.toolCallTimeoutMs);
+    childToolTimeoutGuards.set(session, guard);
+    guard.apply(session);
+    // MCP definitions can be replaced asynchronously after readiness (for example
+    // on reconnect). tool_execution_start fires before handler execution, so refresh
+    // the idempotent guard synchronously for every execution.
+    session.subscribe((event) => {
+      if (event.type === "tool_execution_start") guard.apply(session);
+    });
     return session;
   } catch (error) {
     await shutdownAndDisposeChildSession(session);

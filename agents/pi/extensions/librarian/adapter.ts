@@ -21,22 +21,22 @@ import {
   extractLatestAssistantText,
   shutdownAndDisposeChildSession,
   trackSubagentEvents,
+  guardReadyChildTools,
   type SubagentSessionRegistration,
 } from "../shared/subagent-runtime.ts";
 import {
   createSubagentModelPlan,
   createSubagentSettings,
-  parseExactSubagentModelRef,
   reloadSubagentResources,
   resolveSubagentLifecycleExtensionPaths,
 } from "../shared/subagent-models.ts";
 import { promptSubagentWithFailover } from "../shared/subagent-failover.ts";
 import {
-  assertExecutorMcpToolsRegistered,
+  createExecutorMcpIntegration,
   EXECUTOR_MCP_TOOLS,
   isolateSubagentExtensions,
   isolatedSubagentResourceDir,
-  resolveExecutorMcpExtensionPath,
+  waitForExecutorTools,
 } from "../shared/subagent-mcp.ts";
 import installSubdirContext from "../shared/subdir-context/src/index.ts";
 import {
@@ -140,15 +140,12 @@ export default function librarianExtension(pi: ExtensionAPI, registerSession?: S
         return errorResult(normalized.error, ctx.cwd);
       }
 
-      const { query, repos, owners, model: requestedModel, maxSearchResults } = normalized.value;
+      const { query, repos, owners, maxSearchResults } = normalized.value;
       let plan: Awaited<ReturnType<typeof createSubagentModelPlan>>;
-      let executorMcpExtensionPath: string;
-      let selectedModel = LIBRARIAN_MODEL;
+      let executorMcp: ReturnType<typeof createExecutorMcpIntegration>;
+      const selectedModel = LIBRARIAN_MODEL;
       try {
-        selectedModel = requestedModel === undefined
-          ? LIBRARIAN_MODEL
-          : parseExactSubagentModelRef(requestedModel);
-        executorMcpExtensionPath = resolveExecutorMcpExtensionPath(pi);
+        executorMcp = createExecutorMcpIntegration();
         plan = await createSubagentModelPlan(ctx, selectedModel);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -195,7 +192,7 @@ export default function librarianExtension(pi: ExtensionAPI, registerSession?: S
         );
         const agentDir = getAgentDir();
         const lifecycleExtensionPaths = resolveSubagentLifecycleExtensionPaths(plan, agentDir);
-        const allowedExtensionPaths = [executorMcpExtensionPath, ...lifecycleExtensionPaths];
+        const allowedExtensionPaths = lifecycleExtensionPaths;
         const settingsManager = createSubagentSettings(workspace, agentDir);
         const resourceLoader = new DefaultResourceLoader({
           cwd: workspace,
@@ -207,7 +204,10 @@ export default function librarianExtension(pi: ExtensionAPI, registerSession?: S
           noPromptTemplates: true,
           noThemes: true,
           noContextFiles: true,
+          noExtensions: true,
           extensionFactories: [
+            (extensionApi) => { extensionApi.on("session_shutdown", () => executorMcp.close()); },
+            executorMcp.extensionFactory,
             installSubdirContext,
             createTurnBudgetExtension(DEFAULT_MAX_TURNS),
             plan.extensionFactory,
@@ -232,11 +232,15 @@ export default function librarianExtension(pi: ExtensionAPI, registerSession?: S
           thinkingLevel: LIBRARIAN_THINKING,
           tools: ["read", "bash", ...EXECUTOR_MCP_TOOLS],
         });
-        session = await bindAndPrepareChildSession(created.session);
-        assertExecutorMcpToolsRegistered(session);
-        currentModel = `${plan.models[0].provider}/${plan.models[0].id}`;
+        session = created.session;
         removeActiveSession = activeSessions.add(session);
         removeSteering = registerSession?.(toolCallId, session);
+        await bindAndPrepareChildSession(session);
+        const lifetimeSignal = signal ? AbortSignal.any([signal, executorMcp.signal]) : executorMcp.signal;
+        await waitForExecutorTools(session, lifetimeSignal);
+        executorMcp.assertOpen();
+        guardReadyChildTools(session);
+        currentModel = `${plan.models[0].provider}/${plan.models[0].id}`;
 
         const tracker = trackSubagentEvents(session, {
           run,
@@ -250,13 +254,14 @@ export default function librarianExtension(pi: ExtensionAPI, registerSession?: S
         });
         if (aborted) throw new Error("Aborted");
 
+        executorMcp.assertOpen();
         await promptSubagentWithFailover(
           session,
           buildLibrarianUserPrompt(query, repos, owners, maxSearchResults),
           {
             models: plan.models,
             thinkingLevel: LIBRARIAN_THINKING,
-            signal,
+            signal: signal ? AbortSignal.any([signal, executorMcp.signal]) : executorMcp.signal,
             run,
             onModelChange: (model) => {
               currentModel = `${model.provider}/${model.id}`;
@@ -285,6 +290,7 @@ export default function librarianExtension(pi: ExtensionAPI, registerSession?: S
         stopTracking?.();
         removeSteering?.();
         removeActiveSession?.();
+        await executorMcp.close();
         if (session) await shutdownAndDisposeChildSession(session);
       }
 

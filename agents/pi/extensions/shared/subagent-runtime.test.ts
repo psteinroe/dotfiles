@@ -69,6 +69,7 @@ test("prepared child sessions time out hung tool calls", async () => {
   };
   const definitions = new Map<string, ToolDefinition>([[hungTool.name, hungTool]]);
   const session = {
+    subscribe: () => () => undefined,
     async bindExtensions() {},
     getAllTools: () => [...definitions.keys()].map((name) => ({ name })),
     getToolDefinition: (name: string) => definitions.get(name),
@@ -88,6 +89,30 @@ test("prepared child sessions time out hung tool calls", async () => {
   ]);
 
   assert.equal(outcome, 'Tool call "hung_fixture" timed out after 10 ms.');
+});
+
+test("guards replacement tool definitions synchronously on each tool start", async () => {
+  const session = sessionFixture();
+  const definitions = new Map<string, ToolDefinition>();
+  const makeTool = (): ToolDefinition => ({
+    name: "dynamic_fixture", label: "Dynamic", description: "May hang", parameters: Type.Object({}),
+    async execute() { return new Promise(() => {}); },
+  });
+  const original = makeTool();
+  definitions.set(original.name, original);
+  const child = {
+    subscribe: session.subscribe,
+    async bindExtensions() {},
+    getAllTools: () => [...definitions.keys()].map((name) => ({ name })),
+    getToolDefinition: (name: string) => definitions.get(name),
+    extensionRunner: { hasHandlers: () => false, emit: async () => undefined },
+    dispose() {},
+  } as unknown as AgentSession;
+  await bindAndPrepareChildSession(child, { toolCallTimeoutMs: 10 });
+  const replacement = makeTool();
+  definitions.set(replacement.name, replacement);
+  session.emit({ type: "tool_execution_start", toolCallId: "dynamic", toolName: replacement.name, args: {} } as AgentSessionEvent);
+  await assert.rejects(replacement.execute("dynamic", {}, undefined, undefined, {} as any), /timed out after 10 ms/);
 });
 
 test("extracts the last non-empty assistant text", () => {

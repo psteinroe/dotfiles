@@ -18,6 +18,7 @@ import {
   createActiveSubagentSessionRegistry,
   describeMissingSubagentOutput,
   extractLatestAssistantText,
+  guardReadyChildTools,
   shutdownAndDisposeChildSession,
   trackSubagentEvents,
   type SubagentSessionRegistration,
@@ -34,18 +35,17 @@ import { createTurnBudgetExtension } from "../shared/turn-budget.ts";
 import {
   createSubagentModelPlan,
   createSubagentSettings,
-  parseExactSubagentModelRef,
   reloadSubagentResources,
   resolveSubagentLifecycleExtensionPaths,
   type Model,
 } from "../shared/subagent-models.ts";
 import { promptSubagentWithFailover } from "../shared/subagent-failover.ts";
 import {
-  assertExecutorMcpToolsRegistered,
+  createExecutorMcpIntegration,
   EXECUTOR_MCP_TOOLS,
   isolateSubagentExtensions,
   isolatedSubagentResourceDir,
-  resolveExecutorMcpExtensionPath,
+  waitForExecutorTools,
 } from "../shared/subagent-mcp.ts";
 import { createWorkerWriteScopeExtension } from "../shared/write-scope.ts";
 import {
@@ -96,17 +96,20 @@ function createGitDiffTool(cwd: string) {
 async function createIsolatedSession(options: {
   name: DelegateName;
   ctx: ExtensionContext;
-  executorMcpExtensionPath: string;
-  modelRef?: string;
   writeScope?: string[];
-}): Promise<{ session: AgentSession; models: Model[] }> {
-  const { name, ctx, executorMcpExtensionPath, modelRef, writeScope } = options;
+  signal?: AbortSignal;
+  onSession(session: AgentSession): void;
+}): Promise<{ session: AgentSession; models: Model[]; executorMcp: ReturnType<typeof createExecutorMcpIntegration> }> {
+  const { name, ctx, writeScope, signal } = options;
+  if (signal?.aborted) throw signal.reason instanceof Error ? signal.reason : new Error(`${name} was aborted.`);
+  const executorMcp = createExecutorMcpIntegration();
+  const lifetimeSignal = signal ? AbortSignal.any([signal, executorMcp.signal]) : executorMcp.signal;
   const policy = DELEGATE_POLICIES[name];
-  const plan = await createSubagentModelPlan(ctx, modelRef ?? policy.model);
+  const plan = await createSubagentModelPlan(ctx, policy.model);
 
   const agentDir = getAgentDir();
   const lifecycleExtensionPaths = resolveSubagentLifecycleExtensionPaths(plan, agentDir);
-  const allowedExtensionPaths = [executorMcpExtensionPath, ...lifecycleExtensionPaths];
+  const allowedExtensionPaths = lifecycleExtensionPaths;
   const settingsManager = createSubagentSettings(ctx.cwd, agentDir);
   const loader = new DefaultResourceLoader({
     cwd: ctx.cwd,
@@ -115,12 +118,15 @@ async function createIsolatedSession(options: {
     additionalExtensionPaths: allowedExtensionPaths,
     extensionsOverride: isolateSubagentExtensions(allowedExtensionPaths),
     extensionFactories: [
+      (pi) => { pi.on("session_shutdown", () => executorMcp.close()); },
+      executorMcp.extensionFactory,
       createTurnBudgetExtension(policy.maxTurns),
       ...(name === "worker" && writeScope?.length
         ? [createWorkerWriteScopeExtension(writeScope)]
         : []),
       plan.extensionFactory,
     ],
+    noExtensions: true,
     noSkills: true,
     noPromptTemplates: true,
     noThemes: true,
@@ -141,17 +147,19 @@ async function createIsolatedSession(options: {
     customTools: name === "oracle" ? [createGitDiffTool(ctx.cwd)] : [],
   });
 
-  const boundSession = await bindAndPrepareChildSession(session);
   try {
-    assertExecutorMcpToolsRegistered(boundSession);
+    // Register ownership before session_start launches any background connection.
+    options.onSession(session);
+    const boundSession = await bindAndPrepareChildSession(session);
+    await waitForExecutorTools(boundSession, lifetimeSignal);
+    executorMcp.assertOpen();
+    guardReadyChildTools(boundSession);
+    return { session: boundSession, models: plan.models, executorMcp };
   } catch (error) {
-    await shutdownAndDisposeChildSession(boundSession);
+    await executorMcp.close();
+    await shutdownAndDisposeChildSession(session);
     throw error;
   }
-  return {
-    session: boundSession,
-    models: plan.models,
-  };
 }
 
 function createDelegateRenderers(name: DelegateName) {
@@ -171,13 +179,10 @@ export default function delegatesExtension(pi: ExtensionAPI, registerSession?: S
     signal?: AbortSignal;
     onUpdate?: AgentToolUpdateCallback<DelegateDetails>;
     ctx: ExtensionContext;
-    model?: string;
     writeScope?: string[];
   }) {
     const policy = DELEGATE_POLICIES[options.name];
-    let model = options.model === undefined
-      ? policy.model
-      : parseExactSubagentModelRef(options.model);
+    let model = policy.model;
     const run: DelegateRunDetails = {
       status: "running",
       task: options.task,
@@ -211,20 +216,20 @@ export default function delegatesExtension(pi: ExtensionAPI, registerSession?: S
     emitUpdate();
 
     try {
-      const executorMcpExtensionPath = resolveExecutorMcpExtensionPath(pi);
       const created = await createIsolatedSession({
         name: options.name,
         ctx: options.ctx,
-        executorMcpExtensionPath,
-        modelRef: options.model,
         writeScope: options.writeScope,
+        signal: options.signal,
+        onSession: (child) => {
+          session = child;
+          removeActiveSession = activeSessions.add(child);
+          removeSteering = registerSession?.(options.taskId, child);
+        },
       });
       const child = created.session;
       model = `${created.models[0].provider}/${created.models[0].id}`;
       emitUpdate();
-      session = child;
-      removeActiveSession = activeSessions.add(child);
-      removeSteering = registerSession?.(options.taskId, child);
       const tracker = trackSubagentEvents(child, {
         run,
         maxTurns: policy.maxTurns,
@@ -236,10 +241,11 @@ export default function delegatesExtension(pi: ExtensionAPI, registerSession?: S
       });
       if (options.signal?.aborted) throw new Error(`${options.name} was aborted.`);
 
+      created.executorMcp.assertOpen();
       await promptSubagentWithFailover(child, options.task, {
         models: created.models,
         thinkingLevel: policy.thinking,
-        signal: options.signal,
+        signal: options.signal ? AbortSignal.any([options.signal, created.executorMcp.signal]) : created.executorMcp.signal,
         run,
         onModelChange: (candidate) => {
           model = `${candidate.provider}/${candidate.id}`;
@@ -333,7 +339,6 @@ export default function delegatesExtension(pi: ExtensionAPI, registerSession?: S
         description:
           "Self-contained question, including relevant paths, constraints, and the decision or review needed",
       }),
-      model: Type.Optional(Type.String({ description: "Exact provider/model override." })),
     }),
     async execute(toolCallId, params, signal, onUpdate, ctx) {
       const result = await runDelegate({
@@ -343,7 +348,6 @@ export default function delegatesExtension(pi: ExtensionAPI, registerSession?: S
         signal,
         onUpdate,
         ctx,
-        model: params.model,
       });
       return {
         content: [{ type: "text", text: result.text }],
@@ -357,8 +361,8 @@ export default function delegatesExtension(pi: ExtensionAPI, registerSession?: S
     name: "worker",
     label: "Delegate Work",
     description:
-      "Delegate a bounded implementation, test, or CI-diagnosis task to a fresh Luna high worker. Provide relevant paths, constraints, and a checkable completion condition. The worker edits the current working tree but does not commit or push.",
-    promptSnippet: "Delegate bounded implementation, testing, or CI diagnosis to a fresh Luna worker",
+      "Delegate a bounded implementation, test, or CI-diagnosis task to a fresh GPT-6.1 Sol high worker. Provide relevant paths, constraints, and a checkable completion condition. The worker edits the current working tree but does not commit or push.",
+    promptSnippet: "Delegate bounded implementation, testing, or CI diagnosis to a fresh GPT-6.1 Sol worker",
     promptGuidelines: [
       "Use worker for bounded implementation, tests, routine refactors, or CI diagnosis; include relevant paths, constraints, and a checkable completion condition.",
       "Launch independent worker calls in the same response when they have disjoint file ownership; Pi runs those calls concurrently.",
@@ -371,7 +375,6 @@ export default function delegatesExtension(pi: ExtensionAPI, registerSession?: S
         description:
           "Self-contained task with relevant paths, constraints, and the expected validation or result",
       }),
-      model: Type.Optional(Type.String({ description: "Exact provider/model override." })),
       writeScope: Type.Optional(Type.Array(Type.String(), {
         description: "Canonical Worker write paths supplied by the background task coordinator.",
       })),
@@ -384,7 +387,6 @@ export default function delegatesExtension(pi: ExtensionAPI, registerSession?: S
         signal,
         onUpdate,
         ctx,
-        model: params.model,
         writeScope: params.writeScope,
       });
       return {

@@ -1,7 +1,4 @@
 {
-    "settings": {
-        "autoAuth": true
-    },
     "mcpServers": {
         "foilwick": {
             "url": "https://foilwick.com/api/mcp"
@@ -14,11 +11,12 @@
         },
         "executor": {
             "url": "https://executor.getmateo.com/mcp/toolkits/developer",
-            "directTools": [
-                "execute",
-                "skills",
-                "resume"
-            ]
+            "exposure": "hidden",
+            "toolExposure": {
+                "execute": "direct",
+                "skills": "direct",
+                "resume": "direct"
+            }
         }
     }
 }

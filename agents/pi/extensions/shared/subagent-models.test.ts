@@ -117,8 +117,9 @@ test("selects Claude exactly and loads its complete child lifecycle instead of c
   const root = await mkdtemp(path.join(tmpdir(), "pi-claude-bridge-plan-"));
   const packageEntry = path.join(
     root,
-    "npm",
-    "node_modules",
+    "git",
+    "github.com",
+    "elidickinson",
     "pi-claude-bridge",
     "src",
     "index.ts",
@@ -159,7 +160,7 @@ test("loads isolated resources once because the managed wrapper imports a fresh 
   assert.equal(reloads, 1);
 });
 
-test("public model overrides require a non-empty exact provider/model reference", () => {
+test("model reference parser requires a non-empty exact provider/model reference", () => {
   assert.equal(
     parseExactSubagentModelRef(" claude-bridge/claude-opus-4-6 "),
     "claude-bridge/claude-opus-4-6",

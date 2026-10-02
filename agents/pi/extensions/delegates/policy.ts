@@ -15,7 +15,7 @@ export const DELEGATE_POLICIES: Record<DelegateName, DelegatePolicy> = {
     tools: ["read", "grep", "find", "ls", "git_diff"],
   },
   worker: {
-    model: "openai-codex/gpt-6-luna",
+    model: "openai-codex/gpt-6.1-sol",
     thinking: "high",
     maxTurns: 50,
     tools: ["read", "bash", "edit", "write", "grep", "find", "ls"],

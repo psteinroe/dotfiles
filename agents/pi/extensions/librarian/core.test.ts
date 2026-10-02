@@ -10,6 +10,7 @@ test("preserves the public librarian parameter schema", () => {
   const schema = LibrarianParams as any;
   assert.equal(schema.type, "object");
   assert.equal(schema.properties.query.type, "string");
+  assert.equal(Object.hasOwn(schema.properties, "model"), false);
   assert.equal(schema.properties.repos.maxItems, 30);
   assert.equal(schema.properties.owners.maxItems, 30);
   assert.equal(schema.properties.maxSearchResults.minimum, 1);
@@ -38,10 +39,9 @@ test("normalizes query, scopes, and search limit like upstream", () => {
   assert.deepEqual(normalizeLibrarianParams({ query: "  " }), {
     error: "Invalid parameters: expected `query` to be a non-empty string.",
   });
-  assert.deepEqual(normalizeLibrarianParams({ query: "x", model: "   " }), {
-    value: { query: "x", repos: [], owners: [], model: "", maxSearchResults: DEFAULT_MAX_SEARCH_RESULTS },
-  });
-  assert.deepEqual(normalizeLibrarianParams({ query: "x", model: 42 }), {
-    error: "Invalid parameters: expected `model` to be an exact provider/model string.",
+  // Even if a caller bypasses schema validation, unexpected legacy model input
+  // is ignored and cannot alter the role default selected by the adapter.
+  assert.deepEqual(normalizeLibrarianParams({ query: "x", model: "claude-bridge/claude-opus-4-6" }), {
+    value: { query: "x", repos: [], owners: [], maxSearchResults: DEFAULT_MAX_SEARCH_RESULTS },
   });
 });

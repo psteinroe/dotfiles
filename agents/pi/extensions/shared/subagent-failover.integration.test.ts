@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import * as path from "node:path";
 import test from "node:test";
@@ -25,10 +26,12 @@ import {
   type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { shutdownAndDisposeChildSession } from "./child-session.ts";
+import { isolatedSubagentResourceDir } from "./subagent-mcp.ts";
 import { Type } from "typebox";
 
 const MODEL_ID = "gpt-6-luna";
 const ORACLE_MODEL_ID = "gpt-6-astra";
+const WORKER_MODEL_ID = "gpt-6.1-sol";
 const PRIMARY = "openai-codex";
 const ALIAS = "openai-codex-account-1";
 const API = "openai-responses" as Api;
@@ -44,11 +47,11 @@ type Call = {
   context: Context["messages"];
 };
 
-const EXECUTOR_TOOLS = ["executor_execute", "executor_resume", "executor_skills"];
+const EXECUTOR_TOOLS = ["mcp__executor__execute", "mcp__executor__resume", "mcp__executor__skills"];
 const EXPECTED: Record<Role, { model: string; thinking: "medium" | "high" | "xhigh"; tools: string[] }> = {
   mapper: { model: MODEL_ID, thinking: "medium", tools: ["find", "grep", "ls", "read"] },
   librarian: { model: MODEL_ID, thinking: "high", tools: ["bash", ...EXECUTOR_TOOLS, "read"] },
-  worker: { model: MODEL_ID, thinking: "high", tools: ["bash", "edit", ...EXECUTOR_TOOLS, "find", "grep", "ls", "read", "write"] },
+  worker: { model: WORKER_MODEL_ID, thinking: "high", tools: ["bash", "edit", ...EXECUTOR_TOOLS, "find", "grep", "ls", "read", "write"] },
   oracle: { model: ORACLE_MODEL_ID, thinking: "xhigh", tools: [...EXECUTOR_TOOLS, "find", "git_diff", "grep", "ls", "read"] },
 };
 
@@ -188,7 +191,7 @@ function legacyFixtureProviderConfig(
         return credentials.access;
       },
     },
-    models: [MODEL_ID, ORACLE_MODEL_ID].map((modelId) => {
+    models: [MODEL_ID, ORACLE_MODEL_ID, WORKER_MODEL_ID].map((modelId) => {
       const candidate = model(id, modelId);
       return {
         id: candidate.id,
@@ -220,16 +223,35 @@ function fixtureProvider(id: string, calls: Call[], mode: FixtureMode, workspace
         resolve: async () => ({ auth: { apiKey: `fixture-${id}` }, source: "integration fixture" }),
       },
     },
-    models: [model(id, MODEL_ID), model(id, ORACLE_MODEL_ID)],
+    models: [model(id, MODEL_ID), model(id, ORACLE_MODEL_ID), model(id, WORKER_MODEL_ID)],
     api: { stream, streamSimple: stream },
   });
 }
 
-async function harness(mode: FixtureMode = "failover", registration: "native" | "legacy" = "native") {
+type McpFixtureMode = "ready" | "delayed" | "unauthorized" | "partial" | "hanging";
+
+async function harness(mode: FixtureMode = "failover", registration: "native" | "legacy" = "native", mcpMode: McpFixtureMode = "ready") {
   const root = await mkdtemp(path.join(tmpdir(), "pi-failover-integration-"));
   const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
   process.env.PI_CODING_AGENT_DIR = path.join(root, "agent");
   let parentSession: AgentSession | undefined;
+  let mcpServer: Server | undefined;
+  let maliciousExtension: string | undefined;
+  const children: AgentSession[] = [];
+  const toolSnapshots: Array<{ active: string[]; callable: string[] }> = [];
+  let resolveInitialization!: () => void;
+  let releaseInitialization!: () => void;
+  let resolveSessionClosed!: () => void;
+  const initializationStarted = new Promise<void>((resolve) => { resolveInitialization = resolve; });
+  const initializationGate = new Promise<void>((resolve) => { releaseInitialization = resolve; });
+  const sessionClosed = new Promise<void>((resolve) => { resolveSessionClosed = resolve; });
+  let initialized = 0;
+  const registerChild = (_id: string, child: AgentSession) => {
+    children.push(child);
+    return child.subscribe((event) => {
+      if (event.type === "agent_start") toolSnapshots.push({ active: child.getActiveToolNames(), callable: child.getCallableToolNames() });
+    });
+  };
   try {
     const agentDir = path.join(root, "agent");
     const workspace = path.join(root, "workspace");
@@ -243,6 +265,42 @@ async function harness(mode: FixtureMode = "failover", registration: "native" | 
     retry: { enabled: true, maxRetries: 7, provider: { maxRetries: 3, timeoutMs: 111 } },
   };
   await writeFile(path.join(agentDir, "settings.json"), JSON.stringify(settings));
+  mcpServer = createServer(async (request, response) => {
+    if (request.method === "DELETE") { resolveSessionClosed(); response.writeHead(204).end(); return; }
+    if (request.method !== "POST") { response.writeHead(404).end(); return; }
+    const chunks: Buffer[] = [];
+    for await (const chunk of request) chunks.push(Buffer.from(chunk));
+    let message: any;
+    try { message = JSON.parse(Buffer.concat(chunks).toString("utf8")); } catch { response.writeHead(400).end(); return; }
+    if (message.method?.startsWith("notifications/")) { response.writeHead(202).end(); return; }
+    let result: any = {};
+    if (message.method === "initialize") {
+      initialized++;
+      resolveInitialization();
+      if (mcpMode === "hanging") await initializationGate;
+      if (response.destroyed) return;
+      if (mcpMode === "unauthorized") { response.writeHead(401).end(); return; }
+      result = { protocolVersion: "2025-03-26", capabilities: { tools: {}, resources: {} }, serverInfo: { name: "executor-fixture", version: "1" } };
+    }
+    else if (message.method === "tools/list") {
+      if (mcpMode === "delayed") await new Promise<void>((resolve) => setTimeout(resolve, 80));
+      if (response.destroyed) return;
+      result = { tools: (mcpMode === "partial" ? ["execute", "skills"] : ["execute", "skills", "resume", "extra"]).map((name) => ({ name, description: "Fixture", inputSchema: { type: "object", properties: {} } })) };
+    }
+    else if (message.method === "resources/list") result = { resources: [{ uri: "file:///secret", name: "secret" }] };
+    else if (message.method === "resources/templates/list") result = { resourceTemplates: [] };
+    else if (message.method === "tools/call") result = { content: [{ type: "text", text: "fixture" }] };
+    response.writeHead(200, { "content-type": "application/json", "mcp-session-id": "fixture-session" }).end(JSON.stringify({ jsonrpc: "2.0", id: message.id, result }));
+  });
+  await new Promise<void>((resolve) => mcpServer!.listen(0, "127.0.0.1", resolve));
+  const address = mcpServer.address() as { port: number };
+  const maliciousMarker = path.join(root, "unrelated-mcp-or-extension-loaded");
+  await writeFile(path.join(agentDir, "mcp.json"), JSON.stringify({ mcpServers: {
+    executor: { url: `http://127.0.0.1:${address.port}/mcp`, toolExposure: { "*": "direct" }, resourcesExposure: "direct" },
+    unrelated: { command: process.execPath, args: ["-e", `require('node:fs').writeFileSync(${JSON.stringify(maliciousMarker)}, 'bad')`] },
+  } }));
+  await mkdir(path.join(workspace, ".pi"), { recursive: true });
+  await writeFile(path.join(workspace, ".pi", "mcp.json"), JSON.stringify({ mcpServers: { executor: { url: "http://127.0.0.1:1/override-must-not-connect" } } }));
 
   const calls: Call[] = [];
   const authPath = path.join(agentDir, "auth.json");
@@ -280,21 +338,6 @@ async function harness(mode: FixtureMode = "failover", registration: "native" | 
     });
     pi.on("session_start", (_event, ctx) => { parentContext = ctx; });
   };
-  const executorExtensionPath = path.join(root, "executor-mcp-fixture.ts");
-  await writeFile(executorExtensionPath, `
-import { Type } from "typebox";
-export default function executorFixture(pi) {
-  for (const name of ["executor_execute", "executor_skills", "executor_resume"]) {
-    pi.registerTool({
-      name,
-      label: name,
-      description: "Executor fixture",
-      parameters: Type.Object({}),
-      async execute() { return { content: [{ type: "text", text: name }], details: {} }; },
-    });
-  }
-}
-`);
   const [{ default: mapper }, { default: librarian }, { default: delegates }] = await Promise.all([
     import("../finder/adapter.ts"),
     import("../librarian/adapter.ts"),
@@ -304,8 +347,8 @@ export default function executorFixture(pi) {
     cwd: workspace,
     agentDir,
     settingsManager: SettingsManager.create(workspace, agentDir, { projectTrusted: false }),
-    additionalExtensionPaths: [executorExtensionPath],
-    extensionFactories: [unrelated, mapper, librarian, delegates],
+    additionalExtensionPaths: [],
+    extensionFactories: [unrelated, (pi) => mapper(pi, registerChild), (pi) => librarian(pi, registerChild), (pi) => delegates(pi, registerChild)],
     noSkills: true,
     noPromptTemplates: true,
     noThemes: true,
@@ -328,8 +371,21 @@ export default function executorFixture(pi) {
   assert.ok(parentContext, "parent session_start did not capture its context");
   assert.ok(parentSession, "parent session was not created");
   const parent = parentSession;
+  const discoveredExtensions = path.join(isolatedSubagentResourceDir(), "extensions");
+  await mkdir(discoveredExtensions, { recursive: true });
+  maliciousExtension = path.join(discoveredExtensions, `malicious-${path.basename(root)}.ts`);
+  await writeFile(maliciousExtension, `import { writeFileSync } from 'node:fs'; writeFileSync(${JSON.stringify(maliciousMarker)}, 'bad'); export default function () {}`);
   return {
     root,
+    agentDir,
+    children,
+    toolSnapshots,
+    maliciousMarker,
+    initializationStarted,
+    releaseInitialization,
+    sessionClosed,
+    parent,
+    get initialized() { return initialized; },
     workspace,
     settingsPath: path.join(agentDir, "settings.json"),
     settings,
@@ -340,6 +396,9 @@ export default function executorFixture(pi) {
       try {
         await shutdownAndDisposeChildSession(parent);
       } finally {
+        mcpServer?.closeAllConnections();
+        await new Promise<void>((resolve) => mcpServer?.close(() => resolve()) ?? resolve());
+        if (maliciousExtension) await rm(maliciousExtension, { force: true });
         if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
         else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
         await rm(root, { recursive: true, force: true });
@@ -349,6 +408,9 @@ export default function executorFixture(pi) {
   } catch (error) {
     try {
       if (parentSession) await shutdownAndDisposeChildSession(parentSession);
+      mcpServer?.closeAllConnections();
+      await new Promise<void>((resolve) => mcpServer?.close(() => resolve()) ?? resolve());
+      if (maliciousExtension) await rm(maliciousExtension, { force: true });
     } finally {
       if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
       else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
@@ -358,10 +420,10 @@ export default function executorFixture(pi) {
   }
 }
 
-async function runTool(h: Awaited<ReturnType<typeof harness>>, name: string, params: Record<string, unknown>, updates: unknown[]) {
+async function runTool(h: Awaited<ReturnType<typeof harness>>, name: string, params: Record<string, unknown>, updates: unknown[], signal?: AbortSignal) {
   const tool = h.tools.get(name);
   assert.ok(tool, `${name} adapter was not registered`);
-  return tool.execute("integration-tool-call", params, undefined, (update: unknown) => updates.push(update), h.ctx);
+  return tool.execute("integration-tool-call", params, signal, (update: unknown) => updates.push(update), h.ctx);
 }
 
 async function cleanupLibrarianWorkspace(result: any) {
@@ -394,6 +456,9 @@ test("runs all four real adapters through primary-to-alias failover", async () =
         assert.equal(details.model, `${ALIAS}/${expected.model}`);
         assert.equal(details.thinking, expected.thinking);
         assert.equal(details.run.status, "done");
+        assert.deepEqual([...h.toolSnapshots.at(-1)!.active].sort(), [...expected.tools].sort());
+        assert.deepEqual([...h.toolSnapshots.at(-1)!.callable].sort(), [...expected.tools].sort());
+        if (name === "mapper") assert.equal(h.initialized, 0, "Mapper opened an MCP connection");
       } finally {
         await cleanupLibrarianWorkspace(result);
       }
@@ -403,7 +468,7 @@ test("runs all four real adapters through primary-to-alias failover", async () =
       for (const call of calls) {
         assert.equal(call.model, EXPECTED[name].model, `${name} changed role model during failover`);
         assert.equal(call.reasoning, EXPECTED[name].thinking, `${name} changed reasoning during failover`);
-        assert.deepEqual([...call.tools].sort(), EXPECTED[name].tools, `${name} received unrelated tools`);
+        assert.deepEqual([...call.tools].sort(), [...EXPECTED[name].tools].sort(), `${name} received unrelated tools`);
       }
       assert.ok(calls.some((call) => call.provider === PRIMARY));
       assert.ok(calls.some((call) => call.provider === ALIAS));
@@ -421,6 +486,7 @@ test("runs all four real adapters through primary-to-alias failover", async () =
     assert.ok(Array.isArray(writeResult.content));
     assert.ok(writeResult.content.some((part) => part.type === "text" && /written|success/i.test(part.text)));
     assert.ok(h.calls.every((call) => !call.tools.includes("unrelated_parent_tool")));
+    await assert.rejects(readFile(h.maliciousMarker), { code: "ENOENT" });
     assert.deepEqual(JSON.parse(await readFile(h.settingsPath, "utf8")), h.settings);
   } finally {
     await h.dispose();
@@ -489,4 +555,124 @@ test("does not fail over SDK aborted responses without an external signal", asyn
   } finally {
     await h.dispose();
   }
+});
+
+async function waitUntil(predicate: () => boolean) {
+  const deadline = Date.now() + 2_000;
+  while (!predicate()) {
+    assert.ok(Date.now() < deadline, "fixture did not reach the expected startup state");
+    await new Promise<void>((resolve) => setTimeout(resolve, 10));
+  }
+}
+
+test("waits for delayed native discovery before any model request", async () => {
+  const h = await harness("failover", "native", "delayed");
+  try {
+    const running = runTool(h, "oracle", { task: "Wait for Executor tools." }, []);
+    await h.initializationStarted;
+    assert.equal(h.calls.length, 0);
+    assert.equal(h.children.length, 1, "startup child was not registered for shutdown");
+    const result: any = await running;
+    assert.notEqual(result.isError, true, JSON.stringify(result));
+    assert.deepEqual([...h.toolSnapshots[0]!.callable].sort(), [...EXPECTED.oracle.tools].sort());
+  } finally { await h.dispose(); }
+});
+
+test("pre-aborted adapter calls never connect MCP or prompt a model", async () => {
+  const h = await harness();
+  try {
+    const controller = new AbortController();
+    controller.abort(new Error("cancelled before startup"));
+    for (const [name, params] of ADAPTERS) {
+      const result: any = await runTool(h, name, params, [], controller.signal);
+      try { assert.equal(result.details.run.status, "aborted", JSON.stringify(result)); }
+      finally { await cleanupLibrarianWorkspace(result); }
+    }
+    assert.equal(h.initialized, 0);
+    assert.equal(h.calls.length, 0);
+  } finally { await h.dispose(); }
+});
+
+test("aborting native startup prevents prompting and closes each late-completing connection", async () => {
+  for (const name of ["oracle", "worker", "librarian"] as const) {
+    const h = await harness("failover", "native", "hanging");
+    let result: any;
+    try {
+      const controller = new AbortController();
+      const running = runTool(h, name, name === "librarian" ? { query: "Cancel startup." } : { task: "Cancel startup." }, [], controller.signal);
+      await h.initializationStarted;
+      assert.equal(h.children.length, 1);
+      assert.equal(h.calls.length, 0);
+      controller.abort(new Error("cancelled during startup"));
+      result = await running;
+      assert.equal(result.details.run.status, "aborted", JSON.stringify(result));
+      // Pi 1.0 owns the startup transport only after discovery. Cancellation must
+      // return now; when initialization finishes, native shutdown closes it.
+      h.releaseInitialization();
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        await Promise.race([h.sessionClosed, new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(new Error("late startup connection remained open")), 2_000); })]);
+      } finally { if (timer) clearTimeout(timer); }
+      assert.equal(h.calls.length, 0);
+      assert.equal(h.toolSnapshots.length, 0);
+    } finally {
+      await cleanupLibrarianWorkspace(result);
+      await h.dispose();
+    }
+  }
+});
+
+test("parent shutdown during MCP startup prevents late model requests", async () => {
+  const h = await harness("failover", "native", "hanging");
+  try {
+    const running = runTool(h, "oracle", { task: "Do not run after parent shutdown." }, []);
+    await h.initializationStarted;
+    await shutdownAndDisposeChildSession(h.parent);
+    await running;
+    assert.equal(h.calls.length, 0);
+    h.releaseInitialization();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([h.sessionClosed, new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(new Error("shutdown connection remained open")), 2_000); })]);
+    } finally { if (timer) clearTimeout(timer); }
+    assert.equal(h.calls.length, 0);
+  } finally { await h.dispose(); }
+});
+
+test("partial native tool registration cannot start a model request", async () => {
+  const h = await harness("failover", "native", "partial");
+  try {
+    const controller = new AbortController();
+    const running = runTool(h, "oracle", { task: "Do not run without resume." }, [], controller.signal);
+    await waitUntil(() => h.children[0]?.getActiveToolNames().includes("mcp__executor__skills") === true);
+    assert.equal(h.calls.length, 0);
+    controller.abort(new Error("cancel incomplete discovery"));
+    const result: any = await running;
+    assert.equal(result.details.run.status, "aborted");
+    assert.equal(h.calls.length, 0);
+  } finally { await h.dispose(); }
+});
+
+test("native authentication failure is terminal before model or failover requests", { timeout: 20_000 }, async () => {
+  const h = await harness("failover", "native", "unauthorized");
+  try {
+    const result: any = await runTool(h, "oracle", { task: "Never run without MCP authentication." }, []);
+    assert.equal(result.isError, true, JSON.stringify(result));
+    assert.equal(result.details.run.status, "error");
+    assert.equal(h.calls.length, 0);
+    assert.equal(h.toolSnapshots.length, 0);
+  } finally { await h.dispose(); }
+});
+
+test("Worker write scope remains enforced with native MCP and account failover", async () => {
+  const h = await harness();
+  try {
+    const allowed = path.join(h.workspace, "allowed");
+    await mkdir(allowed);
+    const result: any = await runTool(h, "worker", { task: "Attempt fixture write outside scope.", writeScope: [allowed] }, []);
+    assert.notEqual(result.isError, true, JSON.stringify(result));
+    await assert.rejects(readFile(path.join(h.workspace, "worker-output.txt")), { code: "ENOENT" });
+    assert.ok(h.calls.some((call) => call.context.some((message) => message.role === "toolResult" && message.toolName === "write" && message.isError)));
+    assert.deepEqual(JSON.parse(await readFile(h.settingsPath, "utf8")), h.settings);
+  } finally { await h.dispose(); }
 });

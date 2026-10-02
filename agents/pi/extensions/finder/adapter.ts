@@ -20,7 +20,6 @@ import {
 import {
   createSubagentModelPlan,
   createSubagentSettings,
-  parseExactSubagentModelRef,
   reloadSubagentResources,
   resolveSubagentLifecycleExtensionPaths,
   type Model,
@@ -93,12 +92,11 @@ function resultFor(
 
 async function createFinderSession(
   ctx: ExtensionContext,
-  modelRef = FINDER_MODEL,
 ): Promise<{
   session: AgentSession;
   models: Model[];
 }> {
-  const plan = await createSubagentModelPlan(ctx, modelRef);
+  const plan = await createSubagentModelPlan(ctx, FINDER_MODEL);
   const agentDir = getAgentDir();
   const lifecycleExtensionPaths = resolveSubagentLifecycleExtensionPaths(plan, agentDir);
   const settingsManager = createSubagentSettings(ctx.cwd, agentDir);
@@ -115,6 +113,7 @@ async function createFinderSession(
     // Keep child loading limited to the inline Mapper policy extensions; do not
     // inherit arbitrary workspace or user extensions that could add tools.
     extensionsOverride: isolateSubagentExtensions(lifecycleExtensionPaths),
+    noExtensions: true,
     noSkills: true,
     noPromptTemplates: true,
     noThemes: true,
@@ -179,10 +178,6 @@ export default function finderExtension(pi: ExtensionAPI, registerSession?: Suba
     ) {
       const rawQuery = (params as { query?: unknown }).query;
       const query = typeof rawQuery === "string" ? rawQuery.trim() : "";
-      const rawModel = (params as { model?: unknown }).model;
-      const requestedModel = rawModel === undefined
-        ? undefined
-        : parseExactSubagentModelRef(String(rawModel));
       const run: FinderDetails["run"] = {
         status: "running",
         task: query,
@@ -216,7 +211,7 @@ export default function finderExtension(pi: ExtensionAPI, registerSession?: Suba
       let removeSteering: (() => void) | undefined;
 
       try {
-        const created = await createFinderSession(ctx, requestedModel || undefined);
+        const created = await createFinderSession(ctx);
         const child = created.session;
         currentModel = `${created.models[0].provider}/${created.models[0].id}`;
         session = child;

@@ -10,6 +10,7 @@ test("exposes Mapper's WHERE/WHAT schema and strict read-only mapping prompt", a
   const systemPrompt = buildFinderSystemPrompt();
   assert.equal((FinderParams as any).type, "object");
   assert.equal((FinderParams as any).required.includes("query"), true);
+  assert.equal(Object.hasOwn((FinderParams as any).properties, "model"), false);
   assert.match(description, /WHERE\/WHAT/);
   assert.match(description, /Oracle analysis is required/);
   assert.match(systemPrompt, /You are Mapper/);

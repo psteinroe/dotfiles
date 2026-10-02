@@ -15,7 +15,7 @@ test("delegate routing keeps the coordinator out of routine implementation", () 
     tools: ["read", "grep", "find", "ls", "git_diff"],
   });
   assert.deepEqual(DELEGATE_POLICIES.worker, {
-    model: "openai-codex/gpt-6-luna",
+    model: "openai-codex/gpt-6.1-sol",
     thinking: "high",
     maxTurns: 50,
     tools: ["read", "bash", "edit", "write", "grep", "find", "ls"],
