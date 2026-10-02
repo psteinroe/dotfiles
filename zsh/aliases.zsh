@@ -48,8 +48,8 @@ rpgstream() { rdev postgres-stream "$@"; }
 hpgstream() { hdev postgres-steam-getmateo "$@"; }
 rhpgstream() { rdev postgres-steam-getmateo "$@"; }
 
-pgharness() { hdev postgres-harness "$@"; }
-rpgharness() { rdev postgres-harness "$@"; }
+fabrial() { hdev fabrial "$@"; }
+rfabrial() { rdev fabrial "$@"; }
 
 toolshed() { hdev toolshed "$@"; }
 rtoolshed() { rdev toolshed "$@"; }
