@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, rmSync, symlinkSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { TaskRegistry } from "./registry.ts";
@@ -79,10 +79,19 @@ test("prunes acknowledged settled tasks to a bounded history", () => {
   assert.ok(registry.get("task-80"));
 });
 
-test("rejects repository-wide and out-of-repository Worker scopes", () => {
+test("rejects repository-wide and filesystem-wide Worker scopes", () => {
   const registry = new TaskRegistry();
   assert.throws(() => registry.assertWriteScopeAvailable("/repo", ["."]), /entire repository/);
-  assert.throws(() => registry.assertWriteScopeAvailable("/repo", ["../outside"]), /stay inside/);
+  assert.throws(() => registry.assertWriteScopeAvailable("/repo", ["/"]), /entire filesystem/);
+});
+
+test("allows Worker scopes outside the repository", () => {
+  const registry = new TaskRegistry();
+  assert.deepEqual(registry.assertWriteScopeAvailable("/repo", ["../outside"]), ["/outside"]);
+  assert.deepEqual(
+    registry.assertWriteScopeAvailable("/repo", ["~/.cache/pi-worker-scope-fixture/report.md"]),
+    [join(homedir(), ".cache/pi-worker-scope-fixture/report.md")],
+  );
 });
 
 test("canonicalizes symlink aliases before checking Worker overlap", () => {

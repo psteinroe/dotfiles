@@ -15,8 +15,8 @@ Specs:
   codex                       alias for pi:openai-codex
   claude                      copy Claude Code OAuth used by pi-claude-bridge
   bridge, claude-bridge       aliases for claude
-  mcp                         copy all Pi MCP OAuth credentials
-  mcp:server[,server...]      copy selected ~/.pi/agent/mcp-oauth/<server> dirs
+  mcp                         copy all Pi MCP OAuth credentials (~/.pi/agent/mcp-auth.json)
+  mcp:server[,server...]      copy selected MCP servers, e.g. mcp:executor
   exa                         copy Exa API key to ~/.config/exa/api_key
   aws                         copy AWS config and cached sessions to ~/.aws
 
@@ -260,78 +260,50 @@ gh auth status --hostname "$RAUTH_GH_HOST" >/dev/null
 
 _rauth_copy_mcp() {
   local server_spec="$1"
-  local local_oauth_dir="${PI_MCP_OAUTH_DIR:-$HOME/.pi/agent/mcp-oauth}"
-  [[ -d "$local_oauth_dir" ]] || { echo "MCP OAuth directory not found: $local_oauth_dir" >&2; return 1; }
+  local local_mcp_auth="${PI_MCP_AUTH_FILE:-$HOME/.pi/agent/mcp-auth.json}"
+  [[ -f "$local_mcp_auth" ]] || { echo "Pi MCP auth file not found: $local_mcp_auth. Run: pi mcp login <server>" >&2; return 1; }
+  _rauth_check_jq || return
 
-  local mode="all"
-  local -a servers tar_paths
+  # Pi keys native MCP credentials as "mcp__<server>|<url>".
+  local -a servers
   servers=()
-  if [[ -n "$server_spec" && "$server_spec" != all ]]; then
-    mode="selected"
-    servers=(${(@s:,:)server_spec})
+  [[ -n "$server_spec" && "$server_spec" != all ]] && servers=(${(@s:,:)server_spec})
+  local servers_json mcp_auth
+  servers_json=$(printf '%s\n' "${servers[@]}" | jq -R 'select(length > 0)' | jq -s .) || return
+  mcp_auth=$(jq -c --argjson servers "$servers_json" '
+    with_entries((.key | split("|")[0] | ltrimstr("mcp__")) as $s
+      | select(($servers | length) == 0 or ($servers | index($s)) != null))
+  ' "$local_mcp_auth") || return
+  if [[ "$(jq 'length' <<<"$mcp_auth")" == 0 ]]; then
+    echo "No matching Pi MCP credentials in $local_mcp_auth${servers:+ for: ${servers[*]}}. Run: pi mcp login <server>" >&2
+    return 1
   fi
-
-  local server
-  for server in "${servers[@]}"; do
-    if [[ -z "$server" || "$server" == */* || "$server" == .* ]]; then
-      echo "Invalid MCP OAuth server directory name: $server" >&2
-      return 1
-    fi
-    if [[ ! -d "$local_oauth_dir/$server" ]]; then
-      echo "Local MCP OAuth credentials not found for '$server': $local_oauth_dir/$server" >&2
-      return 1
-    fi
-  done
-
-  local server_list_b64
-  server_list_b64=$(printf '%s\n' "${servers[@]}" | base64 | tr -d '\n') || return
 
   local remote_cmd='set -euo pipefail
-umask 077
-agent_dir="$HOME/.pi/agent"
-target="$agent_dir/mcp-oauth"
-tmp=$(mktemp -d)
-trap '\''rm -rf "$tmp"'\'' EXIT
-mkdir -p "$agent_dir" "$target"
-tar -xzf - -C "$tmp"
-if [ ! -d "$tmp/mcp-oauth" ]; then
-  echo "Archive did not contain mcp-oauth directory" >&2
+if ! command -v jq >/dev/null 2>&1; then
+  echo "rauth requires jq on the remote; run rrebuild/bootstrap first" >&2
   exit 1
 fi
-if [ "${RAUTH_MCP_MODE:-selected}" = "all" ]; then
-  rm -rf "$target"
-  mkdir -p "$target"
-  cp -R "$tmp/mcp-oauth/." "$target/"
+umask 077
+payload=$(mktemp)
+trap '\''rm -f "$payload" "$HOME/.pi/agent/mcp-auth.json.tmp"'\'' EXIT
+cat > "$payload"
+mkdir -p "$HOME/.pi/agent"
+auth="$HOME/.pi/agent/mcp-auth.json"
+if [ -s "$auth" ]; then
+  jq -s '\''.[0] * .[1]'\'' "$auth" "$payload" > "$auth.tmp"
 else
-  printf %s "$RAUTH_MCP_SERVERS_B64" | base64 -d | while IFS= read -r server; do
-    [ -n "$server" ] || continue
-    case "$server" in */*|.*) echo "Invalid server name in payload: $server" >&2; exit 1;; esac
-    if [ ! -d "$tmp/mcp-oauth/$server" ]; then
-      echo "Archive missing server credentials: $server" >&2
-      exit 1
-    fi
-    rm -rf "$target/$server"
-    cp -R "$tmp/mcp-oauth/$server" "$target/$server"
-  done
+  jq -c . "$payload" > "$auth.tmp"
 fi
-chmod -R go-rwx "$target"
-find "$target" -type d -exec chmod 700 {} +
-find "$target" -type f -exec chmod 600 {} +
+mv "$auth.tmp" "$auth"
+chmod 600 "$auth"
 '
   local runner
-  runner=$(_rauth_runner "$remote_cmd" "RAUTH_MCP_MODE=${(q)mode} RAUTH_MCP_SERVERS_B64=${(q)server_list_b64}") || return
-
-  if [[ "$mode" == all ]]; then
-    COPYFILE_DISABLE=1 tar --no-xattrs -czf - -C "${local_oauth_dir:h}" "${local_oauth_dir:t}" | ssh "$host" "$runner" || return
-    print -r -- "Copied all Pi MCP OAuth credentials to $host:$remote_user:$remote_home/.pi/agent/mcp-oauth"
-  else
-    tar_paths=()
-    for server in "${servers[@]}"; do
-      tar_paths+=("${local_oauth_dir:t}/$server")
-    done
-    COPYFILE_DISABLE=1 tar --no-xattrs -czf - -C "${local_oauth_dir:h}" "${tar_paths[@]}" | ssh "$host" "$runner" || return
-    print -r -- "Copied Pi MCP OAuth credentials (${(@j:, :)servers}) to $host:$remote_user:$remote_home/.pi/agent/mcp-oauth"
-  fi
+  runner=$(_rauth_runner "$remote_cmd") || return
+  printf '%s' "$mcp_auth" | ssh "$host" "$runner" || return
+  local copied
+  copied=$(jq -r 'keys | map(split("|")[0] | ltrimstr("mcp__")) | join(", ")' <<<"$mcp_auth")
+  print -r -- "Copied Pi MCP credentials ($copied) to $host:$remote_user:$remote_home/.pi/agent/mcp-auth.json"
 }
 
 _rauth_read_secret_file() {

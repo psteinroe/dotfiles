@@ -1,5 +1,5 @@
 import * as path from "node:path";
-import { canonicalizePath, pathWithinScopes } from "../shared/write-scope-paths.ts";
+import { canonicalizePath } from "../shared/write-scope-paths.ts";
 
 const MAX_TRACKED_TASKS = 64;
 
@@ -138,11 +138,11 @@ export class TaskRegistry {
     const normalized = [...new Set(scope.map((candidate) => canonicalizePath(candidate, cwd)))];
     if (normalized.length === 0) throw new Error("Worker write_scope must not be empty.");
     for (const candidate of normalized) {
+      if (candidate === path.parse(candidate).root) {
+        throw new Error("Worker write_scope cannot claim the entire filesystem.");
+      }
       if (candidate === root) {
         throw new Error("Worker write_scope cannot claim the entire repository.");
-      }
-      if (!pathWithinScopes(candidate, [root])) {
-        throw new Error(`Worker write_scope must stay inside the repository: ${candidate}`);
       }
     }
     for (const entry of this.entries.values()) {

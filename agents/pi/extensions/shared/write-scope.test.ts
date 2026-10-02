@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, rmSync, symlinkSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { createWorkerWriteScopeExtension } from "./write-scope.ts";
@@ -31,6 +31,25 @@ test("allows structured writes inside scope and blocks outside or malformed path
     assert.match(
       (handler({ toolName: "write", input: { path: null } }, ctx) as any).reason,
       /valid path/,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("allows writes to a scope outside the working directory, including ~ paths", () => {
+  const root = mkdtempSync(join(tmpdir(), "worker-write-outside-"));
+  const repo = join(root, "repo");
+  mkdirSync(repo);
+  const report = join(homedir(), ".cache/pi-worker-scope-fixture/report.md");
+  try {
+    const handler = handlerFor([report]);
+    const ctx = { cwd: repo };
+    assert.equal(handler({ toolName: "write", input: { path: report } }, ctx), undefined);
+    assert.equal(handler({ toolName: "write", input: { path: "~/.cache/pi-worker-scope-fixture/report.md" } }, ctx), undefined);
+    assert.match(
+      (handler({ toolName: "write", input: { path: "~/.cache/pi-worker-scope-fixture/other.md" } }, ctx) as any).reason,
+      /outside its declared scope/,
     );
   } finally {
     rmSync(root, { recursive: true, force: true });

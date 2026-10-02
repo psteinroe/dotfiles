@@ -487,7 +487,7 @@ export default function tasksExtension(initialPi: ExtensionAPI) {
       max_search_results: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })),
       write_scope: Type.Optional(Type.Array(Type.String(), {
         minItems: 1,
-        description: "Worker-only files or directory prefixes exclusively owned while the task runs.",
+        description: "Worker-only files or directory prefixes exclusively owned while the task runs. Relative paths resolve from the cwd; absolute and ~ paths may point outside the repository.",
       })),
     }, { additionalProperties: false }),
     async execute(_toolCallId, params: any, signal, _onUpdate, ctx) {
