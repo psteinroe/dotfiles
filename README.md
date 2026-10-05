@@ -203,6 +203,14 @@ Git worktree.
 Pi's internal subagents continue to use their normal runtime rather than Herdr
 workspaces.
 
+## Pi models and login
+
+Main and Worker use `claude-bridge/claude-opus-5-5` with high thinking.
+Run `/reload` in Pi after updating the extensions, then `/claude-login` to
+sign in through the bridge's Claude Code CLI. This command requires Pi's
+interactive terminal UI. Claude Code manages the credentials; Pi's `/login`
+for Anthropic is separate and does not authenticate the bridge.
+
 ## Git worktrees
 
 ```bash

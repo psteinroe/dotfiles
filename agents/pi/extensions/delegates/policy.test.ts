@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ORACLE_SYSTEM_PROMPT } from "./adapter.ts";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import delegatesExtension, { ORACLE_SYSTEM_PROMPT } from "./adapter.ts";
 import {
   DELEGATE_POLICIES,
   gitDiffArgs,
@@ -15,13 +16,28 @@ test("delegate routing keeps the coordinator out of routine implementation", () 
     tools: ["read", "grep", "find", "ls", "git_diff"],
   });
   assert.deepEqual(DELEGATE_POLICIES.worker, {
-    model: "openai-codex/gpt-6.1-sol",
+    model: "claude-bridge/claude-opus-5-5",
     thinking: "high",
     maxTurns: 50,
     tools: ["read", "bash", "edit", "write", "grep", "find", "ls"],
   });
   assert.equal(DELEGATE_POLICIES.oracle.tools.includes("bash"), false);
   assert.equal(DELEGATE_POLICIES.oracle.tools.includes("edit"), false);
+});
+
+test("Worker tool wording reflects the Claude default without changing its role", () => {
+  const tools: Array<{ name: string; description: string; promptSnippet?: string }> = [];
+  const pi: Pick<ExtensionAPI, "registerTool" | "on"> = {
+    registerTool: (tool) => { tools.push(tool); },
+    on: () => () => {},
+  };
+  delegatesExtension(pi as ExtensionAPI);
+  const worker = tools.find((tool) => tool.name === "worker");
+  assert.ok(worker);
+  assert.match(worker.description, /Claude Opus 5\.5 high worker/);
+  assert.match(worker.description, /does not commit or push/);
+  assert.match(worker.promptSnippet ?? "", /Claude Opus 5\.5 worker/);
+  assert.doesNotMatch(`${worker.description} ${worker.promptSnippet}`, /GPT|Sol/i);
 });
 
 test("Oracle is the default read-only analysis role", () => {

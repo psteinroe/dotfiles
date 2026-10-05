@@ -8,6 +8,7 @@ import {
   type ExtensionAPI,
   type ExtensionFactory,
 } from "@earendil-works/pi-coding-agent";
+import { registerClaudeBridgeLogin } from "./shared/claude-bridge-login.ts";
 
 const CLAUDE_BRIDGE_PROVIDER = "claude-bridge";
 const BRIDGE_ENTRY_PARTS = [
@@ -108,6 +109,7 @@ export default async function claudeBridgeProvider(pi: ExtensionAPI): Promise<vo
       guardClaudeBridgeProvider(pi, summaryCwd),
       await loadClaudeBridgeFactory(entryPath),
     );
+    registerClaudeBridgeLogin(pi, { agentDir: getAgentDir(), bridgeEntry: entryPath });
     initialized = true;
   } finally {
     if (!initialized) rmSync(summaryCwd, { recursive: true, force: true });

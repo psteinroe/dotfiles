@@ -24,14 +24,18 @@ import {
   type AgentSession,
   type ExtensionFactory,
   type ExtensionContext,
+  type ExtensionToolContext,
 } from "@earendil-works/pi-coding-agent";
+import { DELEGATE_POLICIES } from "../delegates/policy.ts";
 import { shutdownAndDisposeChildSession } from "./child-session.ts";
 import { isolatedSubagentResourceDir } from "./subagent-mcp.ts";
 import { Type } from "typebox";
 
 const MODEL_ID = "gpt-6-luna";
 const ORACLE_MODEL_ID = "gpt-6-astra";
-const WORKER_MODEL_ID = "gpt-6.1-sol";
+// Worker now defaults to Claude; these synthetic providers deliberately keep
+// exercising Codex account failover, including continuation after a write.
+const CODEX_WORKER_MODEL_ID = "gpt-6.1-sol";
 const PRIMARY = "openai-codex";
 const ALIAS = "openai-codex-account-1";
 const API = "openai-responses" as Api;
@@ -51,7 +55,7 @@ const EXECUTOR_TOOLS = ["mcp__executor__execute", "mcp__executor__resume", "mcp_
 const EXPECTED: Record<Role, { model: string; thinking: "medium" | "high" | "xhigh"; tools: string[] }> = {
   mapper: { model: MODEL_ID, thinking: "medium", tools: ["find", "grep", "ls", "read"] },
   librarian: { model: MODEL_ID, thinking: "high", tools: ["bash", ...EXECUTOR_TOOLS, "read"] },
-  worker: { model: WORKER_MODEL_ID, thinking: "high", tools: ["bash", "edit", ...EXECUTOR_TOOLS, "find", "grep", "ls", "read", "write"] },
+  worker: { model: CODEX_WORKER_MODEL_ID, thinking: "high", tools: ["bash", "edit", ...EXECUTOR_TOOLS, "find", "grep", "ls", "read", "write"] },
   oracle: { model: ORACLE_MODEL_ID, thinking: "xhigh", tools: [...EXECUTOR_TOOLS, "find", "git_diff", "grep", "ls", "read"] },
 };
 
@@ -191,7 +195,7 @@ function legacyFixtureProviderConfig(
         return credentials.access;
       },
     },
-    models: [MODEL_ID, ORACLE_MODEL_ID, WORKER_MODEL_ID].map((modelId) => {
+    models: [MODEL_ID, ORACLE_MODEL_ID, CODEX_WORKER_MODEL_ID].map((modelId) => {
       const candidate = model(id, modelId);
       return {
         id: candidate.id,
@@ -223,7 +227,7 @@ function fixtureProvider(id: string, calls: Call[], mode: FixtureMode, workspace
         resolve: async () => ({ auth: { apiKey: `fixture-${id}` }, source: "integration fixture" }),
       },
     },
-    models: [model(id, MODEL_ID), model(id, ORACLE_MODEL_ID), model(id, WORKER_MODEL_ID)],
+    models: [model(id, MODEL_ID), model(id, ORACLE_MODEL_ID), model(id, CODEX_WORKER_MODEL_ID)],
     api: { stream, streamSimple: stream },
   });
 }
@@ -390,7 +394,13 @@ async function harness(mode: FixtureMode = "failover", registration: "native" | 
     settingsPath: path.join(agentDir, "settings.json"),
     settings,
     calls,
-    ctx: parentContext!,
+    ctx: {
+      ...parentContext!,
+      tools: [],
+      async executeTool() {
+        throw new Error("Fixture adapters must execute tools in their isolated child sessions.");
+      },
+    } satisfies ExtensionToolContext,
     tools: new Map(["mapper", "librarian", "worker", "oracle"].map((name) => [name, parent.extensionRunner.getToolDefinition(name)!])),
     dispose: async () => {
       try {
@@ -423,7 +433,18 @@ async function harness(mode: FixtureMode = "failover", registration: "native" | 
 async function runTool(h: Awaited<ReturnType<typeof harness>>, name: string, params: Record<string, unknown>, updates: unknown[], signal?: AbortSignal) {
   const tool = h.tools.get(name);
   assert.ok(tool, `${name} adapter was not registered`);
-  return tool.execute("integration-tool-call", params, signal, (update: unknown) => updates.push(update), h.ctx);
+  if (name !== "worker") {
+    return tool.execute("integration-tool-call", params, signal, (update: unknown) => updates.push(update), h.ctx);
+  }
+  // This suite runs adapter calls serially. Override only the Worker's model
+  // for this Codex fixture, preserving thinking, tools, and the turn budget.
+  const defaultPolicy = DELEGATE_POLICIES.worker;
+  DELEGATE_POLICIES.worker = { ...defaultPolicy, model: `${PRIMARY}/${CODEX_WORKER_MODEL_ID}` };
+  try {
+    return await tool.execute("integration-tool-call", params, signal, (update: unknown) => updates.push(update), h.ctx);
+  } finally {
+    DELEGATE_POLICIES.worker = defaultPolicy;
+  }
 }
 
 async function cleanupLibrarianWorkspace(result: any) {
@@ -438,7 +459,7 @@ const ADAPTERS = [
   ["oracle", { task: "Give a fixture architecture recommendation." }],
 ] as const;
 
-test("runs all four real adapters through primary-to-alias failover", async () => {
+test("runs all four real adapters through primary-to-alias failover with an explicit Codex Worker fixture", async () => {
   const h = await harness();
   try {
     for (const [name, params] of ADAPTERS) {
@@ -487,6 +508,27 @@ test("runs all four real adapters through primary-to-alias failover", async () =
     assert.ok(writeResult.content.some((part) => part.type === "text" && /written|success/i.test(part.text)));
     assert.ok(h.calls.every((call) => !call.tools.includes("unrelated_parent_tool")));
     await assert.rejects(readFile(h.maliciousMarker), { code: "ENOENT" });
+    assert.deepEqual(JSON.parse(await readFile(h.settingsPath, "utf8")), h.settings);
+  } finally {
+    await h.dispose();
+  }
+});
+
+test("default Worker selects Claude and does not fall back to available Codex accounts", async () => {
+  const h = await harness();
+  try {
+    // Bypass the explicit Codex fixture override: only Codex is authenticated,
+    // so the real Worker default must fail closed before any model request.
+    const result: any = await h.tools.get("worker")!.execute(
+      "default-worker-call", { task: "Use the default Worker model." }, undefined, undefined, h.ctx,
+    );
+    assert.equal(result.isError, true);
+    assert.match(result.content[0].text, /No authenticated candidate provider.*claude-bridge\/claude-opus-5-5/);
+    assert.equal(result.details.model, "claude-bridge/claude-opus-5-5");
+    assert.equal(result.details.thinking, "high");
+    assert.equal(result.details.run.maxTurns, 50);
+    assert.equal(h.calls.length, 0);
+    assert.equal(h.initialized, 0);
     assert.deepEqual(JSON.parse(await readFile(h.settingsPath, "utf8")), h.settings);
   } finally {
     await h.dispose();

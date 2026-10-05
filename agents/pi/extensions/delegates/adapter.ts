@@ -361,8 +361,8 @@ export default function delegatesExtension(pi: ExtensionAPI, registerSession?: S
     name: "worker",
     label: "Delegate Work",
     description:
-      "Delegate a bounded implementation, test, or CI-diagnosis task to a fresh GPT-6.1 Sol high worker. Provide relevant paths, constraints, and a checkable completion condition. The worker edits the current working tree but does not commit or push.",
-    promptSnippet: "Delegate bounded implementation, testing, or CI diagnosis to a fresh GPT-6.1 Sol worker",
+      "Delegate a bounded implementation, test, or CI-diagnosis task to a fresh Claude Opus 5.5 high worker. Provide relevant paths, constraints, and a checkable completion condition. The worker edits the current working tree but does not commit or push.",
+    promptSnippet: "Delegate bounded implementation, testing, or CI diagnosis to a fresh Claude Opus 5.5 worker",
     promptGuidelines: [
       "Use worker for bounded implementation, tests, routine refactors, or CI diagnosis; include relevant paths, constraints, and a checkable completion condition.",
       "Launch independent worker calls in the same response when they have disjoint file ownership; Pi runs those calls concurrently.",

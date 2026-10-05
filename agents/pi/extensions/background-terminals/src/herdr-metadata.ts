@@ -101,6 +101,9 @@ export class HerdrBackgroundMetadata {
 	private closed = false;
 	private pending = Promise.resolve();
 	private renewalTimer: ReturnType<typeof setTimeout> | undefined;
+	private readonly source: string;
+
+	constructor(source = SOURCE) { this.source = source; }
 
 	setActive(active: boolean): Promise<void> {
 		if (!this.connection.enabled || (this.closed && active)) return this.pending;
@@ -159,11 +162,11 @@ export class HerdrBackgroundMetadata {
 	private report(active: boolean): MetadataReport {
 		this.sequence += 1;
 		return {
-			id: `${SOURCE}:${Date.now()}:${Math.random().toString(36).slice(2)}`,
+			id: `${this.source}:${Date.now()}:${Math.random().toString(36).slice(2)}`,
 			method: "pane.report_metadata",
 			params: {
 				pane_id: this.connection.paneId!,
-				source: SOURCE,
+				source: this.source,
 				agent: "pi",
 				applies_to_source: PI_SOURCE,
 				...(active

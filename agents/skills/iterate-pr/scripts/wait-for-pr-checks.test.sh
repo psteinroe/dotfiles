@@ -11,6 +11,20 @@ cat >"$tmp_dir/bin/gh" <<'MOCK'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >>"$GH_ARGS_LOG"
 if [[ "${1:-}" == "pr" && "${2:-}" == "view" ]]; then
+  if [[ "${GH_MOCK_MODE:-error}" == "head-change-during-poll" || "${GH_MOCK_MODE:-error}" == "revalidation-error" ]]; then
+    count=0
+    [[ -f "$GH_VIEW_COUNT_FILE" ]] && count="$(<"$GH_VIEW_COUNT_FILE")"
+    count=$((count + 1))
+    printf '%s\n' "$count" >"$GH_VIEW_COUNT_FILE"
+    if [[ "$GH_MOCK_MODE" == "head-change-during-poll" && "$count" -gt 1 ]]; then
+      printf '%s\n' '{"headRefOid":"new-head","mergeStateStatus":"CLEAN","mergeable":"MERGEABLE","url":"https://github.com/example/project/pull/123"}'
+      exit 0
+    fi
+    if [[ "$GH_MOCK_MODE" == "revalidation-error" ]] && ((count % 2 == 0)); then
+      printf 'revalidation authentication failure\n' >&2
+      exit 4
+    fi
+  fi
   if [[ "${GH_MOCK_MODE:-error}" == "conflicting" ]]; then
     printf '%s\n' '{"headRefOid":"conflicting-head","mergeStateStatus":"DIRTY","mergeable":"CONFLICTING","url":"https://github.com/example/project/pull/123"}'
   else
@@ -21,6 +35,10 @@ fi
 if [[ "${GH_MOCK_MODE:-error}" == "conflicting" ]]; then
   printf '%s\n' '[{"bucket":"pending","link":"test-url","name":"Test","state":"QUEUED","workflow":"CI"}]'
   exit 8
+fi
+if [[ "${GH_MOCK_MODE:-error}" == "head-change-during-poll" || "${GH_MOCK_MODE:-error}" == "revalidation-error" ]]; then
+  printf '%s\n' '[{"bucket":"pass","link":"test-url","name":"Test","state":"SUCCESS","workflow":"CI"}]'
+  exit 0
 fi
 if [[ "${GH_MOCK_MODE:-error}" == "completed" ]]; then
   printf '%s\n' '[{"bucket":"pass","link":"pass-url","name":"Lint","state":"SUCCESS","workflow":"CI"},{"bucket":"fail","link":"fail-url","name":"Test","state":"FAILURE","workflow":"CI"}]'
@@ -51,6 +69,7 @@ chmod +x "$tmp_dir/bin/gh"
 export PATH="$tmp_dir/bin:$PATH"
 export GH_ARGS_LOG="$tmp_dir/gh-args.log"
 export GH_CALL_COUNT_FILE="$tmp_dir/gh-call-count"
+export GH_VIEW_COUNT_FILE="$tmp_dir/gh-view-count"
 
 set +e
 CI_WAIT_INTERVAL_SECONDS=0.05 CI_WAIT_TIMEOUT_SECONDS=1 \
@@ -163,5 +182,24 @@ if ! grep -Fq "pr checks $pr_url --json" "$GH_ARGS_LOG"; then
   printf 'PR selector was not forwarded to gh: %s\n' "$(cat "$GH_ARGS_LOG")" >&2
   exit 1
 fi
+
+rm -f "$GH_VIEW_COUNT_FILE"
+set +e
+GH_MOCK_MODE=head-change-during-poll CI_WAIT_INTERVAL_SECONDS=0.05 CI_WAIT_TIMEOUT_SECONDS=2 \
+  "$wait_script" "$pr_url" >"$tmp_dir/head-change.out"
+head_status=$?
+set -e
+[[ $head_status -eq 4 ]] || { printf 'expected head change to exit 4, got %s\n' "$head_status" >&2; exit 1; }
+jq -e '.status == "head_changed" and .expectedHead == "clean-head" and .head == "new-head"' "$tmp_dir/head-change.out" >/dev/null
+
+rm -f "$GH_VIEW_COUNT_FILE"
+set +e
+GH_MOCK_MODE=revalidation-error CI_WAIT_INTERVAL_SECONDS=0.05 CI_WAIT_TIMEOUT_SECONDS=2 CI_WAIT_MAX_ERRORS=2 \
+  "$wait_script" "$pr_url" >"$tmp_dir/revalidation-error.out"
+revalidation_status=$?
+set -e
+[[ $revalidation_status -eq 2 ]] || { printf 'expected revalidation errors to exit 2, got %s\n' "$revalidation_status" >&2; exit 1; }
+jq -e '.status == "error" and (.message | contains("authentication"))' "$tmp_dir/revalidation-error.out" >/dev/null
+jq -e '.expectedHead == "clean-head"' "$tmp_dir/delayed.out" >/dev/null
 
 printf 'wait-for-pr-checks tests passed\n'

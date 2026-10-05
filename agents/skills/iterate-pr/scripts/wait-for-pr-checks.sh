@@ -27,6 +27,12 @@ deadline=$((SECONDS + timeout))
 consecutive_errors=0
 stable_polls=0
 stable_fingerprint=""
+expected_head=""
+head_changed() {
+  jq -cn --arg head "$1" --arg expected "$expected_head" \
+    '{status:"head_changed", expectedHead:$expected, head:$head}'
+  exit 4
+}
 gh_error_file="$(mktemp "${TMPDIR:-/tmp}/wait-for-pr-checks.XXXXXX")"
 trap 'rm -f "$gh_error_file"' EXIT
 
@@ -35,7 +41,7 @@ while ((SECONDS < deadline)); do
   pr_state="$(gh "${view_args[@]}" 2>"$gh_error_file")"
   command_status=$?
   command_error="$(<"$gh_error_file")"
-  if [[ $command_status -ne 0 ]] || ! jq -e 'type == "object"' <<<"$pr_state" >/dev/null 2>&1; then
+  if [[ $command_status -ne 0 ]] || ! jq -e 'type == "object" and (.headRefOid | type == "string" and length > 0)' <<<"$pr_state" >/dev/null 2>&1; then
     consecutive_errors=$((consecutive_errors + 1))
     stable_polls=0
     stable_fingerprint=""
@@ -50,6 +56,10 @@ while ((SECONDS < deadline)); do
     sleep "$interval"
     continue
   fi
+
+  head="$(jq -r '.headRefOid' <<<"$pr_state")"
+  if [[ -z "$expected_head" ]]; then expected_head="$head"; fi
+  if [[ "$head" != "$expected_head" ]]; then head_changed "$head"; fi
 
   if jq -e '.mergeable == "CONFLICTING" or .mergeStateStatus == "DIRTY"' <<<"$pr_state" >/dev/null; then
     jq -c '{
@@ -85,6 +95,30 @@ while ((SECONDS < deadline)); do
     fi
     sleep "$interval"
     continue
+  fi
+  # Checks and PR view are separate requests. Revalidate the head after checks
+  # so a push during the poll cannot turn the previous commit's checks green.
+  : >"$gh_error_file"
+  current_pr="$(gh "${view_args[@]}" 2>"$gh_error_file")"
+  command_status=$?
+  if [[ $command_status -ne 0 ]] || ! jq -e 'type == "object" and (.headRefOid | type == "string" and length > 0)' <<<"$current_pr" >/dev/null 2>&1; then
+    consecutive_errors=$((consecutive_errors + 1))
+    stable_polls=0
+    stable_fingerprint=""
+    if ((consecutive_errors >= max_errors)); then
+      message="$(<"$gh_error_file")"
+      jq -cn --arg message "${message:-Unable to revalidate PR head}" --argjson command_status "$command_status" \
+        '{status:"error", commandStatus:$command_status, message:$message}'
+      exit 2
+    fi
+    sleep "$interval"
+    continue
+  fi
+  current_head="$(jq -r '.headRefOid' <<<"$current_pr")"
+  if [[ "$current_head" != "$expected_head" ]]; then head_changed "$current_head"; fi
+  if jq -e '.mergeable == "CONFLICTING" or .mergeStateStatus == "DIRTY"' <<<"$current_pr" >/dev/null; then
+    jq -c '{status:"conflict", mergeable, mergeStateStatus, headRefOid, url}' <<<"$current_pr"
+    exit 3
   fi
   consecutive_errors=0
 
@@ -129,8 +163,9 @@ while ((SECONDS < deadline)); do
     continue
   fi
 
-  jq -c '{
+  jq -c --arg expected "$expected_head" '{
     status: "passed",
+    expectedHead: $expected,
     passed: [.[] | select(.bucket == "pass")] | length,
     skipped: [.[] | select(.bucket == "skipping")] | length
   }' <<<"$checks"

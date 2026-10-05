@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { DELEGATE_POLICIES } from "./extensions/delegates/policy.ts";
 
 async function jsonFile(name: string) {
   return JSON.parse(await readFile(new URL(name, import.meta.url), "utf8"));
@@ -15,6 +16,16 @@ test("managed settings use native MCP, no multi-account, and the pinned Claude B
     assert.equal(settings.extensions?.includes("-builtin:mcp") ?? false, false);
     assert.equal(sources.some((source) => source.includes("pi-mcp-adapter") || source.includes("pi-multi-account")), false);
     assert.ok(sources.includes("git:github.com/elidickinson/pi-claude-bridge@227f5eb4450a070dfbc083a7fe75b8b35366b941"));
+  }
+});
+
+test("main and Worker use Claude Bridge Opus 5.5 with high thinking on both platforms", async () => {
+  for (const name of ["settings.json", "settings.linux.json"]) {
+    const settings = await jsonFile(name);
+    assert.equal(settings.defaultProvider, "claude-bridge");
+    assert.equal(settings.defaultModel, "claude-opus-5-5");
+    assert.equal(DELEGATE_POLICIES.worker.model, `${settings.defaultProvider}/${settings.defaultModel}`);
+    assert.equal(DELEGATE_POLICIES.worker.thinking, settings.defaultThinkingLevel);
   }
 });
 

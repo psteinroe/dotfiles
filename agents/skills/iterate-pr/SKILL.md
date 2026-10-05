@@ -25,7 +25,8 @@ Drive one pull request to a clean state or, when explicitly authorized, merge it
    - Merge conflicts (`mergeable == CONFLICTING` or `mergeStateStatus == DIRTY`): do not rerun CI or start another watcher. Update the branch from its base using the repository's established rebase/merge convention, resolve the conflicts deliberately, validate, push, and return to step 2. Stop for user judgment if conflict resolution changes product behavior or branch intent.
    - Failed checks: resolve the failed run ID and run `scripts/failed-run-summary.sh <run-id>`.
    - Actionable review feedback: include the relevant thread, path, and requested behavior, unless the user explicitly authorized skipping reviews for the merge.
-   - Pending automated checks with no actionable failure: start the quiet wait script with `start_background_command`, title it `Wait for PR checks`, and use the pull request worktree as `working_dir`. Pass either the PR URL or its number; a number defaults to the repository at `working_dir`, or accepts an explicit `owner/repo` second argument. Continue useful work; completion resumes the main agent automatically.
+   - Pending automated checks with no actionable failure: call `watch_pr` with the PR URL and `until: "checks"`. To wait for both stable checks and a user-requested `ready` label, use `until: "ready"`. Keep the returned subscription ID, continue independent work or end the turn; meaningful updates resume the agent automatically. Pi sessions on this host share polling for the same repository/PR/head SHA.
+   - If `watch_pr` is unavailable, start `<skill-dir>/scripts/wait-for-pr-checks.sh <pr-number-or-url> [owner/repo]` with `start_background_command`, title `Wait for PR checks`, and the PR worktree as `working_dir`. This is the fallback for other clients; a numeric selector without `owner/repo` resolves from that working directory.
    - No failures or automated checks pending: merge when explicitly authorized; otherwise report completion or actionable feedback.
 
 4. **Delegate a bounded fix**
@@ -37,12 +38,12 @@ Drive one pull request to a clean state or, when explicitly authorized, merge it
 5. **Publish and wait**
    - Run the relevant local check, create one focused commit, and push.
    - Increment the pushed-attempt count.
-   - Start `<skill-dir>/scripts/wait-for-pr-checks.sh <pr-number-or-url> [owner/repo]` with `start_background_command` as described above. The watcher checks mergeability before each CI poll and exits `3` with `status:"conflict"` as soon as GitHub reports a conflict.
-   - When it completes, return to step 2 for the new HEAD. A conflict result is actionable branch state, not a reason to rerun checks.
+   - Start or reuse the watcher from step 3 for the new head. A `head_changed` result ends the old-head subscription: inspect the new commit, then subscribe again if needed. A `conflict` result requires branch repair, not another watcher or CI rerun.
+   - After a terminal update, return to step 2. While a `ready` subscription reports `waiting_ready`, it remains active; keep waiting without creating another subscription.
 
 6. **Merge only when explicitly authorized**
    - Treat `merge this PR` as authorization to merge the identified current PR after automated checks pass. Treat `skip reviews` or `bypass review` as separate authorization to ignore review approval and actionable review feedback for that merge.
-   - Immediately before merging, re-resolve the PR URL and number, verify the expected head SHA, and confirm the stable watcher found no failed or pending automated checks.
+   - Immediately before merging, re-resolve the PR URL and number, verify the watcher’s `expectedHead` still matches the current head, and confirm the stable watcher found no failed or pending automated checks. Recheck any required `ready` label. A watcher update is observed state, not merge or review-bypass authorization.
    - Use the user's requested merge method; otherwise follow the repository convention. If review approval is the remaining blocker and bypass was explicitly authorized, use GitHub's admin merge bypass rather than approving the PR or resolving review threads.
    - Do not ask for merge or review-bypass permission again once the user supplied it for this PR. Verify and report the resulting `MERGED` state.
 
@@ -63,6 +64,6 @@ Stop and report the current state when any condition holds:
 - Preserve pre-existing test coverage when fixing CI; do not remove tests solely to make a failing check disappear.
 - An explicit user request authorizes removing tests introduced by the current PR. Confirm they are additions in the focused base diff, remove only the requested tests, and continue without asking for permission again.
 - Never disable automated checks, approve the PR, or resolve review threads. An explicitly authorized review bypass must use the merge mechanism without mutating review state.
-- Do not start duplicate background waits for the same HEAD.
-- Treat the waiter's success as authoritative only after its built-in stable-check window; do not replace it with a one-shot `gh pr checks` result immediately after a push.
-- When passing only a PR number, make sure `working_dir` is the pull request worktree; otherwise pass `owner/repo` explicitly.
+- Reuse `watch_pr` subscriptions for the same head and goal. Use `pr_watch_status` only when its details unblock immediate work, not for polling; `pr_watch_cancel` cancels only this session’s subscription.
+- Both watchers require a nonempty, unchanged terminal check set across three samples. Preserve that stable-check window; a one-shot result immediately after a push is insufficient.
+- With a numeric `watch_pr` selector, use the PR worktree as the current directory or pass `repo: "owner/repo"`. The shell fallback uses `working_dir` or its second argument for the same purpose.

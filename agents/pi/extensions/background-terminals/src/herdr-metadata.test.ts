@@ -57,6 +57,15 @@ test(
       assert.equal(requests[0]?.params.ttl_ms, 86_400_000);
       assert.equal(requests[1]?.params.clear_state_labels, true);
       assert.ok(requests[1]?.params.seq > requests[0]?.params.seq);
+      assert.equal(requests[0]?.params.source, "pi:background-tasks");
+
+      const prMetadata = new HerdrBackgroundMetadata("pi:pr-monitor");
+      await prMetadata.setActive(true);
+      await prMetadata.shutdown();
+      assert.equal(requests.length, 4);
+      assert.equal(requests[2]?.params.source, "pi:pr-monitor");
+      assert.equal(requests[3]?.params.source, "pi:pr-monitor");
+      assert.equal(requests[3]?.params.clear_state_labels, true);
     } finally {
       await new Promise<void>((resolve, reject) => {
         server.close((error) => (error ? reject(error) : resolve()));
