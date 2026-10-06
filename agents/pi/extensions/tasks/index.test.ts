@@ -252,6 +252,35 @@ test("task_steer validates target, instruction, and child readiness", async () =
   await emit(h.handlers, "session_shutdown", ctx);
 });
 
+test("reload discards legacy tool locks without shutting down the live runtime", () => {
+  const key = Symbol.for("dotfiles.pi.background-tasks.runtime");
+  const slot = globalThis as any;
+  const previous = slot[key];
+  const liveHandler = () => {};
+  try {
+    slot[key] = { bind(pi: any) {
+      pi.on("tool_call", () => ({ block: true }));
+      pi.on("agent_start", liveHandler);
+    } };
+    const h = harness();
+    assert.equal(h.handlers.has("tool_call"), false);
+    assert.deepEqual(h.handlers.get("agent_start"), [liveHandler]);
+  } finally {
+    if (previous) slot[key] = previous;
+    else delete slot[key];
+  }
+});
+
+test("does not install coordinator tool locks, including across reload", async () => {
+  const h = harness();
+  const ctx = context();
+  assert.equal(h.handlers.get("tool_call")?.length ?? 0, 0);
+  await emit(h.handlers, "session_shutdown", ctx, "reload");
+  const reloaded = harness();
+  assert.equal(reloaded.handlers.get("tool_call")?.length ?? 0, 0);
+  await emit(reloaded.handlers, "session_shutdown", ctx);
+});
+
 test("allows a background command while a Worker is active", async () => {
   const h = harness();
   const ctx = context();

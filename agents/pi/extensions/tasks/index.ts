@@ -3,7 +3,6 @@ import type {
   ExtensionAPI,
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
-import { isToolCallEventType } from "@earendil-works/pi-coding-agent";
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 import installDelegates from "../delegates/adapter.ts";
@@ -249,7 +248,18 @@ export default function tasksExtension(initialPi: ExtensionAPI) {
   // the task engines and their callbacks alive, and bind their registrations to
   // the new ExtensionAPI. A real session shutdown still tears everything down.
   if (runtimeSlot[RUNTIME_KEY]) {
-    runtimeSlot[RUNTIME_KEY].bind(initialPi);
+    // Older preserved runtimes registered the coordinator lock. Drop that
+    // registration on reload without cancelling their live background tasks.
+    const unlockedPi = new Proxy(initialPi, {
+      get(target, property) {
+        if (property === "on") return (name: any, handler: any) => {
+          if (name !== "tool_call") target.on(name, handler);
+        };
+        const value = (target as any)[property];
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+    runtimeSlot[RUNTIME_KEY].bind(unlockedPi);
     return;
   }
   let currentPi = initialPi;
@@ -415,32 +425,8 @@ export default function tasksExtension(initialPi: ExtensionAPI) {
     else delivery.setBusy();
   });
 
-  // Keep the coordinator read-only around live Worker mutations. Worker shell
-  // writes remain policy-constrained because arbitrary shell effects cannot be
-  // proven from command text.
-  pi.on("tool_call", (event) => {
-    const activeWorker = registry.firstActiveWorker();
-    if (!activeWorker) return;
-    if (isToolCallEventType("bash", event)) {
-      return {
-        block: true,
-        reason: `${activeWorker.id} (${activeWorker.title}) is editing in the background. Use read-only tools or cancel the Worker before running coordinator shell commands.`,
-      };
-    }
-    if (!isToolCallEventType("edit", event) && !isToolCallEventType("write", event)) return;
-    const rawPath = (event.input as { path?: unknown }).path;
-    if (typeof rawPath !== "string" || !rawPath.trim()) {
-      return { block: true, reason: "File mutation requires a valid path." };
-    }
-    const absolute = path.resolve(uiCtx?.cwd ?? process.cwd(), rawPath.replace(/^@/, ""));
-    const owner = registry.conflictsWithActiveWorker(absolute);
-    if (owner) {
-      return {
-        block: true,
-        reason: `${owner.id} (${owner.title}) owns this write scope until it settles. Continue read-only work or cancel the task first.`,
-      };
-    }
-  });
+  // Worker ownership is a coordination contract, not a coordinator tool lock.
+  // Keep shell and structured file tools available while background work runs.
 
   pi.on("session_shutdown", async (event, ctx) => {
     delivery.setBusy();
