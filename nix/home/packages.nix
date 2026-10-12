@@ -98,6 +98,7 @@ in
         imagemagick
         awscli2
         google-cloud-sdk
+        infisical
         tailscale
         globalPnpm
         bun

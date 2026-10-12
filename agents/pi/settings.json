@@ -24,5 +24,6 @@
   "theme": "gruvbox-high-contrast",
   "defaultProvider": "claude-bridge",
   "defaultModel": "claude-opus-5-5",
-  "defaultThinkingLevel": "high"
+  "defaultThinkingLevel": "high",
+  "deviceId": "ac4b789a-4a14-4355-9981-fc80ddbfd604"
 }

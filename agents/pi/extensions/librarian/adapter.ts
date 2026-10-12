@@ -51,7 +51,7 @@ import {
 import { buildLibrarianSystemPrompt, buildLibrarianUserPrompt } from "./prompt.ts";
 import { createTurnBudgetExtension } from "./turn-budget.ts";
 
-const LIBRARIAN_MODEL_PROVIDER = "openai-codex";
+const LIBRARIAN_MODEL_PROVIDER = "openai";
 const LIBRARIAN_MODEL_ID = "gpt-6-luna";
 const LIBRARIAN_THINKING = "high" as const;
 const LIBRARIAN_MODEL = `${LIBRARIAN_MODEL_PROVIDER}/${LIBRARIAN_MODEL_ID}`;

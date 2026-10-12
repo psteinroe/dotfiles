@@ -7,7 +7,7 @@
  *   PI_CODING_AGENT_DIR="$agent_dir" pi \
  *     -e agents/pi/extensions/shared/subagent-models.host-test.ts -p bridge \
  *     --no-extensions --no-tools --no-session --offline \
- *     --model openai-codex/bridge-fixture 2>&1 | tee /tmp/pi083-host-test.log || true
+ *     --model openai/bridge-fixture 2>&1 | tee /tmp/pi083-host-test.log || true
  *   grep -Fqx 'SUBAGENT_MODEL_BRIDGE primary-failed BRIDGE_ALIAS_OK alias-requested settings-isolated' \
  *     /tmp/pi083-host-test.log
  *
@@ -158,15 +158,15 @@ async function childFactory(
 export default function hostSmokeTest(pi: ExtensionAPI) {
   // Register effective native providers, not legacy `$ENV` configs: children
   // have a separate auth store and must receive the provider's auth behavior.
-  pi.registerProvider(nativeFixtureProvider("openai-codex", false));
-  pi.registerProvider(nativeFixtureProvider("openai-codex-account-1", true));
+  pi.registerProvider(nativeFixtureProvider("openai", false));
+  pi.registerProvider(nativeFixtureProvider("openai-account-1", true));
 
   pi.on("session_start", async (_event, ctx: ExtensionContext) => {
     const root = await mkdtemp(path.join(tmpdir(), "pi-model-bridge-host-"));
     const agentDir = path.join(root, "agent");
     await mkdir(agentDir, { recursive: true });
     const parentSettings = {
-      defaultProvider: "openai-codex",
+      defaultProvider: "openai",
       defaultModel: "parent-model",
       defaultThinkingLevel: "low",
       theme: "parent-theme",
@@ -175,14 +175,14 @@ export default function hostSmokeTest(pi: ExtensionAPI) {
     // Keep the child credential file temporary too; this guards the host
     // compatibility path that asks its credential store before native auth.
     await writeFile(path.join(agentDir, "auth.json"), JSON.stringify({
-      "openai-codex": { type: "api_key", key: "fake-primary-key" },
-      "openai-codex-account-1": { type: "api_key", key: "fake-alias-key" },
+      "openai": { type: "api_key", key: "fake-primary-key" },
+      "openai-account-1": { type: "api_key", key: "fake-alias-key" },
     }));
     try {
       // Allow the synchronous facade to observe the initial registration.
       await new Promise<void>((resolve) => setImmediate(resolve));
       const plan = await createSubagentModelPlan(ctx, MODEL_ID);
-      if (plan.models.map((model) => model.provider).join(",") !== "openai-codex,openai-codex-account-1") {
+      if (plan.models.map((model) => model.provider).join(",") !== "openai,openai-account-1") {
         throw new Error("native provider plan did not preserve base/alias order");
       }
       let primary: Awaited<ReturnType<typeof childFactory>> | undefined;
@@ -205,7 +205,7 @@ export default function hostSmokeTest(pi: ExtensionAPI) {
       let alias: Awaited<ReturnType<typeof childFactory>> | undefined;
       try {
         alias = await childFactory(ctx.cwd, agentDir, plan.extensionFactory, plan.models[1], "high");
-        if (alias.session.model?.provider !== "openai-codex-account-1" || alias.session.thinkingLevel !== "high") {
+        if (alias.session.model?.provider !== "openai-account-1" || alias.session.thinkingLevel !== "high") {
           throw new Error("alias child did not select its role model/thinking level");
         }
         await alias.session.prompt("Say exactly one word.");
@@ -219,7 +219,7 @@ export default function hostSmokeTest(pi: ExtensionAPI) {
       if (JSON.stringify(JSON.parse(await readFile(path.join(agentDir, "settings.json"), "utf8"))) !== JSON.stringify(parentSettings)) {
         throw new Error("child changed parent settings");
       }
-      const aliasCall = calls.find((call) => call.provider === "openai-codex-account-1");
+      const aliasCall = calls.find((call) => call.provider === "openai-account-1");
       if (!aliasCall || aliasCall.model !== MODEL_ID || aliasCall.reasoning !== "high") {
         throw new Error("native alias provider did not receive the alias request/thinking level");
       }

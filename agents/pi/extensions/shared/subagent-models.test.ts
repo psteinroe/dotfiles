@@ -64,22 +64,22 @@ function registry(available: Model[], providers: Map<string, Provider>): Registr
 test("plans exact model candidates in base then numeric account order", async () => {
   const available = [
     model("unrelated"),
-    model("openai-codex-account-10"),
-    model("openai-codex-account-2"),
-    model("openai-codex"),
-    model("openai-codex-account-1"),
-    model("openai-codex", "other-model"),
-    model("openai-codex-account-2"),
+    model("openai-account-10"),
+    model("openai-account-2"),
+    model("openai"),
+    model("openai-account-1"),
+    model("openai", "other-model"),
+    model("openai-account-2"),
   ];
   const providers = new Map(
-    ["openai-codex", "openai-codex-account-1", "openai-codex-account-2", "openai-codex-account-10"]
+    ["openai", "openai-account-1", "openai-account-2", "openai-account-10"]
       .map((id) => [id, provider(id)] as const),
   );
   const plan = await createSubagentModelPlan({ modelRegistry: registry(available, providers) }, "gpt-fixture");
 
   assert.deepEqual(
     plan.models.map((candidate) => candidate.provider),
-    ["openai-codex", "openai-codex-account-1", "openai-codex-account-2", "openai-codex-account-10"],
+    ["openai", "openai-account-1", "openai-account-2", "openai-account-10"],
   );
 
   const registered: Provider[] = [];
@@ -87,16 +87,16 @@ test("plans exact model candidates in base then numeric account order", async ()
     registerProvider: (nativeProvider: Provider) => registered.push(nativeProvider),
   } as unknown as ExtensionAPI);
   assert.deepEqual(registered.map((candidate) => candidate.id), [
-    "openai-codex",
-    "openai-codex-account-1",
-    "openai-codex-account-2",
-    "openai-codex-account-10",
+    "openai",
+    "openai-account-1",
+    "openai-account-2",
+    "openai-account-10",
   ]);
 });
 
 test("bridges effective native parent providers, including alias auth", async () => {
-  const base = nativeProvider("openai-codex");
-  const alias = nativeProvider("openai-codex-account-1");
+  const base = nativeProvider("openai");
+  const alias = nativeProvider("openai-account-1");
   const providers = new Map([[base.id, base], [alias.id, alias]]);
   const available = [...base.getModels(), ...alias.getModels()];
   const plan = await createSubagentModelPlan({ modelRegistry: registry(available, providers) }, "gpt-fixture");
@@ -110,7 +110,21 @@ test("bridges effective native parent providers, including alias auth", async ()
     ctx: { env: async () => undefined, fileExists: async () => false },
     signal: AbortSignal.timeout(1_000),
   });
-  assert.deepEqual(auth?.auth.apiKey, "synthetic-openai-codex-account-1");
+  assert.deepEqual(auth?.auth.apiKey, "synthetic-openai-account-1");
+});
+
+test("OpenAI plans never fall back to Codex accounts", async () => {
+  const openai = nativeProvider("openai");
+  const codex = nativeProvider("openai-codex");
+  const codexAlias = nativeProvider("openai-codex-account-2");
+  const providers = new Map([openai, codex, codexAlias].map((candidate) => [candidate.id, candidate]));
+  const available = [...openai.getModels(), ...codex.getModels(), ...codexAlias.getModels()];
+  const plan = await createSubagentModelPlan({ modelRegistry: registry(available, providers) }, "openai/gpt-fixture");
+  assert.deepEqual(plan.models.map((candidate) => candidate.provider), ["openai"]);
+  assert.equal(plan.requiresClaudeBridge, false);
+  await assert.rejects(createSubagentModelPlan({
+    modelRegistry: registry([...codex.getModels(), ...codexAlias.getModels()], providers),
+  }, "gpt-fixture"), /No authenticated candidate provider/);
 });
 
 test("selects Claude exactly and loads its complete child lifecycle instead of copying the provider", async () => {
@@ -133,7 +147,7 @@ test("selects Claude exactly and loads its complete child lifecycle instead of c
     const claude = provider("claude-bridge");
     const plan = await createSubagentModelPlan({
       modelRegistry: registry(
-        [model("claude-bridge", "claude-opus-4-6"), model("openai-codex", "claude-opus-4-6")],
+        [model("claude-bridge", "claude-opus-4-6"), model("openai", "claude-opus-4-6")],
         new Map([[claude.id, claude]]),
       ),
     }, "claude-bridge/claude-opus-4-6");
@@ -171,21 +185,21 @@ test("model reference parser requires a non-empty exact provider/model reference
 });
 
 test("an authenticated account alias remains usable when base is unavailable", async () => {
-  const alias = provider("openai-codex-account-3");
+  const alias = provider("openai-account-3");
   const plan = await createSubagentModelPlan({
     modelRegistry: registry(
-      [model("openai-codex-account-3"), model("openai-codex", "not-available")],
+      [model("openai-account-3"), model("openai", "not-available")],
       new Map([[alias.id, alias]]),
     ),
   }, "gpt-fixture");
-  assert.deepEqual(plan.models.map((candidate) => candidate.provider), ["openai-codex-account-3"]);
+  assert.deepEqual(plan.models.map((candidate) => candidate.provider), ["openai-account-3"]);
 });
 
 test("unavailable models and non-account providers are not candidates", async () => {
   await assert.rejects(
     createSubagentModelPlan({
       modelRegistry: registry(
-        [model("openai-codex", "different-model"), model("openai-codex-account-x")],
+        [model("openai", "different-model"), model("openai-account-x")],
         new Map(),
       ),
     }, "gpt-fixture"),
@@ -201,7 +215,7 @@ test("settings are copied from untrusted global settings and never persisted", a
     await mkdir(cwd, { recursive: true });
     await mkdir(agentDir, { recursive: true });
     const original = {
-      defaultProvider: "openai-codex",
+      defaultProvider: "openai",
       defaultModel: "parent-model",
       theme: "parent-theme",
       retry: { enabled: true, maxRetries: 7, provider: { maxRetries: 5, timeoutMs: 1234 } },

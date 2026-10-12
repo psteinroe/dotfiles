@@ -9,10 +9,10 @@ Usage: rauth [--host host] [--user user] [--home home] [spec ...]
 Specs:
   all                         copy gh, Pi, Claude/bridge, MCP, Exa, and AWS auth
   gh[:github-host]            copy GitHub CLI auth (default: github.com)
-  pi                          copy default Pi provider auth (default: openai-codex)
+  pi                          copy default Pi provider auth (default: openai)
   pi:provider[,provider...]   copy selected Pi providers from ~/.pi/agent/auth.json
   pi:all                      copy all Pi providers
-  codex                       alias for pi:openai-codex
+  codex                       legacy alias for pi:openai
   claude                      copy Claude Code OAuth used by pi-claude-bridge
   bridge, claude-bridge       aliases for claude
   mcp                         copy all Pi MCP OAuth credentials (~/.pi/agent/mcp-auth.json)
@@ -99,7 +99,7 @@ _rauth_check_jq() {
 _rauth_copy_pi() {
   local provider_spec="$1"
   local local_pi_auth="${PI_AUTH_FILE:-$HOME/.pi/agent/auth.json}"
-  local default_pi_providers="${RAUTH_PI_PROVIDERS:-${PI_AUTH_PROVIDERS:-${PI_CODEX_PROVIDER:-openai-codex}}}"
+  local default_pi_providers="${RAUTH_PI_PROVIDERS:-${PI_AUTH_PROVIDERS:-openai}}"
   local -a pi_providers
   local copy_pi_all=0
 
@@ -412,7 +412,7 @@ for spec in "${specs[@]}"; do
       _rauth_copy_pi "$arg" || return
       ;;
     codex)
-      _rauth_copy_pi openai-codex || return
+      _rauth_copy_pi openai || return
       ;;
     claude|bridge|claude-bridge)
       _rauth_copy_claude || return

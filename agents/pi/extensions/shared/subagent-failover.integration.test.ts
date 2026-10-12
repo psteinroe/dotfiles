@@ -36,8 +36,8 @@ const ORACLE_MODEL_ID = "gpt-6-astra";
 // Worker now defaults to Claude; these synthetic providers deliberately keep
 // exercising Codex account failover, including continuation after a write.
 const CODEX_WORKER_MODEL_ID = "gpt-6.1-sol";
-const PRIMARY = "openai-codex";
-const ALIAS = "openai-codex-account-1";
+const PRIMARY = "openai";
+const ALIAS = "openai-account-1";
 const API = "openai-responses" as Api;
 
 type Role = "mapper" | "librarian" | "worker" | "oracle";

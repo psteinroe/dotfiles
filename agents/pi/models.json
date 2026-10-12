@@ -1,6 +1,6 @@
 {
     "providers": {
-        "openai-codex": {
+        "openai": {
             "modelOverrides": {
                 "gpt-5.6-sol": {
                     "contextWindow": 200000,

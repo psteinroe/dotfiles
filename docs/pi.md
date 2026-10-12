@@ -14,13 +14,23 @@ pi mcp list
 
 Subagents: Mapper gets no MCP. Oracle, Worker and Librarian load only Executor's three tools (`shared/subagent-mcp.ts`), never project MCP config or other extensions.
 
+## Models and authentication
+
+Main and Worker retain `claude-bridge/claude-opus-5-5` with high thinking on both platforms. Existing OpenAI-backed roles use the `openai` provider instead of `openai-codex`, with model IDs and thinking levels unchanged: Oracle uses `gpt-6-astra` with xhigh thinking, and Mapper/Finder and Librarian use `gpt-6-luna` with medium and high thinking respectively. OpenAI subagent account failover considers only `openai` and numeric `openai-account-N` aliases, never Codex accounts.
+
+Codex credentials (`openai-codex` and `openai-codex-account-N`) have been removed from local and remote `auth.json` files. Pi automatically omits unauthenticated providers from `/model`; no hiding extension is needed. Non-Codex credentials and model defaults are unchanged.
+
+OpenAI and OpenAI Codex have separate logins. Authenticate **OpenAI** through Pi's `/login`. `rauth pi` now copies OpenAI by default; `rauth all` still copies the full auth bundle. The legacy `rauth codex` shorthand also selects OpenAI. Copying credentials does not renew them.
+
+After deploying these files, use `/reload` in running Pi sessions. Resumed sessions record their own model, so explicitly switch any Codex-backed sessions to the same model ID under `openai` if necessary.
+
 ## Account usage footer
 
-`extensions/account-usage/` shows the remaining subscription quota for the single Codex and Claude Code accounts, e.g. `Codex 5h 76% left ↻1h | Claude 5h 83% left`. It refreshes every two minutes in the TUI, and `/account-usage` refreshes it immediately. It replaces `pi-multi-account`, which only provided this footer here.
+`extensions/account-usage/` shows subscription quota for Codex and Claude Code. It is independent of model selection and does not report OpenAI API-provider usage. It refreshes every two minutes in the TUI, and `/account-usage` refreshes it immediately.
 
 - Codex: token from Pi's own auth (`modelRegistry.getProviderAuth`).
 - Claude: Claude Code's credentials (macOS Keychain, else `~/.claude/.credentials.json`, or `CLAUDE_CODE_OAUTH_TOKEN`).
-- It is read-only: nothing is refreshed, written or logged. "sign in" means log in normally (`/login` for Codex, `claude` for Claude Code).
+- It is read-only: nothing is refreshed, written or logged.
 
 ## PR monitoring
 
@@ -34,6 +44,7 @@ Subscriptions survive `/reload` in the same process, but end on Pi exit or sessi
 
 ```sh
 node --test agents/pi/config.test.ts agents/pi/extensions/account-usage/*.test.ts agents/pi/extensions/pr-monitor/*.test.ts
+zsh zsh/tests/rauth.test.zsh
 bash agents/skills/iterate-pr/scripts/wait-for-pr-checks.test.sh
 ```
 

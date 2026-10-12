@@ -39,7 +39,7 @@ import subdirContextExtension from "../shared/subdir-context/src/index.ts";
 import { FinderParams } from "./finder-core.ts";
 import { buildFinderSystemPrompt, buildFinderUserPrompt } from "./finder-prompts.md.ts";
 
-const FINDER_PROVIDER = "openai-codex";
+const FINDER_PROVIDER = "openai";
 const FINDER_MODEL_ID = "gpt-6-luna";
 const FINDER_THINKING = "medium" as const;
 const FINDER_MAX_TURNS = 8;

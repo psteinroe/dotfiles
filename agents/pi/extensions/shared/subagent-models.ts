@@ -16,9 +16,9 @@ type NativeProvider = NonNullable<
   ReturnType<ExtensionContext["modelRegistry"]["getProvider"]>
 >;
 
-const BASE_PROVIDER = "openai-codex";
+const BASE_PROVIDER = "openai";
 const CLAUDE_BRIDGE_PROVIDER = "claude-bridge";
-const ACCOUNT_PROVIDER = /^openai-codex-account-(\d+)$/u;
+const ACCOUNT_PROVIDER = /^openai-account-(\d+)$/u;
 const CLAUDE_BRIDGE_WRAPPER = ["extensions", "claude-bridge.ts"] as const;
 const CLAUDE_BRIDGE_PACKAGE_ENTRY = [
   "git",
@@ -50,7 +50,7 @@ function parseModelRef(modelRef: string): { provider: string; modelId: string } 
   const normalized = modelRef.trim();
   const separator = normalized.indexOf("/");
   // Keep bare IDs only as an internal compatibility shorthand for existing
-  // Codex role defaults. Public overrides call parseExactSubagentModelRef().
+  // OpenAI role defaults. Public overrides call parseExactSubagentModelRef().
   if (separator < 0) return { provider: BASE_PROVIDER, modelId: normalized };
   const exact = parseExactSubagentModelRef(normalized);
   const exactSeparator = exact.indexOf("/");
@@ -69,7 +69,7 @@ function providerOrder(provider: string): [number, number, string] | undefined {
 
 /**
  * Select authenticated models for an exact provider/model reference. The base
- * Codex provider retains numeric account failover; every other provider is a
+ * OpenAI provider retains numeric account failover; every other provider is a
  * single exact candidate.
  *
  * Claude Bridge is deliberately not copied as a provider object. Its provider

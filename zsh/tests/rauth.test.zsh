@@ -97,9 +97,44 @@ HOME="$local_home" \
   rauth --host fixture-host --home "$bridge_home" bridge >/dev/null
 [[ "$(jq -r '.claudeAiOauth.accessToken' "$bridge_home/.claude/.credentials.json")" == claude-access ]]
 
+# OpenAI must be copied by both the default Pi spec and the full auth bundle.
+mkdir -p "$local_home/.pi/agent" "$remote_home/.pi/agent" "$remote_home/.local/bin"
+print -r -- '{"openai":{"type":"oauth","access":"openai-access","refresh":"openai-refresh","expires":123,"clientId":"fixture-client","scopes":["api.model.read","api.model.request"]},"openai-codex":{"type":"oauth","access":"old-codex"}}' > "$local_home/.pi/agent/auth.json"
+print -r -- '{"mcp__executor|https://fixture.invalid":{"accessToken":"mcp-fixture"}}' > "$local_home/.pi/agent/mcp-auth.json"
+print -r -- '#!/usr/bin/env bash
+set -euo pipefail
+case "$*" in
+  "auth token "*) printf "%s\\n" "github-fixture" ;;
+  "auth login "*) cat >/dev/null ;;
+esac
+exit 0' > "$remote_home/.local/bin/gh"
+chmod +x "$remote_home/.local/bin/gh"
+
+HOME="$local_home" RDEV_REMOTE_USER="$USER" \
+  rauth --host fixture-host --home "$remote_home" pi >/dev/null
+[[ "$(jq -r '.openai.access' "$remote_home/.pi/agent/auth.json")" == openai-access ]]
+[[ "$(jq -r 'has("openai-codex")' "$remote_home/.pi/agent/auth.json")" == false ]]
+
+# The old shorthand is safe too: it now selects OpenAI rather than Codex.
+HOME="$local_home" RDEV_REMOTE_USER="$USER" \
+  rauth --host fixture-host --home "$remote_home" codex >/dev/null
+[[ "$(jq -r 'has("openai-codex")' "$remote_home/.pi/agent/auth.json")" == false ]]
+
+all_output=$(
+  HOME="$local_home" RDEV_REMOTE_USER="$USER" \
+    PATH="$remote_home/.local/bin:$PATH" \
+    CLAUDE_CREDENTIALS_FILE="$local_home/.claude/.credentials.json" \
+    EXA_API_KEY=exa-fixture \
+    rauth --host fixture-host --home "$remote_home" all
+)
+[[ "$all_output" == *"Copied all Pi auth providers"* ]]
+jq -e --slurpfile local "$local_home/.pi/agent/auth.json" '.openai == $local[0].openai' \
+  "$remote_home/.pi/agent/auth.json" >/dev/null
+
 help=$(rauth --help 2>&1)
+[[ "$help" == *'copy default Pi provider auth (default: openai)'* ]]
 [[ "$help" == *'all                         copy gh, Pi, Claude/bridge, MCP, Exa, and AWS auth'* ]]
 [[ "$help" == *'claude                      copy Claude Code OAuth used by pi-claude-bridge'* ]]
 [[ "$help" == *'aws                         copy AWS config and cached sessions to ~/.aws'* ]]
 
-print 'rauth AWS and Claude Bridge auth copy tests passed'
+print 'rauth OpenAI, full bundle, AWS and Claude Bridge auth copy tests passed'

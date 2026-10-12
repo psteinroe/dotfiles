@@ -9,7 +9,7 @@ export interface DelegatePolicy {
 
 export const DELEGATE_POLICIES: Record<DelegateName, DelegatePolicy> = {
   oracle: {
-    model: "openai-codex/gpt-6-astra",
+    model: "openai/gpt-6-astra",
     thinking: "xhigh",
     maxTurns: 10,
     tools: ["read", "grep", "find", "ls", "git_diff"],

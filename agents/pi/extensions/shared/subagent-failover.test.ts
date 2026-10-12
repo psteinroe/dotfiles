@@ -4,7 +4,7 @@ import { promptSubagentWithFailover } from "./subagent-failover.ts";
 
 type Session = Parameters<typeof promptSubagentWithFailover>[0];
 type Options = Parameters<typeof promptSubagentWithFailover>[2];
-const models = ["openai-codex", "openai-codex-account-2", "openai-codex-account-3"]
+const models = ["openai", "openai-account-2", "openai-account-3"]
   .map((provider) => ({ provider, id: "gpt-6-luna" })) as Options["models"];
 const assistant = (stopReason: string, content: unknown[] = [], errorMessage?: string) =>
   ({ role: "assistant", stopReason, content, errorMessage });
@@ -142,7 +142,7 @@ test("preflight failures before accepting the task submit the original task on t
   f.session.prompt = async (...args) => {
     if (first) {
       first = false;
-      throw new Error("No API key found for openai-codex");
+      throw new Error("No API key found for openai");
     }
     await prompt(...args);
   };

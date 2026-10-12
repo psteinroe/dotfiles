@@ -10,7 +10,7 @@ import {
 
 test("delegate routing keeps the coordinator out of routine implementation", () => {
   assert.deepEqual(DELEGATE_POLICIES.oracle, {
-    model: "openai-codex/gpt-6-astra",
+    model: "openai/gpt-6-astra",
     thinking: "xhigh",
     maxTurns: 10,
     tools: ["read", "grep", "find", "ls", "git_diff"],

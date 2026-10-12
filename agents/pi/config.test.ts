@@ -19,13 +19,25 @@ test("managed settings use native MCP, no multi-account, and the pinned Claude B
   }
 });
 
-test("main and Worker use Claude Bridge Opus 5.5 with high thinking on both platforms", async () => {
+test("main and Worker retain Claude Bridge Opus 5.5 with high thinking on both platforms", async () => {
   for (const name of ["settings.json", "settings.linux.json"]) {
     const settings = await jsonFile(name);
     assert.equal(settings.defaultProvider, "claude-bridge");
     assert.equal(settings.defaultModel, "claude-opus-5-5");
+    assert.equal(settings.enabledModels, undefined);
     assert.equal(DELEGATE_POLICIES.worker.model, `${settings.defaultProvider}/${settings.defaultModel}`);
     assert.equal(DELEGATE_POLICIES.worker.thinking, settings.defaultThinkingLevel);
+  }
+});
+
+test("OpenAI is the only configured failover provider and owns model overrides", async () => {
+  assert.deepEqual((await jsonFile("provider-failover.json")).providerOrder, ["openai"]);
+  assert.deepEqual(Object.keys((await jsonFile("models.json")).providers), ["openai"]);
+  assert.equal(DELEGATE_POLICIES.oracle.model, "openai/gpt-6-astra");
+  assert.equal(DELEGATE_POLICIES.oracle.thinking, "xhigh");
+  for (const role of ["finder", "librarian"]) {
+    const adapter = await readFile(new URL(`extensions/${role}/adapter.ts`, import.meta.url), "utf8");
+    assert.match(adapter, /MODEL_PROVIDER = "openai"|FINDER_PROVIDER = "openai"/);
   }
 });
 
