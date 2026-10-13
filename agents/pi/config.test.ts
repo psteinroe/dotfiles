@@ -44,6 +44,7 @@ test("OpenAI is the only configured failover provider and owns model overrides",
 test("native MCP keeps configured servers and exposes only the three Executor entrypoints", async () => {
   const config = await jsonFile("mcp.json");
   assert.deepEqual(Object.keys(config.mcpServers).sort(), ["executor", "figma", "foilwick", "scryfall"]);
+  assert.equal(config.mcpServers.scryfall.enabled, false);
   assert.equal(config.mcpServers.executor.exposure, "hidden");
   assert.deepEqual(config.mcpServers.executor.toolExposure, { execute: "direct", skills: "direct", resume: "direct" });
 });

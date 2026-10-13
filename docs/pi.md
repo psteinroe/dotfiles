@@ -4,7 +4,7 @@ Pi comes from `inputs.llm-agents` (`nix/home/packages.nix`). Upgrade with `nix f
 
 ## MCP
 
-Pi's built-in MCP client reads `agents/pi/mcp.json`. Foilwick and Scryfall use codemode. Executor is hidden except `execute`, `skills` and `resume`. HTTP servers need a one-time sign-in:
+Pi's built-in MCP client reads `agents/pi/mcp.json`. Foilwick uses codemode. Scryfall is temporarily disabled (`enabled: false`); its configuration is retained for re-enabling. Executor is hidden except `execute`, `skills` and `resume`. HTTP servers need a one-time sign-in:
 
 ```sh
 pi mcp login executor

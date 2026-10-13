@@ -10,6 +10,7 @@
             "url": "https://foilwick.com/api/mcp"
         },
         "scryfall": {
+            "enabled": false,
             "command": "pnpx",
             "args": [
                 "scryfall-mcp-server"
