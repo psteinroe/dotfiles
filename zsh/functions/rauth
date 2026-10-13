@@ -1,5 +1,5 @@
 # Copy local development auth credentials to a remote machine.
-# Usage: rauth [--host host] [--user user] [--home home] [all|gh[:host]|pi[:provider[,provider]|all]|claude|mcp[:all|server[,server]]|exa|aws|codex]...
+# Usage: rauth [--host host] [--user user] [--home home] [all|gh[:host]|pi[:provider[,provider]|all]|claude|mcp[:all|server[,server]]|exa|aws|infisical|codex]...
 # Defaults to: rauth all
 
 _rauth_usage() {
@@ -7,7 +7,7 @@ _rauth_usage() {
 Usage: rauth [--host host] [--user user] [--home home] [spec ...]
 
 Specs:
-  all                         copy gh, Pi, Claude/bridge, MCP, Exa, and AWS auth
+  all                         copy gh, Pi, Claude/bridge, MCP, Exa, AWS, and Infisical auth
   gh[:github-host]            copy GitHub CLI auth (default: github.com)
   pi                          copy default Pi provider auth (default: openai)
   pi:provider[,provider...]   copy selected Pi providers from ~/.pi/agent/auth.json
@@ -19,6 +19,7 @@ Specs:
   mcp:server[,server...]      copy selected MCP servers, e.g. mcp:executor
   exa                         copy Exa API key to ~/.config/exa/api_key
   aws                         copy AWS config and cached sessions to ~/.aws
+  infisical                   copy the Infisical CLI login into the remote file vault
 
 Options:
   --host host                 SSH host (default: rdev)
@@ -384,6 +385,115 @@ find "$HOME/.aws" -type f -exec chmod 600 {} +
   print -r -- "Copied AWS auth to $host:$remote_user:$remote_home/.aws"
 }
 
+# Infisical on macOS keeps its login in the Keychain via go-keyring; the
+# headless remote uses the CLI's encrypted file vault (~/infisical-keyring).
+_rauth_read_infisical_payload() {
+  local config="${INFISICAL_CONFIG_FILE:-$HOME/.infisical/infisical-config.json}"
+  [[ -f "$config" ]] || return 1
+  [[ "$(uname -s)" == Darwin ]] && command -v security >/dev/null 2>&1 || return 1
+  local email domain stored credentials
+  email=$(jq -r '.loggedInUserEmail // empty' "$config") || return 1
+  domain=$(jq -r '.LoggedInUserDomain // empty' "$config") || return 1
+  [[ -n "$email" && -n "$domain" ]] || return 1
+  stored=$(security find-generic-password -s infisical-cli -a "$email" -w 2>/dev/null) || return 1
+  if [[ "$stored" == go-keyring-base64:* ]]; then
+    credentials=$(print -rn -- "${stored#go-keyring-base64:}" | base64 -d 2>/dev/null) || return 1
+  else
+    credentials="$stored"
+  fi
+  jq -ce --arg email "$email" --arg domain "$domain" '
+    select(.JTWToken | type == "string" and length > 0)
+    | {email: $email, domain: $domain, credentials: .}
+  ' <<<"$credentials"
+}
+
+_rauth_infisical_expires_at() {
+  jq -r '
+    (.credentials.JTWToken | split(".")[1] | gsub("-"; "+") | gsub("_"; "/")) as $p
+    | ($p + ("==" | .[0:((4 - ($p | length) % 4) % 4)])) | @base64d | fromjson | .exp // 0
+  ' 2>/dev/null
+}
+
+_rauth_copy_infisical() {
+  _rauth_check_jq || return
+  local payload
+  payload=$(_rauth_read_infisical_payload) || {
+    echo "No local Infisical login found in the macOS Keychain. Run: infisical login" >&2
+    return 1
+  }
+  local expires_at
+  expires_at=$(_rauth_infisical_expires_at <<<"$payload")
+  if [[ "$expires_at" != <-> ]] || (( expires_at <= $(date +%s) )); then
+    echo "Local Infisical login has expired. Run: infisical login" >&2
+    return 1
+  fi
+
+  local remote_cmd='set -euo pipefail
+if ! command -v node >/dev/null 2>&1; then
+  echo "rauth infisical requires node on the remote; run rrebuild/bootstrap first" >&2
+  exit 1
+fi
+umask 077
+payload=$(mktemp)
+trap '\''rm -f "$payload"'\'' EXIT
+cat > "$payload"
+RAUTH_PAYLOAD="$payload" node - <<"JS"
+const fs = require("fs"), path = require("path"), crypto = require("crypto");
+const home = process.env.HOME;
+const { email, domain, credentials } = JSON.parse(fs.readFileSync(process.env.RAUTH_PAYLOAD, "utf8"));
+if (!/^[^/\0]+@[^/\0]+$/.test(email)) throw new Error("Invalid Infisical email");
+
+function writeAtomic(file, data) {
+  const tmp = `${file}.rauth-${process.pid}`;
+  fs.writeFileSync(tmp, data, { mode: 0o600 });
+  fs.renameSync(tmp, file);
+}
+
+const configDir = path.join(home, ".infisical");
+const configPath = path.join(configDir, "infisical-config.json");
+fs.mkdirSync(configDir, { recursive: true, mode: 0o700 });
+let config = {};
+try { config = JSON.parse(fs.readFileSync(configPath, "utf8")); }
+catch (error) { if (error.code !== "ENOENT") throw error; }
+// Reuse an existing file-vault passphrase: other vault entries depend on it.
+if (config.vaultBackendType !== "file" || !config.vaultBackendPassphrase) {
+  config.vaultBackendType = "file";
+  config.vaultBackendPassphrase = crypto.randomBytes(12).toString("base64");
+}
+
+// Same JWE (PBES2-HS256+A128KW / A256GCM) the CLI file vault writes; the
+// payload is the credential JSON encoded once more as a JSON string.
+const header = { alg: "PBES2-HS256+A128KW", created: new Date().toISOString(), enc: "A256GCM",
+  p2c: 8192, p2s: crypto.randomBytes(12).toString("base64url") };
+const protectedHeader = Buffer.from(JSON.stringify(header)).toString("base64url");
+const salt = Buffer.concat([Buffer.from(header.alg), Buffer.from([0]), Buffer.from(header.p2s, "base64url")]);
+const kek = crypto.pbkdf2Sync(Buffer.from(config.vaultBackendPassphrase, "base64"), salt, header.p2c, 16, "sha256");
+const cek = crypto.randomBytes(32);
+const wrap = crypto.createCipheriv("id-aes128-wrap", kek, Buffer.from("A6A6A6A6A6A6A6A6", "hex"));
+const encryptedKey = Buffer.concat([wrap.update(cek), wrap.final()]);
+const iv = crypto.randomBytes(12);
+const gcm = crypto.createCipheriv("aes-256-gcm", cek, iv);
+gcm.setAAD(Buffer.from(protectedHeader));
+const ciphertext = Buffer.concat([gcm.update(JSON.stringify(JSON.stringify(credentials))), gcm.final()]);
+const jwe = [protectedHeader, ...[encryptedKey, iv, ciphertext, gcm.getAuthTag()].map((part) => part.toString("base64url"))].join(".");
+
+const vaultDir = path.join(home, "infisical-keyring");
+fs.mkdirSync(vaultDir, { recursive: true, mode: 0o700 });
+writeAtomic(path.join(vaultDir, email), jwe);
+
+config.loggedInUserEmail = email;
+config.LoggedInUserDomain = domain;
+const users = Array.isArray(config.loggedInUsers) ? config.loggedInUsers : [];
+config.loggedInUsers = [...users.filter((user) => !(user.email === email && user.domain === domain)), { email, domain }];
+writeAtomic(configPath, JSON.stringify(config, null, 2));
+JS
+'
+  local runner
+  runner=$(_rauth_runner "$remote_cmd") || return
+  printf '%s' "$payload" | ssh "$host" "$runner" || return
+  print -r -- "Copied Infisical login for $(jq -r .email <<<"$payload") to $host:$remote_user:$remote_home/infisical-keyring"
+}
+
 local spec name arg
 for spec in "${specs[@]}"; do
   case "$spec" in
@@ -394,6 +504,7 @@ for spec in "${specs[@]}"; do
       _rauth_copy_mcp all || return
       _rauth_copy_exa || return
       _rauth_copy_aws || return
+      _rauth_copy_infisical || return
       ;;
     gh|github)
       _rauth_copy_gh github.com || return
@@ -430,6 +541,9 @@ for spec in "${specs[@]}"; do
       ;;
     aws)
       _rauth_copy_aws || return
+      ;;
+    infisical)
+      _rauth_copy_infisical || return
       ;;
     *)
       echo "Unknown rauth spec: $spec" >&2

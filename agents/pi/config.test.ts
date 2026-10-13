@@ -43,7 +43,15 @@ test("OpenAI is the only configured failover provider and owns model overrides",
 
 test("native MCP keeps configured servers and exposes only the three Executor entrypoints", async () => {
   const config = await jsonFile("mcp.json");
-  assert.deepEqual(Object.keys(config.mcpServers).sort(), ["executor", "foilwick", "scryfall"]);
+  assert.deepEqual(Object.keys(config.mcpServers).sort(), ["executor", "figma", "foilwick", "scryfall"]);
   assert.equal(config.mcpServers.executor.exposure, "hidden");
   assert.deepEqual(config.mcpServers.executor.toolExposure, { execute: "direct", skills: "direct", resume: "direct" });
+});
+
+test("Figma uses native OAuth with the allowed Codex client name", async () => {
+  const config = await jsonFile("mcp.json");
+  assert.deepEqual(config.mcpServers.figma, {
+    url: "https://mcp.figma.com/mcp",
+    oauth: { clientName: "Codex" },
+  });
 });

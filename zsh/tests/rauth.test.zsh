@@ -14,6 +14,13 @@ print -r -- '{"claudeAiOauth":{"accessToken":"old","refreshToken":"old","stale":
 : > "$fixture/ssh-trace"
 : > "$fixture/security-trace"
 keychain_mode=success
+infisical_exp=4102444800
+
+infisical_credentials() {
+  local claims
+  claims=$(print -rn -- "{\"exp\":$infisical_exp}" | base64 | tr '+/' '-_' | tr -d '=\n')
+  print -rn -- "{\"email\":\"dev@example.com\",\"privateKey\":\"\",\"JTWToken\":\"e30.$claims.sig\",\"RefreshToken\":\"\"}"
+}
 
 ssh() {
   print -r -- "$*" >> "$fixture/ssh-trace"
@@ -28,6 +35,10 @@ uname() {
 
 security() {
   print -r -- "$*" >> "$fixture/security-trace"
+  if [[ "$*" == *"-s infisical-cli"* ]]; then
+    print -r -- "go-keyring-base64:$(infisical_credentials | base64 | tr -d '\n')"
+    return
+  fi
   case "$keychain_mode" in
     success)
       print -r -- '{"claudeAiOauth":{"accessToken":"keychain-access","refreshToken":"keychain-refresh"}}'
@@ -120,6 +131,70 @@ HOME="$local_home" RDEV_REMOTE_USER="$USER" \
   rauth --host fixture-host --home "$remote_home" codex >/dev/null
 [[ "$(jq -r 'has("openai-codex")' "$remote_home/.pi/agent/auth.json")" == false ]]
 
+# Infisical: macOS Keychain (go-keyring) login -> remote encrypted file vault.
+decrypt_infisical_vault() {
+  node - "$1" <<'JS'
+const fs = require("fs"), crypto = require("crypto");
+const home = process.argv[2];
+const config = JSON.parse(fs.readFileSync(`${home}/.infisical/infisical-config.json`, "utf8"));
+const [ph, ek, iv, ct, tag] = fs.readFileSync(`${home}/infisical-keyring/${config.loggedInUserEmail}`, "utf8").split(".");
+const b = (s) => Buffer.from(s, "base64url");
+const header = JSON.parse(b(ph));
+const salt = Buffer.concat([Buffer.from(header.alg), Buffer.from([0]), b(header.p2s)]);
+const kek = crypto.pbkdf2Sync(Buffer.from(config.vaultBackendPassphrase, "base64"), salt, header.p2c, 16, "sha256");
+const unwrap = crypto.createDecipheriv("id-aes128-wrap", kek, Buffer.from("A6A6A6A6A6A6A6A6", "hex"));
+const cek = Buffer.concat([unwrap.update(b(ek)), unwrap.final()]);
+const gcm = crypto.createDecipheriv("aes-256-gcm", cek, b(iv));
+gcm.setAAD(Buffer.from(ph)); gcm.setAuthTag(b(tag));
+process.stdout.write(JSON.parse(Buffer.concat([gcm.update(b(ct)), gcm.final()]).toString()));
+JS
+}
+
+mkdir -p "$local_home/.infisical"
+print -r -- '{"loggedInUserEmail":"dev@example.com","LoggedInUserDomain":"https://eu.infisical.com/api"}' \
+  > "$local_home/.infisical/infisical-config.json"
+infisical_home="$fixture/infisical-home"
+# The remote runner uses a fixed PATH; expose this machine's node there.
+mkdir -p "$infisical_home/.local/bin"
+ln -s "$(command -v node)" "$infisical_home/.local/bin/node"
+ln -s "$(command -v node)" "$remote_home/.local/bin/node"
+infisical_output=$(HOME="$local_home" RDEV_REMOTE_USER="$USER" \
+  rauth --host fixture-host --home "$infisical_home" infisical)
+[[ "$infisical_output" == *"Copied Infisical login for dev@example.com"* ]]
+[[ "$(decrypt_infisical_vault "$infisical_home")" == "$(infisical_credentials)" ]]
+jq -e '.vaultBackendType == "file" and .loggedInUserEmail == "dev@example.com"
+  and .LoggedInUserDomain == "https://eu.infisical.com/api"
+  and .loggedInUsers == [{"email": "dev@example.com", "domain": "https://eu.infisical.com/api"}]' \
+  "$infisical_home/.infisical/infisical-config.json" >/dev/null
+if [[ "$OSTYPE" == darwin* ]]; then
+  [[ "$(stat -f '%Lp' "$infisical_home/infisical-keyring/dev@example.com")" == 600 ]]
+else
+  [[ "$(stat -c '%a' "$infisical_home/infisical-keyring/dev@example.com")" == 600 ]]
+fi
+
+# A second copy keeps the remote passphrase (other vault entries depend on it)
+# and unrelated config, without duplicating the logged-in user.
+jq '.telemetry = "keep"' "$infisical_home/.infisical/infisical-config.json" > "$fixture/infisical-config"
+mv "$fixture/infisical-config" "$infisical_home/.infisical/infisical-config.json"
+passphrase=$(jq -r .vaultBackendPassphrase "$infisical_home/.infisical/infisical-config.json")
+HOME="$local_home" RDEV_REMOTE_USER="$USER" \
+  rauth --host fixture-host --home "$infisical_home" infisical >/dev/null
+jq -e --arg p "$passphrase" '.vaultBackendPassphrase == $p and .telemetry == "keep" and (.loggedInUsers | length) == 1' \
+  "$infisical_home/.infisical/infisical-config.json" >/dev/null
+[[ "$(decrypt_infisical_vault "$infisical_home")" == "$(infisical_credentials)" ]]
+
+# An expired local login is refused rather than copied.
+vault_before=$(cat "$infisical_home/infisical-keyring/dev@example.com")
+infisical_exp=1
+if HOME="$local_home" RDEV_REMOTE_USER="$USER" \
+  rauth --host fixture-host --home "$infisical_home" infisical 2>"$fixture/infisical-err"; then
+  print -r -- 'expected an expired Infisical login to fail' >&2
+  exit 1
+fi
+grep -q 'Local Infisical login has expired' "$fixture/infisical-err"
+[[ "$(cat "$infisical_home/infisical-keyring/dev@example.com")" == "$vault_before" ]]
+infisical_exp=4102444800
+
 all_output=$(
   HOME="$local_home" RDEV_REMOTE_USER="$USER" \
     PATH="$remote_home/.local/bin:$PATH" \
@@ -128,13 +203,16 @@ all_output=$(
     rauth --host fixture-host --home "$remote_home" all
 )
 [[ "$all_output" == *"Copied all Pi auth providers"* ]]
+[[ "$all_output" == *"Copied Infisical login for dev@example.com"* ]]
+[[ "$(decrypt_infisical_vault "$remote_home")" == "$(infisical_credentials)" ]]
 jq -e --slurpfile local "$local_home/.pi/agent/auth.json" '.openai == $local[0].openai' \
   "$remote_home/.pi/agent/auth.json" >/dev/null
 
 help=$(rauth --help 2>&1)
 [[ "$help" == *'copy default Pi provider auth (default: openai)'* ]]
-[[ "$help" == *'all                         copy gh, Pi, Claude/bridge, MCP, Exa, and AWS auth'* ]]
+[[ "$help" == *'all                         copy gh, Pi, Claude/bridge, MCP, Exa, AWS, and Infisical auth'* ]]
+[[ "$help" == *'infisical                   copy the Infisical CLI login into the remote file vault'* ]]
 [[ "$help" == *'claude                      copy Claude Code OAuth used by pi-claude-bridge'* ]]
 [[ "$help" == *'aws                         copy AWS config and cached sessions to ~/.aws'* ]]
 
-print 'rauth OpenAI, full bundle, AWS and Claude Bridge auth copy tests passed'
+print 'rauth OpenAI, Infisical, full bundle, AWS and Claude Bridge auth copy tests passed'
