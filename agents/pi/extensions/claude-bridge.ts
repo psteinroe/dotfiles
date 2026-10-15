@@ -9,6 +9,8 @@ import {
   type ExtensionFactory,
 } from "@earendil-works/pi-coding-agent";
 import { registerClaudeBridgeLogin } from "./shared/claude-bridge-login.ts";
+import { prepareClaudeBridgeSource } from "./shared/claude-bridge-source.ts";
+import { createClaudeUsageWait } from "./shared/claude-usage-wait-extension.ts";
 
 const CLAUDE_BRIDGE_PROVIDER = "claude-bridge";
 const BRIDGE_ENTRY_PARTS = [
@@ -27,6 +29,7 @@ export function resolveManagedClaudeBridgeEntry(agentDir = getAgentDir()): strin
 export function guardClaudeBridgeProvider(
   pi: ExtensionAPI,
   summaryCwd: string,
+  wrapStream?: ReturnType<typeof createClaudeUsageWait>,
 ): ExtensionAPI {
   return new Proxy(pi, {
     get(target, property, receiver) {
@@ -40,7 +43,8 @@ export function guardClaudeBridgeProvider(
           && config
           && typeof config.streamSimple === "function"
         ) {
-          const streamSimple = config.streamSimple as (...args: any[]) => unknown;
+          const original = config.streamSimple as Parameters<ReturnType<typeof createClaudeUsageWait>>[0];
+          const streamSimple = wrapStream ? wrapStream(original) : original;
           config = {
             ...config,
             streamSimple: (...args: any[]) => {
@@ -48,7 +52,7 @@ export function guardClaudeBridgeProvider(
               if (options?.cacheRetention === "none") {
                 args[2] = { ...options, cwd: summaryCwd };
               }
-              return streamSimple(...args);
+              return streamSimple(args[0], args[1], args[2]);
             },
           };
         }
@@ -100,18 +104,25 @@ export default async function claudeBridgeProvider(pi: ExtensionAPI): Promise<vo
   // Keep a second empty cwd for one-off summaries: bridge 0.8.0 reloads its
   // config from options.cwd on that path instead of reusing providerSettings.
   const summaryCwd = mkdtempSync(path.join(tmpdir(), "pi-claude-bridge-summary-"));
+  let source: ReturnType<typeof prepareClaudeBridgeSource> | undefined;
   let initialized = false;
   try {
+    source = prepareClaudeBridgeSource(entryPath);
+    const wrapStream = createClaudeUsageWait(pi);
     pi.on("session_shutdown", () => {
+      source?.dispose();
       rmSync(summaryCwd, { recursive: true, force: true });
     });
     activateClaudeBridgeFactory(
-      guardClaudeBridgeProvider(pi, summaryCwd),
-      await loadClaudeBridgeFactory(entryPath),
+      guardClaudeBridgeProvider(pi, summaryCwd, wrapStream),
+      await loadClaudeBridgeFactory(source.entryPath),
     );
     registerClaudeBridgeLogin(pi, { agentDir: getAgentDir(), bridgeEntry: entryPath });
     initialized = true;
   } finally {
-    if (!initialized) rmSync(summaryCwd, { recursive: true, force: true });
+    if (!initialized) {
+      source?.dispose();
+      rmSync(summaryCwd, { recursive: true, force: true });
+    }
   }
 }
