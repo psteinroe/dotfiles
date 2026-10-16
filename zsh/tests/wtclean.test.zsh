@@ -14,7 +14,9 @@ fail() {
 
 make_fixture() {
   local fixture="$1"
-  mkdir -p "$fixture/seed" "$fixture/bin" "$fixture/home" "$fixture/session"
+  mkdir -p "$fixture/seed" "$fixture/bin" "$fixture/home/.local" "$fixture/session"
+  # Shared helpers prepend ~/.local/bin: keep every executable stub first.
+  ln -s "$fixture/bin" "$fixture/home/.local/bin"
   git -C "$fixture/seed" init -q
   git -C "$fixture/seed" config user.name Test
   git -C "$fixture/seed" config user.email test@example.com
@@ -292,6 +294,155 @@ done
 [[ ! -d "$stale_fixture/repo.git/stale-dirty" ]] || fail "stale dirty integrated worktree was not removed"
 [[ -d "$stale_fixture/repo.git/recent-dirty" ]] || fail "recent dirty integrated worktree was removed"
 grep -q 'stale local changes' "$stale_fixture/output" || fail "stale dirty candidate was not labeled"
+
+# Safety checks must fail before Git can partially delete/unregister a checkout.
+run_safety_cleanup() {
+  local fixture="$1"
+  printf 'y\n' | env \
+    HOME="$fixture/home" PATH="$fixture/bin:$PATH" \
+    RDEV_DOTFILES="$repo_root" HERDR_SOCKET_PATH="$fixture/session/herdr.sock" \
+    HERDR_TRACE="$fixture/herdr.trace" \
+    WTCLEAN_CONFIRM_ACTION="${WTCLEAN_CONFIRM_ACTION:-}" \
+    WTCLEAN_TEST_MISSING_HERDR="${WTCLEAN_TEST_MISSING_HERDR:-0}" \
+    zsh -c '
+      command() {
+        if [[ "$*" == "-v herdr" && "$WTCLEAN_TEST_MISSING_HERDR" == 1 ]]; then
+          print "missing herdr cli" >> "$HERDR_TRACE"
+          return 1
+        fi
+        builtin command "$@"
+      }
+      read() {
+        if [[ "$1" == response && -n "$WTCLEAN_CONFIRM_ACTION" ]]; then
+          eval "$WTCLEAN_CONFIRM_ACTION"
+        fi
+        builtin read "$@"
+      }
+      cd "$1" && source "$2/zsh/functions/wtclean"
+    ' zsh "$fixture/repo.git/main" "$repo_root" > "$fixture/output" 2>&1
+}
+
+permission_fixture="$test_root/permission"
+make_fixture "$permission_fixture"
+mkdir -p "$permission_fixture/repo.git/a/supabase/generated"
+print protected > "$permission_fixture/repo.git/a/supabase/generated/file.sql"
+print '/supabase/' >> "$permission_fixture/repo.git/info/exclude"
+chmod a-w "$permission_fixture/repo.git/a/supabase/generated"
+: > "$permission_fixture/herdr.trace"
+set +e
+run_safety_cleanup "$permission_fixture"
+permission_status=$?
+set -e
+if (( EUID != 0 )); then
+  [[ "$permission_status" -ne 0 ]] || fail "permission blocker returned success"
+  [[ -f "$permission_fixture/repo.git/a/.git" ]] || fail "permission failure destroyed .git"
+  [[ -f "$permission_fixture/repo.git/a/supabase/generated/file.sql" ]] || fail "permission failure removed local files"
+  git --git-dir="$permission_fixture/repo.git" worktree list --porcelain | grep -Fq "$permission_fixture/repo.git/a" \
+    || fail "permission failure unregistered the worktree"
+  ! grep -q '^workspace close ws-a$' "$permission_fixture/herdr.trace" || fail "permission blocker closed its workspace"
+fi
+chmod u+w "$permission_fixture/repo.git/a/supabase/generated" 2>/dev/null || true
+
+status_fixture="$test_root/status-error"
+make_fixture "$status_fixture"
+real_git=$(command -v git)
+printf '#!/bin/sh\ncase "$*" in *" status --porcelain=v1"*) printf "status failure\\n" >> "$HERDR_TRACE"; exit 1;; esac\nexec %q "$@"\n' "$real_git" > "$status_fixture/bin/git"
+chmod +x "$status_fixture/bin/git"
+: > "$status_fixture/herdr.trace"
+if run_safety_cleanup "$status_fixture"; then fail "failed Git status returned success"; fi
+grep -q '^status failure$' "$status_fixture/herdr.trace" || fail "Git status failure stub was bypassed"
+[[ -f "$status_fixture/repo.git/a/.git" ]] || fail "failed Git status was treated as clean"
+
+live_dirty_fixture="$test_root/live-dirty"
+make_fixture "$live_dirty_fixture"
+print pending >> "$live_dirty_fixture/repo.git/a/file"
+python3 - "$live_dirty_fixture/repo.git/a/file" "$live_dirty_fixture/session/session.json" <<'PY'
+import json, os, sys, time
+os.utime(sys.argv[1], (time.time() - 8 * 86400,) * 2)
+with open(sys.argv[2]) as f:
+    data = json.load(f)
+data['workspaces'][1]['id'] = 'ws-working'
+with open(sys.argv[2], 'w') as f:
+    json.dump(data, f)
+PY
+: > "$live_dirty_fixture/herdr.trace"
+run_safety_cleanup "$live_dirty_fixture" || true
+[[ -f "$live_dirty_fixture/repo.git/a/.git" ]] || fail "stale-dirty checkout bypassed live-agent protection"
+
+unknown_fixture="$test_root/unknown-agent"
+make_fixture "$unknown_fixture"
+mv "$unknown_fixture/bin/herdr" "$unknown_fixture/bin/herdr-real"
+printf '#!/bin/sh\ncase "$1 $2" in "pane list") exit 1;; esac\nexec %q "$@"\n' "$unknown_fixture/bin/herdr-real" > "$unknown_fixture/bin/herdr"
+chmod +x "$unknown_fixture/bin/herdr"
+: > "$unknown_fixture/herdr.trace"
+run_safety_cleanup "$unknown_fixture" || true
+[[ -f "$unknown_fixture/repo.git/a/.git" ]] || fail "failed agent lookup was treated as absent"
+
+changed_fixture="$test_root/changed-after-confirmation"
+make_fixture "$changed_fixture"
+: > "$changed_fixture/herdr.trace"
+WTCLEAN_CONFIRM_ACTION="print new-work >> ${(q)changed_fixture}/repo.git/a/file" run_safety_cleanup "$changed_fixture" || true
+[[ -f "$changed_fixture/repo.git/a/.git" ]] || fail "clean candidate changed while confirming was force-deleted"
+
+switched_fixture="$test_root/switched-after-confirmation"
+make_fixture "$switched_fixture"
+: > "$switched_fixture/herdr.trace"
+WTCLEAN_CONFIRM_ACTION="git -C ${(q)switched_fixture}/repo.git/a branch -m trunk" run_safety_cleanup "$switched_fixture" || true
+[[ -f "$switched_fixture/repo.git/a/.git" ]] || fail "candidate switched to a protected branch was deleted"
+
+new_tip_fixture="$test_root/merged-pr-new-tip"
+make_fixture "$new_tip_fixture"
+git -C "$new_tip_fixture/repo.git/a" config user.name Test
+git -C "$new_tip_fixture/repo.git/a" config user.email test@example.com
+print unpushed >> "$new_tip_fixture/repo.git/a/file"
+git -C "$new_tip_fixture/repo.git/a" commit -qam 'new work after merged PR'
+: > "$new_tip_fixture/herdr.trace"
+run_safety_cleanup "$new_tip_fixture" || true
+[[ -f "$new_tip_fixture/repo.git/a/.git" ]] || fail "old merged PR incorrectly proved integration of new local tip"
+
+missing_cli_fixture="$test_root/missing-herdr"
+make_fixture "$missing_cli_fixture"
+: > "$missing_cli_fixture/herdr.trace"
+if WTCLEAN_TEST_MISSING_HERDR=1 run_safety_cleanup "$missing_cli_fixture"; then
+  fail "missing Herdr CLI returned success"
+fi
+grep -q '^missing herdr cli$' "$missing_cli_fixture/herdr.trace" || fail "missing CLI guard was not exercised"
+[[ -f "$missing_cli_fixture/repo.git/a/.git" ]] || fail "missing Herdr CLI was treated as verified absence"
+
+make_stale_safety_fixture() {
+  make_fixture "$1"
+  print pending >> "$1/repo.git/a/file"
+  python3 - "$1/repo.git/a/file" <<'PY'
+import os, sys, time
+os.utime(sys.argv[1], (time.time() - 8 * 86400,) * 2)
+PY
+  : > "$1/herdr.trace"
+}
+
+copied_fixture="$test_root/copied-old-work"
+make_stale_safety_fixture "$copied_fixture"
+if WTCLEAN_CONFIRM_ACTION="cp -p ${(q)copied_fixture}/repo.git/a/file ${(q)copied_fixture}/repo.git/a/new-old-file" run_safety_cleanup "$copied_fixture"; then
+  fail "new backdated work returned success"
+fi
+[[ -f "$copied_fixture/repo.git/a/new-old-file" ]] || fail "newly copied old file was deleted"
+[[ -f "$copied_fixture/repo.git/a/.git" ]] || fail "new backdated work was not protected"
+
+preserved_fixture="$test_root/preserved-mtime"
+make_stale_safety_fixture "$preserved_fixture"
+if WTCLEAN_CONFIRM_ACTION="cp -p ${(q)preserved_fixture}/repo.git/a/file ${(q)preserved_fixture}/reference; print changed >> ${(q)preserved_fixture}/repo.git/a/file; touch -r ${(q)preserved_fixture}/reference ${(q)preserved_fixture}/repo.git/a/file" run_safety_cleanup "$preserved_fixture"; then
+  fail "changed dirty contents returned success"
+fi
+[[ -f "$preserved_fixture/repo.git/a/.git" ]] || fail "changed contents with preserved mtime were deleted"
+
+fingerprint_fixture="$test_root/fingerprint-error"
+make_stale_safety_fixture "$fingerprint_fixture"
+printf '#!/bin/sh\ncase "$*" in *" diff --binary"*) if test -f %q; then printf "fingerprint failure\\n" >> "$HERDR_TRACE"; exit 1; fi;; esac\nexec %q "$@"\n' "$fingerprint_fixture/fail-inspection" "$real_git" > "$fingerprint_fixture/bin/git"
+chmod +x "$fingerprint_fixture/bin/git"
+if WTCLEAN_CONFIRM_ACTION="touch ${(q)fingerprint_fixture}/fail-inspection" run_safety_cleanup "$fingerprint_fixture"; then
+  fail "failed fingerprint inspection returned success"
+fi
+grep -q '^fingerprint failure$' "$fingerprint_fixture/herdr.trace" || fail "fingerprint failure stub was bypassed"
+[[ -f "$fingerprint_fixture/repo.git/a/.git" ]] || fail "failed fingerprint inspection allowed force removal"
 
 if (( failures > 0 )); then
   print -u2 -- "$failures wtclean Herdr cleanup test(s) failed"

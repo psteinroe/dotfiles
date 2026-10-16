@@ -221,6 +221,24 @@ wtcheckout 123
 wtclean
 ```
 
+`wtclean` / `rwtclean` **delete worktree directories**, including ignored files;
+use `htrimworkspaces` when you only want to close idle workspaces. Cleanup asks
+for confirmation, protects live agents, and skips candidates whose Git status,
+agent state, or filesystem permissions cannot be verified. It requires Python
+3.8+, Herdr, and jq for read-only preflight and agent checks, including ignored
+directories and nested mounts on Linux. Permission blockers require manual review: cleanup never runs
+`sudo`, `chown`, or `chmod` to bypass them. Existing unregistered leftovers are
+not force-deleted.
+
+Clean candidates are removed without `--force`. Stale local changes require
+explicit confirmation and must still be older than `WTCLEAN_STALE_DAYS` (default
+7) after confirmation. Branch, commit, dirty state, agent state, and filesystem
+permissions are rechecked before removal; stale-dirty contents are fingerprinted
+so preserved timestamps cannot conceal new work. These checks reduce risk but are not
+atomic: Git deletion can still partially fail if the filesystem or another
+process changes after preflight. Unrelated Herdr workspaces are not globally
+pruned, and tmux sessions are not killed by cleanup.
+
 Common local commands:
 
 | Command | Purpose |
