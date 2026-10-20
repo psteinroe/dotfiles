@@ -21,5 +21,14 @@
   },
   "projectSettingsFolded": true,
   "deviceOnboardingCompleted": true,
-  "defaultThreadEnvMode": "worktree"
+  "defaultThreadEnvMode": "worktree",
+  "providerInstances": {
+    "codex": {
+      "driver": "codex",
+      "enabled": true,
+      "config": {
+        "setupMode": "existing"
+      }
+    }
+  }
 }
