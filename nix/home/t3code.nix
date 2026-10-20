@@ -6,14 +6,14 @@
 }:
 
 let
-  t3codeVersion = "0.0.42";
+  t3codeVersion = "0.1.0";
   t3code = pkgs.stdenvNoCC.mkDerivation {
     pname = "t3code";
     version = t3codeVersion;
 
     src = pkgs.fetchurl {
       url = "https://github.com/pingdotgg/t3code/releases/download/v${t3codeVersion}/t3-${t3codeVersion}-linux-x64.tar.gz";
-      hash = "sha256-9QTpMe5EBr/nZ1QUfLDioPMA11xsUFoOF0oeefZc7qM=";
+      hash = "sha256-93A/8buPYkNYAFizzPLAKrti66S5keJrux2iL0tW2bE=";
     };
     sourceRoot = "t3-${t3codeVersion}-linux-x64";
 

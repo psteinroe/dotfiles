@@ -74,8 +74,10 @@ ssh -t rdev-hetzner 't3 pair --tailscale'
 
 Pairing tokens are never stored in Nix. Manage or revoke paired sessions under
 **Settings → Connections** or with `t3 auth --help`. Update the server only by
-changing the pinned Nix version; do not use `t3 update` or
-`t3 service install`. Before switching Home Manager, stop the service and make
+changing the pinned Nix version, with `scripts/update-t3code [tag]` (latest
+stable release by default); do not use `t3 update` or `t3 service install`.
+Server, desktop app, and mobile app must share a major version, so update the
+Mac app (`brew upgrade --cask --greedy t3-code`) and the phone at the same time. Before switching Home Manager, stop the service and make
 a versioned backup of `~/.t3`, then start it again after the switch. A Home
 Manager rollback restores the binary and unit, but a database-migrating
 downgrade also requires the matching state backup. Removing `~/.t3` is a full
