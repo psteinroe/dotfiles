@@ -37,6 +37,11 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    # Claude Code and Codex for T3 Code, which flags versions behind npm latest. Bumped on its own
+    # (`nix flake update llm-agents-providers`) so pi and herdr stay put; no nixpkgs follows, so
+    # outputs match cache.numtide.com instead of compiling Codex
+    llm-agents-providers.url = "github:numtide/llm-agents.nix";
+
     # Herdr/Neovim pane navigation plugin
     vim-herdr-navigation = {
       url = "github:paulbkim-dev/vim-herdr-navigation";
