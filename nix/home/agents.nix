@@ -19,6 +19,12 @@ let
   piSkillSources = map (skill: skill // { groupName = "pi"; }) (
     remoteSkills.shared ++ remoteSkills.pi
   );
+  # Called by the machine-wide actions in agents/t3/settings.json
+  t3RepoAction = pkgs.writeShellApplication {
+    name = "t3-repo-action";
+    runtimeInputs = [ pkgs.jq ];
+    text = builtins.readFile ../../agents/t3/t3-repo-action.sh;
+  };
   piSkillAssertions = map (skill: {
     assertion = builtins.pathExists skill.path && builtins.pathExists "${skill.path}/SKILL.md";
     message = "Remote ${skill.groupName} skill '${skill.name}' is missing or has no SKILL.md at ${skill.path}. Update nix/home/remote-skills.nix.";
@@ -26,6 +32,8 @@ let
 in
 {
   assertions = piSkillAssertions;
+
+  home.packages = [ t3RepoAction ];
 
   home.activation.agentConfigs = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
         remove_path() {

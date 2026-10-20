@@ -30,5 +30,23 @@
         "setupMode": "existing"
       }
     }
-  }
+  },
+  "defaultProjectScripts": [
+    {
+      "id": "repo-setup",
+      "name": "Repo setup",
+      "command": "t3-repo-action setup",
+      "icon": "configure",
+      "runOnWorktreeCreate": true,
+      "runOnSettle": false
+    },
+    {
+      "id": "repo-settle",
+      "name": "Repo settle",
+      "command": "t3-repo-action settle",
+      "icon": "configure",
+      "runOnWorktreeCreate": false,
+      "runOnSettle": true
+    }
+  ]
 }
