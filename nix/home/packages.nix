@@ -12,8 +12,8 @@ let
   tuicr = lib.attrByPath [ system "tuicr" ] null inputs.llm-agents.packages;
   herdr = lib.attrByPath [ system "herdr" ] null inputs.llm-agents.packages;
   # T3 Code's Claude and Codex providers run `claude` and `codex` from PATH
-  claudeCode = lib.attrByPath [ system "claude-code" ] null inputs.llm-agents-providers.packages;
-  codex = lib.attrByPath [ system "codex" ] null inputs.llm-agents-providers.packages;
+  claudeCode = lib.attrByPath [ system "claude-code" ] null inputs.llm-agents.packages;
+  codex = lib.attrByPath [ system "codex" ] null inputs.llm-agents.packages;
   # On PATH for non-interactive agent shells too, which never load direnv
   devenv = inputs.nixpkgs-devenv.legacyPackages.${system}.devenv;
   optionalPackage = pkg: lib.optional (pkg != null) pkg;
