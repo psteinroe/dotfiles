@@ -11,6 +11,8 @@ let
   piAgent = lib.attrByPath [ system "pi" ] null inputs.llm-agents.packages;
   tuicr = lib.attrByPath [ system "tuicr" ] null inputs.llm-agents.packages;
   herdr = lib.attrByPath [ system "herdr" ] null inputs.llm-agents.packages;
+  # On PATH for non-interactive agent shells too, which never load direnv
+  devenv = inputs.nixpkgs-devenv.legacyPackages.${system}.devenv;
   optionalPackage = pkg: lib.optional (pkg != null) pkg;
 
   # Keep pnpm's shebang pointed at the same runtime as the global Node install.
@@ -91,6 +93,7 @@ in
         yq-go
         postgresql
         just
+        devenv
         hugo
         presenterm
         cmake
