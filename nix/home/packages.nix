@@ -11,6 +11,8 @@ let
   piAgent = lib.attrByPath [ system "pi" ] null inputs.llm-agents.packages;
   tuicr = lib.attrByPath [ system "tuicr" ] null inputs.llm-agents.packages;
   herdr = lib.attrByPath [ system "herdr" ] null inputs.llm-agents.packages;
+  # T3 Code's Claude provider runs `claude` from PATH
+  claudeCode = lib.attrByPath [ system "claude-code" ] null inputs.llm-agents.packages;
   # On PATH for non-interactive agent shells too, which never load direnv
   devenv = inputs.nixpkgs-devenv.legacyPackages.${system}.devenv;
   optionalPackage = pkg: lib.optional (pkg != null) pkg;
@@ -148,6 +150,7 @@ in
       ++ lib.optional isLinux tmux
       ++ optionalPackage tuicr
       ++ optionalPackage herdr
+      ++ optionalPackage claudeCode
       ++ optionalPackage piAgent;
 
   }
