@@ -1,0 +1,13 @@
+{
+  "storageCleanup": {
+    "worktreeAfterDays": 8,
+    "worktreeSettledAfterDays": 8,
+    "worktreeOnMerge": true,
+    "worktreeOnDelete": true,
+    "worktreeUnchanged": true,
+    "browserArtifactsAfterDays": 8,
+    "logsAfterDays": 8
+  },
+  "enableProviderUpdateChecks": false,
+  "deviceOnboardingCompleted": true
+}

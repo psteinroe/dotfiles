@@ -1,5 +1,7 @@
 {
+  config,
   lib,
+  pkgs,
   inputs,
   dotfilesPath,
   isDarwin ? false,
@@ -120,6 +122,29 @@ in
         deploy_remote_skill_specs '${piSkillSpecs}' "$HOME/.pi/agent/skills"
         deploy_local_skill_dir "${agentsDir}/skills" "$HOME/.pi/agent/skills"
         deploy_local_skill_dir "${agentsDir}/pi/skills" "$HOME/.pi/agent/skills"
+
+        # T3 Code writes settings changed in its UI through the link, back into the checkout
+        mkdir -p "$HOME/.t3/userdata"
+        link_optional_path "${agentsDir}/t3/settings.json" "$HOME/.t3/userdata/settings.json"
+  '';
+
+  # Registers Pi's executor MCP server with Claude Code (user scope) and Codex, which run under
+  # T3 Code. Only adds a missing entry, so an existing one and its OAuth login stay untouched.
+  home.activation.agentMcpServers = lib.hm.dag.entryAfter [ "agentConfigs" "installPackages" ] ''
+    bin="${config.home.profileDirectory}/bin"
+    url=$(${pkgs.jq}/bin/jq -r '.mcpServers.executor.url // empty' "${agentsDir}/pi/mcp.json" 2>/dev/null)
+
+    if [ -n "$url" ]; then
+      if [ -x "$bin/claude" ] &&
+        ! ${pkgs.jq}/bin/jq -e '.mcpServers.executor' "$HOME/.claude.json" >/dev/null 2>&1; then
+        $DRY_RUN_CMD "$bin/claude" mcp add --scope user --transport http executor "$url"
+      fi
+
+      if [ -x "$bin/codex" ] &&
+        ! grep -q '^\[mcp_servers\.executor\]' "$HOME/.codex/config.toml" 2>/dev/null; then
+        $DRY_RUN_CMD "$bin/codex" mcp add executor --url "$url"
+      fi
+    fi
   '';
 
   home.activation.herdrPiIntegration = lib.hm.dag.entryAfter [ "agentConfigs" "installPackages" ] ''
