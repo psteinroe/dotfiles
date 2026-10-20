@@ -130,6 +130,7 @@ in
 
   # Registers Pi's executor MCP server with Claude Code (user scope) and Codex, which run under
   # T3 Code. Only adds a missing entry, so an existing one and its OAuth login stay untouched.
+  # Codex's entry is appended directly: `codex mcp add` starts a blocking OAuth login.
   home.activation.agentMcpServers = lib.hm.dag.entryAfter [ "agentConfigs" "installPackages" ] ''
     bin="${config.home.profileDirectory}/bin"
     url=$(${pkgs.jq}/bin/jq -r '.mcpServers.executor.url // empty' "${agentsDir}/pi/mcp.json" 2>/dev/null)
@@ -137,12 +138,15 @@ in
     if [ -n "$url" ]; then
       if [ -x "$bin/claude" ] &&
         ! ${pkgs.jq}/bin/jq -e '.mcpServers.executor' "$HOME/.claude.json" >/dev/null 2>&1; then
-        $DRY_RUN_CMD "$bin/claude" mcp add --scope user --transport http executor "$url"
+        $DRY_RUN_CMD "$bin/claude" mcp add --scope user --transport http executor "$url" ||
+          echo "warning: could not add the executor MCP server to Claude Code" >&2
       fi
 
-      if [ -x "$bin/codex" ] &&
-        ! grep -q '^\[mcp_servers\.executor\]' "$HOME/.codex/config.toml" 2>/dev/null; then
-        $DRY_RUN_CMD "$bin/codex" mcp add executor --url "$url"
+      if ! grep -q '^\[mcp_servers\.executor\]' "$HOME/.codex/config.toml" 2>/dev/null; then
+        $DRY_RUN_CMD mkdir -p "$HOME/.codex"
+        if [ -z "''${DRY_RUN:-}" ]; then
+          printf '\n[mcp_servers.executor]\nurl = "%s"\n' "$url" >>"$HOME/.codex/config.toml"
+        fi
       fi
     fi
   '';
