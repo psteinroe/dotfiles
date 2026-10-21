@@ -9,28 +9,6 @@
     "logsAfterDays": 8
   },
   "enableProviderUpdateChecks": false,
-  "defaultModelSelection": {
-    "instanceId": "claudeAgent",
-    "model": "claude-opus-5-5",
-    "options": [
-      {
-        "id": "effort",
-        "value": "high"
-      }
-    ]
-  },
-  "projectSettingsFolded": true,
-  "deviceOnboardingCompleted": true,
-  "defaultThreadEnvMode": "worktree",
-  "providerInstances": {
-    "codex": {
-      "driver": "codex",
-      "enabled": true,
-      "config": {
-        "setupMode": "existing"
-      }
-    }
-  },
   "defaultProjectScripts": [
     {
       "id": "repo-setup",
@@ -48,5 +26,32 @@
       "runOnWorktreeCreate": false,
       "runOnSettle": true
     }
-  ]
+  ],
+  "defaultModelSelection": {
+    "instanceId": "claudeAgent",
+    "model": "claude-opus-5-5",
+    "options": [
+      {
+        "id": "effort",
+        "value": "high"
+      }
+    ]
+  },
+  "projectSettingsFolded": true,
+  "enableDeviceSupport": true,
+  "deviceOnboardingCompleted": true,
+  "sidebarAutoSettleAfterDays": 5,
+  "snoozeLimitedThreads": true,
+  "autoResumeLimitedThreads": true,
+  "sidebarAutoSettleKeepPullRequests": true,
+  "defaultThreadEnvMode": "worktree",
+  "providerInstances": {
+    "codex": {
+      "driver": "codex",
+      "enabled": true,
+      "config": {
+        "setupMode": "existing"
+      }
+    }
+  }
 }
