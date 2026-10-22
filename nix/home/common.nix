@@ -22,12 +22,31 @@ let
     pkgs.stdenv.hostPlatform.system
     "herdr"
   ] null inputs.llm-agents.packages;
+
+  # One CA bundle for every nix-provided tool, independent of the OS store.
+  # The eMudhra intermediates compromised in October 2026 chain to these roots;
+  # drop the entries once nixpkgs' cacert distrusts them itself (NSS >= 3.131.1).
+  caBundle =
+    (pkgs.cacert.override {
+      blacklist = [
+        "emSign ECC Root CA - G3"
+        "Comodo AAA Services root"
+      ];
+    })
+    + "/etc/ssl/certs/ca-bundle.crt";
 in
 {
   home = {
     username = lib.mkForce username;
     homeDirectory = lib.mkForce resolvedHomeDirectory;
     stateVersion = "24.11";
+
+    sessionVariables = {
+      SSL_CERT_FILE = caBundle;
+      NIX_SSL_CERT_FILE = caBundle;
+      # Node trusts its bundled roots otherwise (fixed only in Node >= 24.22.1).
+      NODE_OPTIONS = "--use-openssl-ca";
+    };
 
     # Install Python tools via uv (runs only on rebuild, not every shell)
     activation.uvTools = lib.hm.dag.entryAfter [ "writeBoundary" ] ''

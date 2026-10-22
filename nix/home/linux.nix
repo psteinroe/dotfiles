@@ -158,6 +158,10 @@ in
         $DRY_RUN_CMD ${moshiHook}/bin/moshi-hook install >/dev/null
       '';
 
+  systemd.user.sessionVariables = {
+    inherit (config.home.sessionVariables) SSL_CERT_FILE NIX_SSL_CERT_FILE NODE_OPTIONS;
+  };
+
   systemd.user.services.moshi-hook = {
     Unit = {
       Description = "Moshi agent hook daemon";
