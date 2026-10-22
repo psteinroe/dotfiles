@@ -103,6 +103,7 @@ in
         ffmpeg
         imagemagick
         awscli2
+        azure-cli
         google-cloud-sdk
         infisical
         tailscale
