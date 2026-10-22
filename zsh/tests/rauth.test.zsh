@@ -9,6 +9,20 @@ remote_home="$fixture/remote-home"
 mkdir -p "$local_home/.aws/sso/cache" "$local_home/.claude" "$remote_home/.claude"
 print -r -- $'[default]\nregion = eu-central-1' > "$local_home/.aws/config"
 print -r -- '{"accessToken":"fixture-token"}' > "$local_home/.aws/sso/cache/fixture.json"
+mkdir -p "$local_home/.config/gcloud/configurations" "$local_home/.config/gcloud/logs" "$remote_home/.config/gcloud/logs"
+print -r -- fixture-credentials > "$local_home/.config/gcloud/credentials.db"
+print -r -- $'[core]\naccount = dev@example.com' > "$local_home/.config/gcloud/configurations/config_default"
+print -r -- local-log > "$local_home/.config/gcloud/logs/local.log"
+print -r -- True > "$local_home/.config/gcloud/gce"
+print -r -- remote-log > "$remote_home/.config/gcloud/logs/remote.log"
+print -r -- stale > "$remote_home/.config/gcloud/stale.db"
+mkdir -p "$local_home/.azure/logs" "$remote_home/.azure/logs"
+print -r -- '{"subscriptions":[{"id":"fixture-subscription"}]}' > "$local_home/.azure/azureProfile.json"
+print -r -- '{"AccessToken":{}}' > "$local_home/.azure/msal_token_cache.json"
+print -r -- local-session > "$local_home/.azure/az.sess"
+print -r -- local-log > "$local_home/.azure/logs/local.log"
+print -r -- remote-log > "$remote_home/.azure/logs/remote.log"
+print -r -- '[{"client_id":"stale"}]' > "$remote_home/.azure/service_principal_entries.json"
 print -r -- '{"claudeAiOauth":{"accessToken":"claude-access","refreshToken":"claude-refresh","expiresAt":123},"mcpOAuth":{"local-only":{}}}' > "$local_home/.claude/.credentials.json"
 print -r -- '{"claudeAiOauth":{"accessToken":"old","refreshToken":"old","stale":"remove-me","expiresAt":999},"mcpOAuth":{"remote-preserved":{}}}' > "$remote_home/.claude/.credentials.json"
 : > "$fixture/ssh-trace"
@@ -65,6 +79,39 @@ output=$(
 cmp "$local_home/.aws/config" "$remote_home/.aws/config"
 cmp "$local_home/.aws/sso/cache/fixture.json" "$remote_home/.aws/sso/cache/fixture.json"
 ! grep -q '^-t ' "$fixture/ssh-trace"
+
+gcloud_output=$(
+  HOME="$local_home" \
+    RDEV_REMOTE_USER="$USER" \
+    rauth --host fixture-host --home "$remote_home" gcloud
+)
+[[ "$gcloud_output" == *"Copied gcloud auth to fixture-host:$USER:$remote_home/.config/gcloud"* ]]
+cmp "$local_home/.config/gcloud/credentials.db" "$remote_home/.config/gcloud/credentials.db"
+cmp "$local_home/.config/gcloud/configurations/config_default" "$remote_home/.config/gcloud/configurations/config_default"
+[[ -f "$remote_home/.config/gcloud/logs/remote.log" ]]
+[[ ! -e "$remote_home/.config/gcloud/logs/local.log" ]]
+[[ ! -e "$remote_home/.config/gcloud/gce" ]]
+[[ ! -e "$remote_home/.config/gcloud/stale.db" ]]
+
+azure_output=$(
+  HOME="$local_home" \
+    RDEV_REMOTE_USER="$USER" \
+    rauth --host fixture-host --home "$remote_home" azure
+)
+[[ "$azure_output" == *"Copied Azure CLI auth to fixture-host:$USER:$remote_home/.azure"* ]]
+cmp "$local_home/.azure/azureProfile.json" "$remote_home/.azure/azureProfile.json"
+cmp "$local_home/.azure/msal_token_cache.json" "$remote_home/.azure/msal_token_cache.json"
+[[ ! -e "$remote_home/.azure/service_principal_entries.json" ]]
+[[ ! -e "$remote_home/.azure/az.sess" ]]
+[[ ! -e "$remote_home/.azure/logs/local.log" ]]
+[[ -f "$remote_home/.azure/logs/remote.log" ]]
+
+mkdir -p "$fixture/no-azure-home"
+if azure_missing=$(HOME="$fixture/no-azure-home" rauth --host fixture-host --home "$remote_home" azure 2>&1); then
+  print -u2 'rauth azure succeeded without a local login'
+  exit 1
+fi
+[[ "$azure_missing" == *'No Azure CLI login found'*'Run: az login'* ]]
 
 claude_output=$(
   HOME="$local_home" \
@@ -210,9 +257,11 @@ jq -e --slurpfile local "$local_home/.pi/agent/auth.json" '.openai == $local[0].
 
 help=$(rauth --help 2>&1)
 [[ "$help" == *'copy default Pi provider auth (default: openai)'* ]]
-[[ "$help" == *'all                         copy gh, Pi, Claude/bridge, MCP, Exa, AWS, and Infisical auth'* ]]
+[[ "$help" == *'all                         copy gh, Pi, Claude/bridge, MCP, Exa, AWS, gcloud, Azure, and Infisical auth'* ]]
+[[ "$help" == *'azure, az                   copy the Azure CLI login and subscriptions to ~/.azure'* ]]
+[[ "$help" == *'gcloud                      copy Google Cloud CLI logins and configurations to ~/.config/gcloud'* ]]
 [[ "$help" == *'infisical                   copy the Infisical CLI login into the remote file vault'* ]]
 [[ "$help" == *'claude                      copy Claude Code OAuth used by pi-claude-bridge'* ]]
 [[ "$help" == *'aws                         copy AWS config and cached sessions to ~/.aws'* ]]
 
-print 'rauth OpenAI, Infisical, full bundle, AWS and Claude Bridge auth copy tests passed'
+print 'rauth OpenAI, Infisical, full bundle, AWS, gcloud, Azure and Claude Bridge auth copy tests passed'

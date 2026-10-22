@@ -1,5 +1,5 @@
 # Copy local development auth credentials to a remote machine.
-# Usage: rauth [--host host] [--user user] [--home home] [all|gh[:host]|pi[:provider[,provider]|all]|claude|mcp[:all|server[,server]]|exa|aws|infisical|codex]...
+# Usage: rauth [--host host] [--user user] [--home home] [all|gh[:host]|pi[:provider[,provider]|all]|claude|mcp[:all|server[,server]]|exa|aws|gcloud|azure|infisical|codex]...
 # Defaults to: rauth all
 
 _rauth_usage() {
@@ -7,7 +7,8 @@ _rauth_usage() {
 Usage: rauth [--host host] [--user user] [--home home] [spec ...]
 
 Specs:
-  all                         copy gh, Pi, Claude/bridge, MCP, Exa, AWS, and Infisical auth
+  all                         copy gh, Pi, Claude/bridge, MCP, Exa, AWS, gcloud, Azure, and Infisical auth
+                              (Azure is skipped without a local az login)
   gh[:github-host]            copy GitHub CLI auth (default: github.com)
   pi                          copy default Pi provider auth (default: openai)
   pi:provider[,provider...]   copy selected Pi providers from ~/.pi/agent/auth.json
@@ -19,6 +20,8 @@ Specs:
   mcp:server[,server...]      copy selected MCP servers, e.g. mcp:executor
   exa                         copy Exa API key to ~/.config/exa/api_key
   aws                         copy AWS config and cached sessions to ~/.aws
+  gcloud                      copy Google Cloud CLI logins and configurations to ~/.config/gcloud
+  azure, az                   copy the Azure CLI login and subscriptions to ~/.azure
   infisical                   copy the Infisical CLI login into the remote file vault
 
 Options:
@@ -385,6 +388,85 @@ find "$HOME/.aws" -type f -exec chmod 600 {} +
   print -r -- "Copied AWS auth to $host:$remote_user:$remote_home/.aws"
 }
 
+# Machine-specific state stays behind: the remote keeps its own logs, and gce caches whether
+# the machine itself runs on Google Compute Engine.
+_rauth_copy_gcloud() {
+  local local_gcloud_dir="${CLOUDSDK_CONFIG:-$HOME/.config/gcloud}"
+  [[ -d "$local_gcloud_dir" ]] || { echo "gcloud config directory not found: $local_gcloud_dir. Run: gcloud auth login" >&2; return 1; }
+
+  local remote_cmd='set -euo pipefail
+umask 077
+tmp=$(mktemp -d)
+trap '\''rm -rf "$tmp"'\'' EXIT
+tar -xzf - -C "$tmp"
+if [ ! -f "$tmp/credentials.db" ] && [ ! -d "$tmp/configurations" ]; then
+  echo "Archive did not contain gcloud credentials or configurations" >&2
+  exit 1
+fi
+gcloud_dir="$HOME/.config/gcloud"
+mkdir -p "$gcloud_dir"
+find "$gcloud_dir" -mindepth 1 -maxdepth 1 ! -name logs -exec rm -rf {} +
+cp -R "$tmp/." "$gcloud_dir/"
+chmod -R go-rwx "$gcloud_dir"
+'
+  local runner
+  runner=$(_rauth_runner "$remote_cmd") || return
+  COPYFILE_DISABLE=1 tar --no-xattrs -czf - -C "$local_gcloud_dir" \
+    --exclude ./logs --exclude ./gce --exclude ./virtenv --exclude ./.last_survey_prompt.yaml . \
+    | ssh "$host" "$runner" || return
+  print -r -- "Copied gcloud auth to $host:$remote_user:$remote_home/.config/gcloud"
+}
+
+# Only the login state: az's caches, indexes, logs and installed extensions stay per machine.
+_rauth_azure_dir() {
+  print -r -- "${AZURE_CONFIG_DIR:-$HOME/.azure}"
+}
+
+_rauth_has_azure_login() {
+  local dir
+  dir=$(_rauth_azure_dir)
+  [[ -s "$dir/azureProfile.json" && -s "$dir/msal_token_cache.json" ]]
+}
+
+_rauth_copy_azure() {
+  local local_azure_dir
+  local_azure_dir=$(_rauth_azure_dir)
+  _rauth_has_azure_login || { echo "No Azure CLI login found in $local_azure_dir. Run: az login" >&2; return 1; }
+
+  local -a files
+  local file
+  files=()
+  for file in azureProfile.json msal_token_cache.json service_principal_entries.json clouds.config config; do
+    [[ -f "$local_azure_dir/$file" ]] && files+=("$file")
+  done
+
+  # Login files the local machine lacks are removed too, so no stale remote login survives.
+  local remote_cmd='set -euo pipefail
+umask 077
+tmp=$(mktemp -d)
+trap '\''rm -rf "$tmp"'\'' EXIT
+tar -xzf - -C "$tmp"
+if [ ! -s "$tmp/azureProfile.json" ] || [ ! -s "$tmp/msal_token_cache.json" ]; then
+  echo "Archive did not contain an Azure CLI login" >&2
+  exit 1
+fi
+azure_dir="$HOME/.azure"
+mkdir -p "$azure_dir"
+chmod 700 "$azure_dir"
+for file in azureProfile.json msal_token_cache.json service_principal_entries.json clouds.config config; do
+  rm -f "$azure_dir/$file"
+  if [ -f "$tmp/$file" ]; then
+    cp "$tmp/$file" "$azure_dir/$file"
+    chmod 600 "$azure_dir/$file"
+  fi
+done
+'
+  local runner
+  runner=$(_rauth_runner "$remote_cmd") || return
+  COPYFILE_DISABLE=1 tar --no-xattrs -czf - -C "$local_azure_dir" "${files[@]}" | ssh "$host" "$runner" || return
+  print -r -- "Copied Azure CLI auth to $host:$remote_user:$remote_home/.azure"
+}
+
 # Infisical on macOS keeps its login in the Keychain via go-keyring; the
 # headless remote uses the CLI's encrypted file vault (~/infisical-keyring).
 _rauth_read_infisical_payload() {
@@ -504,6 +586,12 @@ for spec in "${specs[@]}"; do
       _rauth_copy_mcp all || return
       _rauth_copy_exa || return
       _rauth_copy_aws || return
+      _rauth_copy_gcloud || return
+      if _rauth_has_azure_login; then
+        _rauth_copy_azure || return
+      else
+        print -r -- "Skipped Azure CLI auth: no local login in $(_rauth_azure_dir) (run az login)"
+      fi
       _rauth_copy_infisical || return
       ;;
     gh|github)
@@ -541,6 +629,12 @@ for spec in "${specs[@]}"; do
       ;;
     aws)
       _rauth_copy_aws || return
+      ;;
+    gcloud)
+      _rauth_copy_gcloud || return
+      ;;
+    azure|az)
+      _rauth_copy_azure || return
       ;;
     infisical)
       _rauth_copy_infisical || return
