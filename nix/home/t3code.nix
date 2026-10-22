@@ -73,6 +73,8 @@ let
     operations-platform = "https://github.com/getmateo/operations-platform.git";
     fabrial = "https://github.com/psteinroe/fabrial.git";
     postgres-stream = "https://github.com/psteinroe/postgres-stream.git";
+    ce-platform = "https://github.com/getmateo/ce-platform.git";
+    ninjascale = "https://github.com/psteinroe/ninjascale.git";
   };
   t3ProjectsDir = "${homeDirectory}/Developer/t3";
 
