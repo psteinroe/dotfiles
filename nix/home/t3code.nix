@@ -1,4 +1,5 @@
 {
+  config,
   lib,
   pkgs,
   homeDirectory,
@@ -109,7 +110,9 @@ in
 
         if [ ! -d "$path/.git" ]; then
           $DRY_RUN_CMD mkdir -p "${t3ProjectsDir}"
-          if ! $DRY_RUN_CMD ${pkgs.git}/bin/git clone --quiet --recurse-submodules "$url" "$path"; then
+          # Git's credential helper runs `gh`, which activation's PATH lacks
+          if ! PATH="${config.home.profileDirectory}/bin:$PATH" \
+            $DRY_RUN_CMD ${pkgs.git}/bin/git clone --quiet --recurse-submodules "$url" "$path"; then
             echo "warning: could not clone $url for T3 Code" >&2
             return 0
           fi
