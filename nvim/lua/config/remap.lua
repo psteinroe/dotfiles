@@ -27,8 +27,6 @@ vim.keymap.set("i", "<C-c>", "<Esc>")
 
 -- never press capital q
 vim.keymap.set("n", "Q", "<nop>")
--- ctrl f to switch projects, ctrl a + L to go back
-vim.keymap.set("n", "<C-f>", "<cmd>silent !tmux new tmux-sessionizer<CR>")
 
 -- quick fix navigation
 -- vim.keymap.set("n", "<C-k>", "<cmd>cnext<CR>zz")
@@ -61,9 +59,11 @@ vim.keymap.set("n", "YY", "va{Vy")
 vim.keymap.set("n", "gu", "<cmd>diffget //2<cr>")
 vim.keymap.set("n", "gh", "<cmd>diffget //3<cr>")
 
--- Pane navigation is owned by paulbkim-dev/vim-herdr-navigation.
--- It preserves normal Neovim window movement outside Herdr/tmux and crosses
--- Herdr pane edges when $HERDR_PANE_ID is present.
+-- window navigation
+vim.keymap.set("n", "<C-h>", "<C-w>h")
+vim.keymap.set("n", "<C-j>", "<C-w>j")
+vim.keymap.set("n", "<C-k>", "<C-w>k")
+vim.keymap.set("n", "<C-l>", "<C-w>l")
 
 local function open_latest_migration()
   local path = "supabase/migrations/"

@@ -1,4 +1,0 @@
-# List git worktrees with fzf search, cd into selected worktree
-local selected
-selected=$(wtselect) || return 0
-cd "$selected"

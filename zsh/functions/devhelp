@@ -1,9 +1,9 @@
 # List dotfiles helper commands and what they do.
-# Usage: devhelp [remote|worktree|auth|all]
+# Usage: devhelp [remote|git|auth|all]
 local topic="${1:-all}"
 
 if [[ $# -gt 1 ]]; then
-  echo "Usage: devhelp [remote|worktree|auth|all]" >&2
+  echo "Usage: devhelp [remote|git|auth|all]" >&2
   return 1
 fi
 
@@ -16,68 +16,34 @@ _case_row() {
 }
 
 case "$topic" in
-  all|remote|worktree|auth) ;;
+  all|remote|git|auth) ;;
   *)
     echo "Unknown devhelp topic: $topic" >&2
-    echo "Usage: devhelp [remote|worktree|auth|all]" >&2
+    echo "Usage: devhelp [remote|git|auth|all]" >&2
     return 1
     ;;
 esac
 
-if [[ "$topic" == all || "$topic" == remote || "$topic" == worktree ]]; then
-  _case_header "Project shortcuts"
-  _case_row "hellomateo / rhellomateo" "open local; prepare/register remote Herdr session"
-  _case_row "hops / rhops" "operations-platform local/remote session"
-  _case_row "ceplatform / rceplatform" "ce-platform local/remote session"
-  _case_row "radiomarl / rradiomarl" "radio-marl-app local/remote session"
-  _case_row "ninjascale / rninjascale" "ninjascale local/remote session"
-  _case_row "dotfiles / rdotfiles" "open local; prepare/register remote Herdr session"
-  _case_row "sbch / rsbch" "supabase-cache-helpers local/remote session"
-  _case_row "pgls / rpgls" "postgres-language-server local/remote session"
-  _case_row "pgconductor / rpgconductor" "postgres-conductor local/remote session"
-  _case_row "pgstream / rpgstream" "psteinroe/postgres-stream local/remote session"
-  _case_row "hpgstream / rhpgstream" "getmateo/postgres-stream local/remote session"
-  _case_row "toolshed / rtoolshed" "toolshed local/remote session"
-  [[ "$topic" == all ]] && print
-
-  _case_header "Local / remote pairs"
-  _case_row "rebuild / rrebuild [host]" "rebuild and safely reload idle Pi agents"
-  _case_row "pireload" "reload resources in currently idle Herdr Pi agents"
-  _case_row "Herdr remote model" "one local client; one saved profile per remote named session"
-  _case_row "hdev / rdev <repo> [branch|pr]" "open locally; prepare/register remotely and return"
-  _case_row "wtclean / rwtclean <repo>" "clean integrated/stale worktrees"
-  _case_row "wtforceclean / rwtforceclean <repo>" "select and force-remove worktrees"
-  _case_row "hwtcreate / rhwtcreate" "ensure requested worktree and focus/open its workspace"
-  _case_row "htrimworkspaces" "preview/confirm, or --auto close only strictly safe idle siblings"
-  _case_row "hsyncworktrees / rhsyncworktrees" "manual expose-all escape hatch; remote startup uses rdev without a second TUI"
-  [[ "$topic" == all ]] && print
-fi
-
-if [[ "$topic" == all || "$topic" == worktree ]]; then
-  _case_header "Local worktree commands"
-  _case_row "wtclone <url> [name]" "bare clone into worktree layout"
-  _case_row "wtcreate <branch>" "create a new worktree branch"
-  _case_row "wtcheckout <branch|pr>" "checkout an existing branch or PR into a worktree"
-  _case_row "wtlist" "list/select existing worktrees"
-  _case_row "wtensure <branch|pr>" "upsert worktree and cd into it"
-  _case_row "Agent-first policy" "navigation starts collapsed; opening auto-cleans safe shell-idle siblings"
-  _case_row "htrimworkspaces [--apply|--auto]" "preview/confirm, or auto-close strictly safe shell-idle siblings (Git stays)"
-  [[ "$topic" == all ]] && print
-fi
-
 if [[ "$topic" == all || "$topic" == remote ]]; then
-  _case_header "Remote-only helpers"
-  _case_row "rauth [all|gh|pi|claude|mcp|exa|aws|infisical]" "copy GitHub/Pi/Claude Bridge/MCP/Exa/AWS/Infisical auth to the remote"
+  _case_header "Machines"
+  _case_row "rebuild [-u]" "rebuild this machine (-u updates flake inputs first)"
+  _case_row "rrebuild [host]" "force-sync dotfiles on the remote and rebuild it"
   _case_row "rssh [dir]" "open a plain remote psteinroe shell"
-  _case_row "rpushdev [repo] [msg]" "commit/push, then prepare/register with rdev and return"
-  _case_row "rherdr <repo> [branch|pr]" "direct remote recovery/Moshi attach (explicit TUI)"
   _case_row "ssh rdev-exe" "recovery path via exe.dev gateway"
   [[ "$topic" == all ]] && print
 fi
 
+if [[ "$topic" == all || "$topic" == git ]]; then
+  _case_header "Git"
+  _case_row "gpr [-a] [-n] [-e] [-d]" "commit, push and open a PR with a generated title/body"
+  _case_row "gclean" "delete local branches merged into the default branch"
+  _case_row "greset" "check out the default branch, pull, and gclean"
+  [[ "$topic" == all ]] && print
+fi
+
 if [[ "$topic" == all || "$topic" == auth ]]; then
-  _case_header "Auth/helper utilities"
+  _case_header "Auth"
+  _case_row "rauth [spec...]" "copy local auth (gh, Pi, Claude, MCP, Exa, AWS, gcloud, Azure, Infisical) to the remote"
   _case_row "gh" "wrap gh to auto-use exe.dev integration hosts from origin"
-  _case_row "rauth [spec...]" "copy local auth bundle to the remote"
   _case_row "devhelp [topic]" "show this command reference"
 fi

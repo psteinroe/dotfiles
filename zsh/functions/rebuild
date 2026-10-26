@@ -24,20 +24,10 @@ case "$(uname -s)" in
     '
     ;;
   Linux)
-    if [[ -e /etc/NIXOS ]]; then
-      local nixos_flake_attr="${NIXOS_FLAKE_ATTR:-hetzner-dev}"
-      sudo nixos-rebuild switch --flake "$dotfiles#$nixos_flake_attr"
-    else
-      home-manager switch --flake "$dotfiles#psteinroe@linux-x86_64"
-    fi
+    home-manager switch --flake "$dotfiles#psteinroe@linux-x86_64"
     ;;
   *)
     echo "Unsupported platform: $(uname -s)" >&2
     return 1
     ;;
 esac
-
-if [[ -r "$dotfiles/zsh/functions/pireload" ]] && command -v herdr >/dev/null 2>&1; then
-  echo "Reloading idle Pi agents..."
-  (set --; source "$dotfiles/zsh/functions/pireload") || echo "Warning: safe Pi reload failed." >&2
-fi
