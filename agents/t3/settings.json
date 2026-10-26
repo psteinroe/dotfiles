@@ -53,11 +53,6 @@
         "setupMode": "existing"
       }
     },
-    "claudeAgent_2": {
-      "driver": "claudeAgent",
-      "displayName": "Claude",
-      "enabled": true
-    },
     "claudePersonal": {
       "driver": "claudeAgent",
       "displayName": "Claude Personal",
