@@ -49,6 +49,25 @@ Shared configuration:
   the `runOnWorktreeCreate` / `runOnSettle` scripts in a repo's checked-in
   `t3.json`.
 
+### Claude accounts
+
+`agents/claude/accounts.json` lists the Claude Code accounts: `work` uses the
+default `~/.claude`, `personal` uses `~/.claude-personal` via
+`CLAUDE_CONFIG_DIR`. Each account keeps its own login, settings, history, and
+MCP servers; each switch registers executor in every account. T3 Code has one
+Claude instance per account (Claude Work, Claude Personal).
+
+Logins stay per machine; they are not copied, because machines sharing one
+refresh token log each other out:
+
+```bash
+claude-login                                 # this machine; skips logged-in accounts
+claude-login --host rdev                     # the remote, over ssh -t
+claude-login --host psteinroe@devbox-psteinroe personal
+claude-accounts --host rdev                  # who is logged in where
+claude-personal                              # Claude Code as the personal account
+```
+
 ### Remote server
 
 Linux Home Manager owns the pinned T3 Code package and its `systemd --user`

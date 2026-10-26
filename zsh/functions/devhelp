@@ -44,6 +44,9 @@ fi
 if [[ "$topic" == all || "$topic" == auth ]]; then
   _case_header "Auth"
   _case_row "rauth [spec...]" "copy local auth (gh, Pi, Claude, MCP, Exa, AWS, gcloud, Azure, Infisical) to the remote"
+  _case_row "claude-login [--host h] [acct...]" "log in to the Claude accounts here or on a remote (skips logged-in ones)"
+  _case_row "claude-accounts [--host h]" "show which Claude accounts are logged in"
+  _case_row "claude-<account>" "run Claude Code as that account, e.g. claude-personal"
   _case_row "gh" "wrap gh to auto-use exe.dev integration hosts from origin"
   _case_row "devhelp [topic]" "show this command reference"
 fi

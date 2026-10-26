@@ -1,0 +1,22 @@
+# Show which Claude Code accounts are logged in, here or on a remote.
+# Usage: claude-accounts [--host host] [account...]
+local host=""
+local -a accounts
+while (( $# )); do
+  case "$1" in
+    --host) host="${2:?--host needs a host}"; shift 2 ;;
+    -h|--help) echo "Usage: claude-accounts [--host host] [account...]"; return 0 ;;
+    *) accounts+=("$1"); shift ;;
+  esac
+done
+
+local dotfiles="${DOTFILES_DIR:-$HOME/Developer/dotfiles}"
+source "$dotfiles/zsh/functions/_claude_accounts" 2>/dev/null || true
+local script
+script=$(_claude_accounts_script "claude auth status --text" "${accounts[@]}") || return
+
+if [[ -n "$host" ]]; then
+  ssh "$host" "exec \"\$SHELL\" -lc ${(qq)script}"
+else
+  sh -c "$script"
+fi

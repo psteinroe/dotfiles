@@ -1,0 +1,32 @@
+# Shared by claude-login and claude-accounts. Source, then call:
+#   _claude_accounts_script <command> [account...]
+# It prints one shell snippet per account in agents/claude/accounts.json that runs
+# <command> with that account's CLAUDE_CONFIG_DIR.
+_claude_accounts_script() {
+  local accounts_file="${DOTFILES_DIR:-$HOME/Developer/dotfiles}/agents/claude/accounts.json"
+  local command="$1"
+  shift
+  command -v jq >/dev/null 2>&1 || { echo "claude accounts need jq" >&2; return 1; }
+  [[ -r "$accounts_file" ]] || { echo "No account list at $accounts_file" >&2; return 1; }
+
+  local -a names
+  if (( $# )); then
+    names=("$@")
+  else
+    names=(${(f)"$(jq -r 'keys_unsorted[]' "$accounts_file")"})
+  fi
+
+  local name dir env_prefix
+  for name in "${names[@]}"; do
+    dir=$(jq -r --arg name "$name" '.[$name] // empty' "$accounts_file")
+    if [[ -z "$dir" ]]; then
+      echo "Unknown Claude account: $name (known: $(jq -r 'keys_unsorted | join(", ")' "$accounts_file"))" >&2
+      return 1
+    fi
+    # The default account runs without CLAUDE_CONFIG_DIR: setting it, even to
+    # ~/.claude, selects a different macOS Keychain entry.
+    env_prefix=""
+    [[ "$dir" == "~/.claude" ]] || env_prefix="CLAUDE_CONFIG_DIR=\"\$HOME/${dir#\~/}\" "
+    print -r -- "echo \"== $name ($dir)\"; ${env_prefix}${command}"
+  done
+}

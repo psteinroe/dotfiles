@@ -52,6 +52,19 @@
       "config": {
         "setupMode": "existing"
       }
+    },
+    "claudeAgent": {
+      "driver": "claudeAgent",
+      "displayName": "Claude Work",
+      "enabled": true
+    },
+    "claudePersonal": {
+      "driver": "claudeAgent",
+      "displayName": "Claude Personal",
+      "enabled": true,
+      "config": {
+        "homePath": "~/.claude-personal"
+      }
     }
   }
 }

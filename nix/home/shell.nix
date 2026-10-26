@@ -1,6 +1,12 @@
-{ pkgs, dotfilesPath, ... }:
+{
+  lib,
+  pkgs,
+  dotfilesPath,
+  ...
+}:
 
 let
+  claudeAccounts = import ./claude-accounts.nix { inherit lib; };
   starshipZshInit = pkgs.runCommand "starship-init.zsh" { } ''
     ${pkgs.starship}/bin/starship init zsh > $out
   '';
@@ -64,6 +70,13 @@ in
       autoload -Uz rssh
       autoload -Uz rrebuild
       autoload -Uz rauth
+      autoload -Uz claude-login
+      autoload -Uz claude-accounts
+
+      # One command per extra Claude Code account, e.g. claude-personal
+      ${lib.concatMapStrings (account: ''
+        alias claude-${account.name}='CLAUDE_CONFIG_DIR="$HOME/${account.dir}" claude'
+      '') claudeAccounts}
 
       if [[ $TERM != "dumb" ]]; then
         source ${starshipZshInit}

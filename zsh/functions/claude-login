@@ -1,0 +1,28 @@
+# Log in to the Claude Code accounts in agents/claude/accounts.json, here or on a remote.
+# Accounts that are already logged in are skipped unless --force is given.
+# Usage: claude-login [--host host] [--force] [account...]
+local host="" force=0
+local -a accounts
+while (( $# )); do
+  case "$1" in
+    --host) host="${2:?--host needs a host}"; shift 2 ;;
+    --force) force=1; shift ;;
+    -h|--help) echo "Usage: claude-login [--host host] [--force] [account...]"; return 0 ;;
+    *) accounts+=("$1"); shift ;;
+  esac
+done
+
+local dotfiles="${DOTFILES_DIR:-$HOME/Developer/dotfiles}"
+source "$dotfiles/zsh/functions/_claude_accounts" 2>/dev/null || true
+local login='claude auth login'
+(( force )) || login='if claude auth status >/dev/null 2>&1; then echo "Already logged in (claude-login --force to switch accounts)"; else claude auth login; fi'
+login='[ -z "${CLAUDE_CONFIG_DIR:-}" ] || mkdir -p "$CLAUDE_CONFIG_DIR"; '"$login"
+# The account's variable applies to one command, so run the whole step as one sh -c.
+local script
+script=$(_claude_accounts_script "sh -c '$login'" "${accounts[@]}") || return
+
+if [[ -n "$host" ]]; then
+  ssh -t "$host" "exec \"\$SHELL\" -lc ${(qq)script}"
+else
+  sh -c "$script"
+fi
