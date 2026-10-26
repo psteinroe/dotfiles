@@ -112,8 +112,8 @@ if [ "$PASSWORDLESS_SUDO" = "1" ] && [ "$(id -u)" -eq 0 ]; then
 fi
 
 # Keep the managed user's systemd services running without an active SSH
-# login. This is required by long-lived remote services such as moshi-hook and
-# T3 Code. On non-systemd hosts this is optional, so do not abort bootstrap.
+# login. This is required by long-lived remote services such as T3 Code. On
+# non-systemd hosts this is optional, so do not abort bootstrap.
 if [ -d /run/systemd/system ] && command -v loginctl >/dev/null 2>&1; then
   if ! as_root loginctl enable-linger "$DEV_USER"; then
     warn "Could not enable systemd lingering for ${DEV_USER}; continuing bootstrap."
