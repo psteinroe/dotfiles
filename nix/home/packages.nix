@@ -10,7 +10,6 @@
 let
   piAgent = lib.attrByPath [ system "pi" ] null inputs.llm-agents.packages;
   tuicr = lib.attrByPath [ system "tuicr" ] null inputs.llm-agents.packages;
-  herdr = lib.attrByPath [ system "herdr" ] null inputs.llm-agents.packages;
   # T3 Code's Claude and Codex providers run `claude` and `codex` from PATH
   claudeCode = lib.attrByPath [ system "claude-code" ] null inputs.llm-agents.packages;
   codex = lib.attrByPath [ system "codex" ] null inputs.llm-agents.packages;
@@ -151,7 +150,6 @@ in
       ]
       ++ lib.optional isLinux tmux
       ++ optionalPackage tuicr
-      ++ optionalPackage herdr
       ++ optionalPackage claudeCode
       ++ optionalPackage codex
       ++ optionalPackage piAgent;

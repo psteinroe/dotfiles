@@ -12,48 +12,6 @@ alias mkdir='mkdir -p'
 alias vim='nvim'
 alias v='nvim'
 
-# Project shortcuts open Herdr sessions. Pass an optional worktree/branch/PR.
-dotfiles() { hdev dotfiles "$@"; }
-rdotfiles() { rdev dotfiles "$@"; }
-
-hellomateo() { hdev hellomateo "$@"; }
-rhellomateo() { rdev hellomateo "$@"; }
-
-hops() { hdev operations-platform "$@"; }
-rhops() { rdev operations-platform "$@"; }
-
-ceplatform() { hdev ce-platform "$@"; }
-rceplatform() { rdev ce-platform "$@"; }
-
-radiomarl() { hdev radio-marl-app "$@"; }
-rradiomarl() { rdev radio-marl-app "$@"; }
-
-ninjascale() { hdev ninjascale "$@"; }
-rninjascale() { rdev ninjascale "$@"; }
-
-sbch() { hdev supabase-cache-helpers "$@"; }
-rsbch() { rdev supabase-cache-helpers "$@"; }
-
-pgls() { hdev postgres-language-server "$@"; }
-pglsp() { pgls "$@"; }
-rpgls() { rdev postgres-language-server "$@"; }
-rpglsp() { rpgls "$@"; }
-
-pgconductor() { hdev postgres-conductor "$@"; }
-rpgconductor() { rdev postgres-conductor "$@"; }
-
-pgstream() { hdev postgres-stream "$@"; }
-rpgstream() { rdev postgres-stream "$@"; }
-
-hpgstream() { hdev postgres-steam-getmateo "$@"; }
-rhpgstream() { rdev postgres-steam-getmateo "$@"; }
-
-fabrial() { hdev fabrial "$@"; }
-rfabrial() { rdev fabrial "$@"; }
-
-toolshed() { hdev toolshed "$@"; }
-rtoolshed() { rdev toolshed "$@"; }
-
 # Nix
 alias ndc='nix develop -c'
 update() {

@@ -53,35 +53,14 @@ in
       autoload -Uz set-keychain-environment-variable
       autoload -Uz video_to_gif
       autoload -Uz rebuild
-      autoload -Uz pireload
       autoload -Uz devhelp
       autoload -Uz coffee
-      autoload -Uz wtclone
-      autoload -Uz wtfork
-      autoload -Uz wtcreate
-      autoload -Uz wtcheckout
-      autoload -Uz wtlist
-      autoload -Uz wtclean
-      autoload -Uz wtforceclean
-      autoload -Uz wtsetup
-      autoload -Uz wtensure
-      autoload -Uz hdev
-      autoload -Uz hprepare
-      autoload -Uz hsyncworktrees
-      autoload -Uz hwtcreate
       autoload -Uz gh
       autoload -Uz gh-default-branch
       autoload -Uz cpi
       autoload -Uz gpr
       autoload -Uz gclean
       autoload -Uz greset
-      autoload -Uz rdev
-      autoload -Uz rherdr
-      autoload -Uz rhsyncworktrees
-      autoload -Uz rhwtcreate
-      autoload -Uz rwtclean
-      autoload -Uz rwtforceclean
-      autoload -Uz rpushdev
       autoload -Uz rssh
       autoload -Uz rrebuild
       autoload -Uz rauth

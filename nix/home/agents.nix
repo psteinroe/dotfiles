@@ -158,10 +158,4 @@ in
       fi
     fi
   '';
-
-  home.activation.herdrPiIntegration = lib.hm.dag.entryAfter [ "agentConfigs" "installPackages" ] ''
-    if command -v herdr >/dev/null 2>&1 && [ -d "$HOME/.pi/agent/extensions" ]; then
-      herdr integration install pi >/dev/null 2>&1 || true
-    fi
-  '';
 }
