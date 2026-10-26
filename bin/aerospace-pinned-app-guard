@@ -44,13 +44,15 @@ guard_app() {
   done
 }
 
-# Workspace 1: Ghostty floats so native macOS tabs do not get retiled.
-guard_app 'com.mitchellh.ghostty' '1' 'floating'
-
 # Daily pinned apps. These mirror the on-window-detected rules in aerospace.toml.
+guard_app 'com.t3tools.t3code' '1'
 guard_app 'com.google.Chrome' '2'
 guard_app 'com.apple.Safari' '2'
-guard_app 'com.apple.Notes' '3'
-guard_app 'com.tinyspeck.slackmacgap' '4'
-guard_app 'com.linear' '5'
-guard_app 'com.spotify.client' '6'
+
+# Ghostty floats on its own workspace so native macOS tabs do not get retiled.
+guard_app 'com.mitchellh.ghostty' '3' 'floating'
+
+guard_app 'com.apple.Notes' '4'
+guard_app 'com.tinyspeck.slackmacgap' '5'
+guard_app 'com.linear' '6'
+guard_app 'com.spotify.client' '7'
