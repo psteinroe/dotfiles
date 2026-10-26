@@ -3,7 +3,6 @@
   lib,
   pkgs,
   homeDirectory,
-  t3codeTransport ? "tailscale-serve",
   ...
 }:
 
@@ -65,8 +64,7 @@ let
     exec ${t3code}/bin/t3 serve --host "$tailnet_ip" --port 3773
   '';
 
-  # T3 projects get their own clones, apart from the Herdr-managed <repo>.git worktrees, so T3's
-  # project-folder threads and its worktrees never show up in the Herdr helpers
+  # T3 projects get their own clones, apart from any <repo>.git worktrees in ~/Developer
   t3Projects = {
     hellomateo = "https://github.com/getmateo/hellomateo.git";
     postgres-conductor = "https://github.com/psteinroe/postgres-conductor.git";
@@ -79,23 +77,8 @@ let
   };
   t3ProjectsDir = "${homeDirectory}/Developer/t3";
 
-  startCommand =
-    if t3codeTransport == "tailscale-serve" then
-      "${t3code}/bin/t3 serve --host 127.0.0.1 --port 3773 --tailscale-serve"
-    else
-      startDirect;
 in
 {
-  assertions = [
-    {
-      assertion = builtins.elem t3codeTransport [
-        "tailscale-serve"
-        "tailscale-direct"
-      ];
-      message = "t3codeTransport must be tailscale-serve or tailscale-direct";
-    }
-  ];
-
   # Nix owns the executable and service definition; T3 owns mutable pairing,
   # provider, and session state under ~/.t3.
   home.packages = [ t3code ];
@@ -143,11 +126,11 @@ in
     };
 
     Service = {
-      # tailscale-serve publishes loopback through private HTTPS. The direct
-      # fallback binds only the host's 100.x tailnet address, never its public
-      # interface; Tailscale still encrypts and authorizes the traffic.
+      # Binds only the host's 100.x tailnet address, never its public interface;
+      # Tailscale still encrypts and authorizes the traffic. exe.dev's Tailscale
+      # Serve path drops large post-quantum TLS handshakes, so it isn't used.
       ExecStartPre = waitForTailscale;
-      ExecStart = startCommand;
+      ExecStart = startDirect;
       Environment = [
         "T3CODE_HOME=${homeDirectory}/.t3"
         "HOME=${homeDirectory}"
