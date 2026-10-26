@@ -115,6 +115,51 @@ versioned backup of `~/.t3`, then start it again after the switch. A Home
 Manager rollback restores the binary and unit, but a database-migrating
 downgrade also requires the matching state backup.
 
+## Home hub
+
+A Raspberry Pi 3 at home (`nixosConfigurations.hub`, `nix/nixos/hub/`) runs
+[CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI), following
+[this guide](https://gist.github.com/t3dotgg/59a521d2ee8d70aaf90e280c175072af).
+Every Claude and Codex subscription logs in on the hub only; the Mac, rdev, and
+the devbox reach it at `https://hub.tail6aabd2.ts.net:8317` (`tailscale serve`,
+configured in `zsh/functions/_hub`). The hub lives in the personal tailnet and is
+shared into the work tailnet (Tailscale admin: Machines → hub → Share).
+
+Two rules: never serve other people's traffic with these subscriptions, and use
+the Claude subscriptions only through Claude Code.
+
+Bootstrap:
+
+1. Run the `hub-image` workflow (Actions → hub-image → Run workflow) and
+   download the `hub-sd-image` artifact.
+2. `zstd -d nixos-image-*.img.zst`, then flash it with Raspberry Pi Imager or
+   `sudo dd if=nixos-image-*.img of=/dev/rdiskN bs=4m`.
+3. Boot the Pi on Ethernet and `ssh psteinroe@hub.local` (or its LAN IP).
+4. `sudo tailscale up` and log in to the personal tailnet. Enable HTTPS
+   certificates in that tailnet's admin (DNS → HTTPS Certificates), then share
+   the machine into the work tailnet. `systemctl status cliproxyapi-tailscale-serve`
+   finishes once Serve is up.
+5. Store the access key in this Mac's Keychain (it is generated on the hub and
+   never leaves it otherwise):
+   `ssh psteinroe@hub.tail6aabd2.ts.net sudo cat /var/lib/cliproxyapi/access-key`,
+   then `set-keychain-environment-variable CLIPROXY_ACCESS_KEY` and paste it.
+6. Add accounts, one run per account: `hub-login claude`, `hub-login codex`.
+7. Point clients at the hub: `hub-client` (this Mac), `hub-client --host rdev`,
+   `hub-client --host psteinroe@devbox-psteinroe`. This writes
+   `~/.claude-hub/settings.json` and `~/.codex-hub/config.toml` only; normal
+   logins stay. Use `claude-hub` / `codex-hub` in the terminal.
+8. Verify: `curl -s https://hub.tail6aabd2.ts.net:8317/v1/models -H "Authorization: Bearer $(keychain-environment-variable CLIPROXY_ACCESS_KEY)" | head -c 300`
+
+The T3 instances "Claude (Hub)" and "Codex (Hub)" in `agents/t3/settings.json`
+stay disabled until the hub works; enable them in the T3 UI afterwards. The
+management panel is at `/management.html` with the key in
+`/var/lib/cliproxyapi/management-key`.
+
+Updates: `scripts/update-cliproxyapi [tag]` pins a new release, `hub-rebuild`
+deploys (it evaluates on the Mac and builds or substitutes on the Pi).
+`/var/lib/cliproxyapi/config.yaml` is re-rendered from Nix on every service
+start, so make config changes in `nix/nixos/hub/cliproxyapi.nix`, not the panel.
+
 ## Remote machine
 
 - `rdev` → exe.dev machine over Tailscale as `psteinroe`
