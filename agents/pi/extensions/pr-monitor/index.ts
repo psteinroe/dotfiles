@@ -4,7 +4,6 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { PrMonitor, watchSummary, type WatchSnapshot } from "./manager.ts";
 import { SharedStore } from "./store.ts";
-import { HerdrBackgroundMetadata } from "../background-terminals/src/herdr-metadata.ts";
 
 const KEY = Symbol.for("dotfiles.pi.pr-monitor.v1");
 interface Runtime { bind(pi: ExtensionAPI): void }
@@ -17,14 +16,12 @@ export default function prMonitorExtension(initialPi: ExtensionAPI) {
   let monitor: PrMonitor | undefined;
   let deliveryTimer: ReturnType<typeof setTimeout> | undefined;
   let delivering = false;
-  const metadata = new HerdrBackgroundMetadata("pi:pr-monitor");
   const pending = new Map<string, WatchSnapshot>();
   const registrations: ((api: ExtensionAPI) => void)[] = [];
   const runtime: Runtime = { bind(api) { pi = api; for (const register of registrations) register(api); } };
   const register = (action: (api: ExtensionAPI) => void) => { registrations.push(action); action(pi); };
   const active = () => monitor?.list().filter(w => w.status === "watching") ?? [];
   const refresh = () => {
-    if (ctx?.mode === "tui") void metadata.setActive(active().length > 0);
     if (ctx?.hasUI) ctx.ui.setStatus("pr-monitor", active().length ? `${active().length} PR watch${active().length === 1 ? "" : "es"} · /pr-watches` : undefined);
   };
   const scheduleDelivery = () => {
@@ -69,7 +66,6 @@ export default function prMonitorExtension(initialPi: ExtensionAPI) {
     if (event.reason === "reload") return;
     monitor?.shutdown();
     monitor = undefined;
-    await metadata.shutdown();
     pending.clear();
     if (deliveryTimer) clearTimeout(deliveryTimer);
     deliveryTimer = undefined;

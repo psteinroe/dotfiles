@@ -17,7 +17,6 @@ import {
   TerminalManager,
   type TerminalSnapshot,
 } from "../background-terminals/src/manager.ts";
-import { HerdrBackgroundMetadata } from "../background-terminals/src/herdr-metadata.ts";
 import { TaskDelivery } from "./delivery.ts";
 import { TaskSteering } from "./steering.ts";
 import {
@@ -294,12 +293,9 @@ export default function tasksExtension(initialPi: ExtensionAPI) {
   const registry = new TaskRegistry();
   const terminalManager = new TerminalManager();
   const terminalTaskIds = new Map<string, string>();
-  const herdrMetadata = new HerdrBackgroundMetadata();
   const steering = new TaskSteering();
   const subagents = collectSubagentTools(pi, (id, session) => steering.register(id, session));
   let uiCtx: ExtensionContext | undefined;
-  let ownsHerdrMetadata = false;
-  let shuttingDown = false;
   let renderedStatusKey: string | undefined;
   let renderedWidgetKey: string | undefined;
 
@@ -336,10 +332,6 @@ export default function tasksExtension(initialPi: ExtensionAPI) {
 
   const activeTasks = () => registry.list().filter((task) =>
     task.status === "starting" || task.status === "running" || task.status === "cancelling");
-  const refreshHerdrMetadata = () => {
-    if (!ownsHerdrMetadata || shuttingDown) return;
-    void herdrMetadata.setActive(activeTasks().length > 0);
-  };
   const refreshUi = (force = false) => {
     if (!uiCtx?.hasUI) return;
     const active = activeTasks();
@@ -363,7 +355,6 @@ export default function tasksExtension(initialPi: ExtensionAPI) {
 
   registry.onSettle((snapshot, consumed) => {
     refreshUi();
-    refreshHerdrMetadata();
     if (uiCtx?.isIdle()) delivery.setIdle();
     else delivery.setBusy();
     if (consumed) delivery.consume(snapshot.id);
@@ -413,11 +404,9 @@ export default function tasksExtension(initialPi: ExtensionAPI) {
 
   pi.on("session_start", async (_event, ctx) => {
     uiCtx = ctx;
-    ownsHerdrMetadata = ctx.mode === "tui";
     if (ctx.isIdle()) delivery.setIdle();
     else delivery.setBusy();
     refreshUi(true);
-    refreshHerdrMetadata();
   });
   pi.on("agent_start", async () => delivery.setBusy());
   pi.on("agent_settled", async (_event, ctx) => {
@@ -435,7 +424,6 @@ export default function tasksExtension(initialPi: ExtensionAPI) {
     uiCtx = undefined;
     if (event.reason === "reload") return;
     delivery.shutdown();
-    shuttingDown = true;
     if (runtimeSlot[RUNTIME_KEY] === runtime) delete runtimeSlot[RUNTIME_KEY];
     // Registry cancellation owns the first teardown request. The terminal pass
     // is a bounded safety net after command cancellation has settled.
@@ -443,10 +431,9 @@ export default function tasksExtension(initialPi: ExtensionAPI) {
     steering.clear();
     await terminalManager.disposeAll();
     terminalTaskIds.clear();
-    await Promise.allSettled([
-      ...subagents.shutdownHandlers.map((handler) => Promise.resolve(handler(event, ctx))),
-      ownsHerdrMetadata ? herdrMetadata.shutdown() : Promise.resolve(),
-    ]);
+    await Promise.allSettled(
+      subagents.shutdownHandlers.map((handler) => Promise.resolve(handler(event, ctx))),
+    );
   });
 
   pi.registerTool({
@@ -508,7 +495,6 @@ export default function tasksExtension(initialPi: ExtensionAPI) {
         cancel: () => controller.abort(),
       });
       refreshUi();
-      refreshHerdrMetadata();
 
       const definition = subagents.tools.get(agent)!;
       const run = Promise.resolve().then(() => definition.execute(
@@ -598,7 +584,6 @@ export default function tasksExtension(initialPi: ExtensionAPI) {
       }
       terminalTaskIds.set(terminal.id, task.id);
       refreshUi();
-      refreshHerdrMetadata();
       return {
         content: [{
           type: "text" as const,
