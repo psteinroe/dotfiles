@@ -60,6 +60,23 @@
       "config": {
         "homePath": "~/.claude-personal"
       }
+    },
+    "claudeHub": {
+      "driver": "claudeAgent",
+      "displayName": "Claude (Hub)",
+      "enabled": false,
+      "config": {
+        "homePath": "~/.claude-hub"
+      }
+    },
+    "codexHub": {
+      "driver": "codex",
+      "displayName": "Codex (Hub)",
+      "enabled": false,
+      "config": {
+        "setupMode": "existing",
+        "homePath": "~/.codex-hub"
+      }
     }
   }
 }

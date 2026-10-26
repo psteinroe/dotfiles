@@ -11,6 +11,9 @@
 let
   agentsDir = "${dotfilesPath}/agents";
   claudeAccounts = import ./claude-accounts.nix { inherit lib; };
+  # Every extra Claude config dir. ~/.claude-hub uses the hub's access key instead of a
+  # login, so it isn't an account in agents/claude/accounts.json (claude-login skips it).
+  claudeConfigDirs = map (account: account.dir) claudeAccounts ++ [ ".claude-hub" ];
   piSettings =
     if isDarwin then "${agentsDir}/pi/settings.json" else "${agentsDir}/pi/settings.linux.json";
   remoteSkills = import ./remote-skills.nix { inherit inputs; };
@@ -159,9 +162,9 @@ in
       }
 
       add_claude_executor ""
-${lib.concatMapStrings (account: ''
-      add_claude_executor "$HOME/${account.dir}"
-'') claudeAccounts}
+${lib.concatMapStrings (dir: ''
+      add_claude_executor "$HOME/${dir}"
+'') claudeConfigDirs}
 
       if ! grep -q '^\[mcp_servers\.executor\]' "$HOME/.codex/config.toml" 2>/dev/null; then
         $DRY_RUN_CMD mkdir -p "$HOME/.codex"
