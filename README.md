@@ -68,6 +68,16 @@ claude-accounts --host rdev                  # who is logged in where
 claude-personal                              # Claude Code as the personal account
 ```
 
+Executor needs one OAuth login per machine and agent as well. `executor-login`
+registers it for every Claude account and Codex, skips those already logged in,
+and logs in the rest. On a remote it forwards the login's localhost callback and
+opens the approval page on this machine:
+
+```bash
+executor-login --host psteinroe@devbox-psteinroe   # all Claude accounts and Codex
+executor-login --host rdev personal
+```
+
 ### Remote server
 
 Linux Home Manager owns the pinned T3 Code package and its `systemd --user`

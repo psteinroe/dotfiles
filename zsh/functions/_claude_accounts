@@ -1,32 +1,43 @@
-# Shared by claude-login and claude-accounts. Source, then call:
+# Shared by claude-login, claude-accounts and executor-login. Source, then call:
+#   _claude_account_names              every account in agents/claude/accounts.json
+#   _claude_account_env <account>      shell prefix that selects the account
 #   _claude_accounts_script <command> [account...]
-# It prints one shell snippet per account in agents/claude/accounts.json that runs
-# <command> with that account's CLAUDE_CONFIG_DIR.
-_claude_accounts_script() {
-  local accounts_file="${DOTFILES_DIR:-$HOME/Developer/dotfiles}/agents/claude/accounts.json"
-  local command="$1"
-  shift
-  command -v jq >/dev/null 2>&1 || { echo "claude accounts need jq" >&2; return 1; }
-  [[ -r "$accounts_file" ]] || { echo "No account list at $accounts_file" >&2; return 1; }
+#                                      one snippet per account that runs <command> as it
+_claude_accounts_file() {
+  print -r -- "${DOTFILES_DIR:-$HOME/Developer/dotfiles}/agents/claude/accounts.json"
+}
 
+_claude_account_names() {
+  command -v jq >/dev/null 2>&1 || { echo "claude accounts need jq" >&2; return 1; }
+  jq -r 'keys_unsorted[]' "$(_claude_accounts_file)"
+}
+
+_claude_account_env() {
+  local file dir
+  file=$(_claude_accounts_file)
+  command -v jq >/dev/null 2>&1 || { echo "claude accounts need jq" >&2; return 1; }
+  [[ -r "$file" ]] || { echo "No account list at $file" >&2; return 1; }
+  dir=$(jq -r --arg name "$1" '.[$name] // empty' "$file")
+  if [[ -z "$dir" ]]; then
+    echo "Unknown Claude account: $1 (known: $(jq -r 'keys_unsorted | join(", ")' "$file"))" >&2
+    return 1
+  fi
+  # The default account runs without CLAUDE_CONFIG_DIR: setting it, even to
+  # ~/.claude, selects a different macOS Keychain entry.
+  [[ "$dir" == "~/.claude" ]] || print -r -- "CLAUDE_CONFIG_DIR=\"\$HOME/${dir#\~/}\" "
+}
+
+_claude_accounts_script() {
+  local command="$1" name env_prefix
+  shift
   local -a names
   if (( $# )); then
     names=("$@")
   else
-    names=(${(f)"$(jq -r 'keys_unsorted[]' "$accounts_file")"})
+    names=(${(f)"$(_claude_account_names)"}) || return
   fi
-
-  local name dir env_prefix
   for name in "${names[@]}"; do
-    dir=$(jq -r --arg name "$name" '.[$name] // empty' "$accounts_file")
-    if [[ -z "$dir" ]]; then
-      echo "Unknown Claude account: $name (known: $(jq -r 'keys_unsorted | join(", ")' "$accounts_file"))" >&2
-      return 1
-    fi
-    # The default account runs without CLAUDE_CONFIG_DIR: setting it, even to
-    # ~/.claude, selects a different macOS Keychain entry.
-    env_prefix=""
-    [[ "$dir" == "~/.claude" ]] || env_prefix="CLAUDE_CONFIG_DIR=\"\$HOME/${dir#\~/}\" "
-    print -r -- "echo \"== $name ($dir)\"; ${env_prefix}${command}"
+    env_prefix=$(_claude_account_env "$name") || return
+    print -r -- "echo \"== $name\"; ${env_prefix}${command}"
   done
 }

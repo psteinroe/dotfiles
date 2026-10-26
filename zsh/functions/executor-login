@@ -1,0 +1,111 @@
+# Register the executor MCP server and log in to it, for every Claude account and Codex,
+# here or on a remote. Targets that are already logged in are skipped unless --force.
+# On a remote, the login's localhost callback is forwarded and the approval page opens here.
+# Usage: executor-login [--host host] [--force] [account|codex...]
+local host="" force=0
+local -a targets
+while (( $# )); do
+  case "$1" in
+    --host) host="${2:?--host needs a host}"; shift 2 ;;
+    --force) force=1; shift ;;
+    -h|--help) echo "Usage: executor-login [--host host] [--force] [account|codex...]"; return 0 ;;
+    *) targets+=("$1"); shift ;;
+  esac
+done
+
+local dotfiles="${DOTFILES_DIR:-$HOME/Developer/dotfiles}"
+source "$dotfiles/zsh/functions/_claude_accounts" || return
+local url
+url=$(jq -r '.mcpServers.executor.url // empty' "$dotfiles/agents/pi/mcp.json" 2>/dev/null)
+[[ -n "$url" ]] || { echo "No executor URL in $dotfiles/agents/pi/mcp.json" >&2; return 1; }
+(( ${#targets} )) || targets=(${(f)"$(_claude_account_names)"} codex)
+
+# Runs a shell snippet here or on the host, in a login shell so agent CLIs are on PATH.
+_executor_run() {
+  if [[ -n "$host" ]]; then
+    ssh -o ControlMaster=no -o ControlPath=none "$host" "exec \"\$SHELL\" -lc ${(qq)1}"
+  else
+    sh -c "$1"
+  fi
+}
+
+setopt local_options no_monitor no_notify
+local target env_prefix register logged_in login log output link port tunnel outcome i
+for target in "${targets[@]}"; do
+  echo "== $target"
+  if [[ "$target" == codex ]]; then
+    register="grep -q '^\\[mcp_servers\\.executor\\]' \"\${CODEX_HOME:-\$HOME/.codex}/config.toml\" 2>/dev/null ||
+      { mkdir -p \"\${CODEX_HOME:-\$HOME/.codex}\"; printf '\\n[mcp_servers.executor]\\nurl = \"%s\"\\n' '$url' >>\"\${CODEX_HOME:-\$HOME/.codex}/config.toml\"; }"
+    logged_in="codex mcp list 2>/dev/null | awk '\$1 == \"executor\"' | grep -q OAuth"
+    login="codex mcp login executor"
+  else
+    env_prefix=$(_claude_account_env "$target") || return
+    register="${env_prefix}sh -c '[ -z \"\${CLAUDE_CONFIG_DIR:-}\" ] || mkdir -p \"\$CLAUDE_CONFIG_DIR\"
+      jq -e .mcpServers.executor \"\${CLAUDE_CONFIG_DIR:-\$HOME}/.claude.json\" >/dev/null 2>&1 ||
+        claude mcp add --scope user --transport http executor $url >/dev/null'"
+    logged_in="${env_prefix}claude mcp get executor 2>&1 | grep -q Connected"
+    login="${env_prefix}claude mcp login executor"
+  fi
+
+  _executor_run "$register" || { echo "Could not register executor" >&2; return 1; }
+  if (( ! force )) && _executor_run "$logged_in"; then
+    echo "Already logged in"
+    continue
+  fi
+
+  if [[ -z "$host" ]]; then
+    sh -c "$login" || return
+    continue
+  fi
+
+  # Claude's login needs a terminal; `script` provides one. BROWSER=true keeps it from
+  # trying to open a browser on the host.
+  log=$(_executor_run "log=\$(mktemp); BROWSER=true setsid -f script -qfc ${(qq)login} \"\$log\" </dev/null >/dev/null 2>&1; echo \"\$log\"") || return
+  link="" port=""
+  for i in {1..20}; do
+    sleep 1
+    output=$(_executor_run "cat $log" 2>/dev/null)
+    # Drop terminal escapes, including OSC 8 hyperlinks whose payload repeats the URL.
+    link=$(print -r -- "$output" | perl -pe 's/\e\]8;[^\a\e]*(?:\a|\e\\)//g; s/\e\[[0-9;?]*[A-Za-z]//g' |
+      grep -o -E 'https://[^[:space:]]+authorize\?[^[:space:]]+' | head -n 1)
+    port=$(print -r -- "$link" | grep -o -E 'redirect_uri=http%3A%2F%2F(localhost|127\.0\.0\.1)%3A[0-9]+' | grep -o -E '[0-9]+$')
+    [[ -n "$port" ]] && break
+  done
+  if [[ -z "$port" ]]; then
+    echo "The login didn't print an authorization link:" >&2
+    print -r -- "$output" | tail -n 5 >&2
+    _executor_run "pkill -f $log; rm -f $log" >/dev/null 2>&1
+    return 1
+  fi
+
+  # Quiet: browsers open extra connections to the callback port, which the login refuses.
+  ssh -N -o ExitOnForwardFailure=yes -o ControlMaster=no -o ControlPath=none -o LogLevel=QUIET \
+    -L "$port:127.0.0.1:$port" "$host" &
+  tunnel=$!
+  sleep 2
+  echo "Approve executor in the browser: $link"
+  if command -v open >/dev/null 2>&1; then open "$link"; else xdg-open "$link" >/dev/null 2>&1 || true; fi
+
+  outcome=pending
+  for i in {1..100}; do
+    sleep 3
+    output=$(_executor_run "cat $log" 2>/dev/null)
+    if print -r -- "$output" | grep -q -i -E 'Authenticated with|Successfully logged in'; then
+      outcome=done
+      break
+    fi
+    if print -r -- "$output" | grep -q -i -E "couldn.t complete|^Error:"; then
+      outcome=failed
+      break
+    fi
+  done
+  kill "$tunnel" 2>/dev/null
+  # The login's `script` process carries the log path, so this ends only that login.
+  _executor_run "pkill -f $log; rm -f $log" >/dev/null 2>&1
+
+  case "$outcome" in
+    done) echo "Logged in" ;;
+    failed) echo "Login failed:" >&2; print -r -- "$output" | tail -n 3 >&2; return 1 ;;
+    *) echo "Timed out waiting for approval" >&2; return 1 ;;
+  esac
+done

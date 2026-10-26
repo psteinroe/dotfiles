@@ -72,6 +72,7 @@ in
       autoload -Uz rauth
       autoload -Uz claude-login
       autoload -Uz claude-accounts
+      autoload -Uz executor-login
 
       # One command per extra Claude Code account, e.g. claude-personal
       ${lib.concatMapStrings (account: ''
