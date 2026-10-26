@@ -30,6 +30,7 @@ if [[ "$topic" == all || "$topic" == remote ]]; then
   _case_row "rrebuild [host]" "force-sync dotfiles on the remote and rebuild it"
   _case_row "rssh [dir]" "open a plain remote psteinroe shell"
   _case_row "ssh rdev-exe" "recovery path via exe.dev gateway"
+  _case_row "hub-rebuild [action]" "deploy the Raspberry Pi hub (nixos-rebuild, builds on the hub)"
   [[ "$topic" == all ]] && print
 fi
 
@@ -48,6 +49,9 @@ if [[ "$topic" == all || "$topic" == auth ]]; then
   _case_row "claude-accounts [--host h]" "show which Claude accounts are logged in"
   _case_row "claude-<account>" "run Claude Code as that account, e.g. claude-personal"
   _case_row "executor-login [--host h] [acct|codex...]" "register executor and log in to it, per account and Codex"
+  _case_row "hub-login claude|codex" "add a Claude or Codex account to the hub's CLIProxyAPI"
+  _case_row "hub-client [--host h]" "point ~/.claude-hub and ~/.codex-hub at the hub"
+  _case_row "claude-hub / codex-hub" "run Claude Code / Codex through the hub"
   _case_row "gh" "wrap gh to auto-use exe.dev integration hosts from origin"
   _case_row "devhelp [topic]" "show this command reference"
 fi

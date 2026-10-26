@@ -73,11 +73,18 @@ in
       autoload -Uz claude-login
       autoload -Uz claude-accounts
       autoload -Uz executor-login
+      autoload -Uz hub-rebuild
+      autoload -Uz hub-login
+      autoload -Uz hub-client
 
       # One command per extra Claude Code account, e.g. claude-personal
       ${lib.concatMapStrings (account: ''
         alias claude-${account.name}='CLAUDE_CONFIG_DIR="$HOME/${account.dir}" claude'
       '') claudeAccounts}
+
+      # Second Claude Code and Codex configs that use the home hub (hub-client sets them up)
+      alias claude-hub='CLAUDE_CONFIG_DIR="$HOME/.claude-hub" claude'
+      alias codex-hub='CODEX_HOME="$HOME/.codex-hub" codex'
 
       if [[ $TERM != "dumb" ]]; then
         source ${starshipZshInit}

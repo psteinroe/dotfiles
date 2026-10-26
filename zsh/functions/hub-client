@@ -1,0 +1,71 @@
+# Point a second Claude Code and Codex config (~/.claude-hub, ~/.codex-hub) at the hub, here or on a remote.
+# The normal ~/.claude and ~/.codex logins stay untouched; use them via claude-hub and codex-hub.
+# The access key comes from this Mac's Keychain (CLIPROXY_ACCESS_KEY) and is never printed. Fetch it once:
+#   ssh psteinroe@hub.tail6aabd2.ts.net sudo cat /var/lib/cliproxyapi/access-key
+#   set-keychain-environment-variable CLIPROXY_ACCESS_KEY    # paste it at the hidden prompt
+# Usage: hub-client [--host host]
+local usage="Usage: hub-client [--host host]"
+local host=""
+while (( $# )); do
+  case "$1" in
+    --host) host="${2:?--host needs a host}"; shift 2 ;;
+    -h|--help) echo "$usage"; return 0 ;;
+    *) echo "$usage" >&2; return 1 ;;
+  esac
+done
+
+local dotfiles="${DOTFILES_DIR:-$HOME/Developer/dotfiles}"
+source "$dotfiles/zsh/functions/_hub" || return
+(( $+functions[keychain-environment-variable] )) ||
+  autoload -Uz "$dotfiles/zsh/functions/keychain-environment-variable"
+local key
+key=$(keychain-environment-variable CLIPROXY_ACCESS_KEY 2>/dev/null)
+if [[ -z "$key" ]]; then
+  echo "No CLIPROXY_ACCESS_KEY in the Keychain. Fetch it from the hub once:" >&2
+  echo "  ssh $hub_ssh sudo cat /var/lib/cliproxyapi/access-key" >&2
+  echo "  set-keychain-environment-variable CLIPROXY_ACCESS_KEY" >&2
+  return 1
+fi
+
+# Reads the key from stdin and passes it on only through builtins and the environment,
+# never in a command's arguments. Existing files are backed up, then merged.
+local script='set -eu
+IFS= read -r HUB_KEY
+export HUB_KEY
+url='"${(qq)hub_url}"'
+umask 077
+stamp=$(date +%Y%m%d%H%M%S)
+mkdir -p "$HOME/.claude-hub" "$HOME/.codex-hub"
+
+settings="$HOME/.claude-hub/settings.json"
+if [ -s "$settings" ]; then cp "$settings" "$settings.bak-$stamp"; else echo "{}" >"$settings"; fi
+HUB_URL="$url" jq ".env = ((.env // {}) + {ANTHROPIC_BASE_URL: env.HUB_URL, ANTHROPIC_AUTH_TOKEN: env.HUB_KEY})" \
+  "$settings" >"$settings.tmp"
+mv "$settings.tmp" "$settings"
+
+config="$HOME/.codex-hub/config.toml"
+if [ -s "$config" ]; then cp "$config" "$config.bak-$stamp"; else : >"$config"; fi
+{
+  printf "model_provider = \"cliproxy\"\n"
+  # Drops the old top-level model_provider and [model_providers.cliproxy] table, keeps the rest
+  awk "/^[[:space:]]*\\[/ { table = 1; skip = (\$0 ~ /^[[:space:]]*\\[model_providers\\.cliproxy\\][[:space:]]*\$/) }
+    !table && /^[[:space:]]*model_provider[[:space:]]*=/ { next }
+    skip { next }
+    { print }" "$config"
+  printf "\n[model_providers.cliproxy]\nname = \"CLIProxyAPI\"\nbase_url = \"%s/v1\"\nwire_api = \"responses\"\nrequires_openai_auth = false\nsupports_websockets = true\nexperimental_bearer_token = \"%s\"\n" "$url" "$HUB_KEY"
+} >"$config.tmp"
+mv "$config.tmp" "$config"
+echo "Wrote $settings and $config"
+
+if body=$(printf "Authorization: Bearer %s\n" "$HUB_KEY" | curl -fsS -H @- "$url/v1/models") &&
+  models=$(printf "%s" "$body" | jq -e ".data | length"); then
+  echo "The hub serves $models models"
+else
+  echo "warning: could not list models at $url/v1/models" >&2
+fi'
+
+if [[ -n "$host" ]]; then
+  print -r -- "$key" | ssh -o ControlMaster=no -o ControlPath=none "$host" "exec \"\$SHELL\" -lc ${(qq)script}"
+else
+  print -r -- "$key" | sh -c "$script"
+fi
