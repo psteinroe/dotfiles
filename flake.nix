@@ -139,6 +139,18 @@
         isLinux = true;
       };
 
+      # Raspberry Pi 3 home hub running CLIProxyAPI. Build the SD image on an aarch64-linux
+      # machine (.github/workflows/hub-image.yml); deploy changes with hub-rebuild.
+      nixosConfigurations.hub = nixpkgs.lib.nixosSystem {
+        specialArgs = { inherit username; };
+        modules = [
+          "${nixpkgs}/nixos/modules/installer/sd-card/sd-image-aarch64.nix"
+          ./nix/nixos/hub
+        ];
+      };
+
+      packages.aarch64-linux.hub-sd-image = self.nixosConfigurations.hub.config.system.build.sdImage;
+
       # Expose the package set
       darwinPackages = self.darwinConfigurations.${hostname}.pkgs;
     };
