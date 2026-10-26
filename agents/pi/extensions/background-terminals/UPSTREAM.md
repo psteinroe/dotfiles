@@ -11,5 +11,4 @@ Local changes:
 - expanded one TypeScript parameter property for Node's strip-only test runner;
 - evolved the bundled skill into `agents/skills/background-tasks` and routed commands through the shared task control plane;
 - made completion delivery lifecycle-aware so terminals that settle after the agent becomes idle still resume it, with deduplication, retry, and shutdown-safe timer cleanup;
-- run commands with Bash on macOS/Linux so defensive CI guards can use `pipefail` reliably;
-- publish source-scoped Herdr metadata that displays `background` instead of `idle` or `done` while terminals run, without changing lifecycle authority.
+- run commands with Bash on macOS/Linux so defensive CI guards can use `pipefail` reliably.

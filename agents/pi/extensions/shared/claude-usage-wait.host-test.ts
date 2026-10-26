@@ -30,7 +30,6 @@ export default function hostTest(pi: ExtensionAPI) {
     }, 5000);
     try {
       assert.ok(path.basename(homedir()).startsWith("pi-claude-usage-host."), "Use a temporary HOME, never the real home.");
-      process.env.HERDR_ENV = "0";
       process.env.CLAUDE_CONFIG_DIR = path.join(homedir(), ".claude");
       mkdirSync(path.join(homedir(), ".pi/agent"), { recursive: true });
       const entry = process.env.CLAUDE_BRIDGE_TEST_ENTRY;
