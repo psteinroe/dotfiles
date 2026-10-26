@@ -54,8 +54,8 @@ Shared configuration:
 `agents/claude/accounts.json` lists the Claude Code accounts: `work` uses the
 default `~/.claude`, `personal` uses `~/.claude-personal` via
 `CLAUDE_CONFIG_DIR`. Each account keeps its own login, settings, history, and
-MCP servers; each switch registers executor in every account. T3 Code has one
-Claude instance per account (Claude Work, Claude Personal).
+MCP servers; each switch registers executor in every account. In T3 Code, the
+default Claude instances use `work` and "Claude Personal" uses `personal`.
 
 Logins stay per machine; they are not copied, because machines sharing one
 refresh token log each other out:
