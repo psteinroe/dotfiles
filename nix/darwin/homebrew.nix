@@ -27,7 +27,6 @@
       "ausweisapp"
       "nikitabobko/tap/aerospace"
       "ghostty"
-      "codex-app"
       "t3-code"
       "logitech-options"
       "slack"

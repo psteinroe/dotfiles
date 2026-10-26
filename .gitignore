@@ -8,3 +8,5 @@ node_modules
 # macOS
 # Neovim
 nvim/plugin
+# Nix build output
+result
