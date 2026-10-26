@@ -4,7 +4,7 @@ Cross-platform Nix + Home Manager dev environment.
 
 - macOS: `nix-darwin` + Home Manager
 - Linux remotes: standalone Home Manager
-- Remote dev: Tailscale SSH + Herdr-first project sessions
+- Daily work: [T3 Code](https://github.com/pingdotgg/t3code), on the Mac and against the remote over Tailscale
 
 ## Install / update
 
@@ -14,9 +14,6 @@ curl -fsSL https://raw.githubusercontent.com/psteinroe/dotfiles/main/bootstrap.s
 
 # Generic/exe.dev Linux remote fresh install
 curl -fsSL https://raw.githubusercontent.com/psteinroe/dotfiles/main/bootstrap-remote.sh | bash
-
-# Prepared Hetzner NixOS replacement (review before destructive use)
-# See docs/hetzner-nixos.md and ./bootstrap-hetzner-nixos.sh
 
 # Update an existing machine
 rebuild
@@ -34,25 +31,36 @@ nix run nixpkgs#home-manager -- switch --flake ~/Developer/dotfiles#psteinroe@li
 
 The bootstrap and nix-darwin configuration manage Determinate Nix's
 `/etc/nix/nix.custom.conf`. It trusts Numtide's binary cache for prebuilt
-`llm-agents.nix` packages such as Pi, tuicr, and Herdr while leaving arbitrary
-flake configuration untrusted.
+`llm-agents.nix` packages such as Pi, Claude Code, Codex, and tuicr while
+leaving arbitrary flake configuration untrusted.
 
-### T3 Code remote access
+## T3 Code
 
-Linux Home Manager declaratively owns the pinned T3 Code package and its
-`systemd --user` service; T3 owns mutable pairing/provider state in `~/.t3`.
-It does not use T3 Connect or Tailscale Funnel. Nix Darwin installs the
-`t3-code` desktop app on the Mac.
+The Mac runs the T3 Code desktop app (`t3-code` cask). AeroSpace keeps it on
+workspace 1 (`alt-enter`); Ghostty floats on its own workspace 3 (`alt-shift-enter`).
 
-The standalone Linux profile used by exe.dev binds port 3773 only to the
-machine's dynamic `100.x` Tailscale address. Traffic is private and encrypted
-by Tailscale, but it intentionally has no second HTTPS layer. This avoids a
-Tailscale Serve/netstack failure on exe.dev where the default 1.5-KiB
-post-quantum TLS ClientHello stalls; TLS 1.2 and TLS 1.3 forced to X25519 both
-succeed, as does the same default TLS handshake to a normal Go server over the
-same tailnet path. The prepared Hetzner NixOS profile uses private Tailscale
-Serve HTTPS, subject to the TLS 1.3 acceptance check in
-[`docs/hetzner-nixos.md`](docs/hetzner-nixos.md).
+Shared configuration:
+
+- `agents/t3/settings.json` is linked into `~/.t3/userdata/settings.json` on
+  every machine. Changes made in the T3 UI land in this file as a Git diff.
+- Claude Code and Codex come from `llm-agents.nix`; each switch registers the
+  executor MCP server for both (add-only, so existing logins stay).
+- The machine-wide setup and settle actions run `t3-repo-action`, which executes
+  the `runOnWorktreeCreate` / `runOnSettle` scripts in a repo's checked-in
+  `t3.json`.
+
+### Remote server
+
+Linux Home Manager owns the pinned T3 Code package and its `systemd --user`
+service; T3 owns mutable pairing/provider state in `~/.t3`. Each switch clones
+and registers the projects listed in `nix/home/t3code.nix` under
+`~/Developer/t3/<repo>` (add-only).
+
+The server binds port 3773 only to the machine's `100.x` Tailscale address.
+Traffic is private and encrypted by Tailscale but has no second HTTPS layer:
+exe.dev's Tailscale Serve path stalls on the default 1.5-KiB post-quantum TLS
+ClientHello. T3 Connect is linked as a fallback route for networks without the
+tailnet.
 
 ```bash
 systemctl --user status t3code
@@ -60,16 +68,11 @@ journalctl --user -u t3code -f
 systemctl --user restart t3code
 ```
 
-The Mac and phone must be connected to the existing tailnet. Generate a fresh
-one-time link on the host for each client, then open it in the Mac app or scan
-it with the mobile app:
+Generate a fresh one-time link for each new client, then open it in the Mac app
+or scan it with the mobile app:
 
 ```bash
-# Current exe.dev direct-tailnet transport
 ssh -t rdev 't3 pair'
-
-# Future Hetzner private HTTPS transport
-ssh -t rdev-hetzner 't3 pair --tailscale'
 ```
 
 Pairing tokens are never stored in Nix. Manage or revoke paired sessions under
@@ -77,178 +80,34 @@ Pairing tokens are never stored in Nix. Manage or revoke paired sessions under
 changing the pinned Nix version, with `scripts/update-t3code [tag]` (latest
 stable release by default); do not use `t3 update` or `t3 service install`.
 Server, desktop app, and mobile app must share a major version, so update the
-Mac app (`brew upgrade --cask --greedy t3-code`) and the phone at the same time. Before switching Home Manager, stop the service and make
-a versioned backup of `~/.t3`, then start it again after the switch. A Home
+Mac app (`brew upgrade --cask --greedy t3-code`) and the phone at the same time.
+Before switching Home Manager across a T3 update, stop the service and make a
+versioned backup of `~/.t3`, then start it again after the switch. A Home
 Manager rollback restores the binary and unit, but a database-migrating
-downgrade also requires the matching state backup. Removing `~/.t3` is a full
-reset that requires pairing every client again. When switching exe.dev from
-Serve to direct mode, remove any stale mapping with
-`tailscale serve --https=443 off`.
+downgrade also requires the matching state backup.
 
-## Daily project workflow
+## Remote machine
 
-One project/repo maps to one Herdr named session. The active-workspace policy is
-agent-first: Herdr starts with its sidebar hidden and agent panel sorted by
-priority, and only the selected/requested Git worktree is opened as a workspace.
-Other worktrees remain available in Git but are not materialized in Herdr until
-opened explicitly. Use `prefix+b` to toggle the sidebar and `prefix+w` to pick a
-workspace; `alt+h`/`alt+l` switch workspaces and `alt+k`/`alt+j` switch agents.
-
-```bash
-hdev dotfiles main       # local Herdr session/workspace
-rdev hellomateo main     # prepare/register remote session, then return
-hellomateo main          # shortcut for hdev hellomateo main
-rhellomateo main         # shortcut for rdev hellomateo main
-rhops main               # shortcut for rdev operations-platform main
-```
-
-Remote defaults:
-
-- `rdev` → current exe.dev machine over Tailscale as `psteinroe`
-- `rdev-hetzner` → prepared NixOS replacement's future MagicDNS name
+- `rdev` → exe.dev machine over Tailscale as `psteinroe`
 - `rdev-exe` → exe.dev public SSH fallback as `exedev`
-- Worktrees stay at `~/Developer/<repo>.git/<worktree>`
-
-The full Hetzner install, validation, cutover, and recovery runbook is in
-[`docs/hetzner-nixos.md`](docs/hetzner-nixos.md). `rdev` is not switched until
-the new host passes those checks.
-
-There is one local Herdr client. `rdev <repo> [branch|pr]` SSHes to the remote,
-prepares the named session, and returns; it does not open a second remote TUI.
-Identity is the target plus session (`<host>` and `<repo>`), not the label.
-New profiles use the canonical `<host>/<repo>` label, while existing labels are
-preserved when their target/session profile is reused. Profiles are refreshed
-live in the Herdr client. `rherdr <repo> [branch|pr]` remains the explicit
-direct remote attach for recovery.
-
-### Moshi mobile access
-
-Home Manager installs Mosh and a pinned `moshi-hook`, runs the hook as a
-persistent systemd user service, and exposes the managed Herdr sessions to
-Moshi. Moshi remains independent of the local Herdr client and connects
-directly to the named remote session. For the primary mobile connection,
-install Tailscale on the phone and use:
-
-- Host: `psteinroe-dev.tail6aabd2.ts.net`
-- Port: `22`
-- User: `psteinroe`
-- Connection type: **Mosh** or **Auto**
-
-As `psteinroe`, run the following and scan its Easy Pair QR in Moshi:
-
-```bash
-moshi-hook host setup \
-  --host psteinroe-dev.tail6aabd2.ts.net \
-  --user psteinroe
-```
-
-The exe.dev SSH configuration accepts the generated key from
-`~/.ssh/authorized_keys`, and the Mosh server is exposed on the non-TUI
-SSH path. Agent notification pairing remains a one-time secret-bearing step:
-
-```bash
-moshi-hook pair --token <token-from-Moshi> --store file
-systemctl --user restart moshi-hook
-```
-
-The public exe.dev route remains an SSH-only fallback: connect to
-`psteinroe-dev.exe.xyz` as `exedev` and force **SSH** because the gateway does
-not proxy Mosh UDP traffic. Global Herdr and `moshi-hook` bridges transparently
-run those integrations as `psteinroe` on that fallback connection.
-
-Project shortcuts follow the same local/remote pattern: `dotfiles` / `rdotfiles`, `hellomateo` / `rhellomateo`, `hops` / `rhops`, `ceplatform` / `rceplatform`, `radiomarl` / `rradiomarl`, `ninjascale` / `rninjascale`, `sbch` / `rsbch`, `pgls` / `rpgls`, `pgconductor` / `rpgconductor`, `pgstream` / `rpgstream`, `hpgstream` / `rhpgstream`, and `toolshed` / `rtoolshed`.
-
-Local and remote helpers intentionally mirror each other where possible:
-
-| Local | Remote | Purpose |
-| --- | --- | --- |
-| `rebuild` | `rrebuild [host]` | Rebuild locally/remotely, then reload resources in idle Pi agents |
-| `hdev <repo> [branch\|pr]` | `rdev <repo> [branch\|pr]` | Open locally, or prepare/register remote session and return to the Herdr client |
-| `wtclean` | `rwtclean <repo>` | Clean integrated/stale worktrees |
-| `wtforceclean` | `rwtforceclean <repo>` | Select and force-remove worktrees |
-| `hwtcreate <branch\|pr>` | `rhwtcreate <repo> <branch\|pr>` | Ensure requested worktree and focus/open its workspace |
-| `htrimworkspaces [--apply\|--auto]` | — | Preview/confirm, or automatically close only strictly safe idle siblings |
-| `hsyncworktrees [--prune\|--prune-only]` | `rhsyncworktrees <repo> [--prune]` | Explicitly expose all worktrees, or prune stale Herdr workspaces |
-| — | `rauth [all\|gh\|pi\|claude\|mcp\|exa\|aws\|gcloud\|azure\|infisical]` | Copy local GitHub/Pi/Claude Bridge/MCP/Exa/AWS/gcloud/Azure/Infisical auth to the remote |
-| — | `ssh rdev-hetzner` | Test the prepared Hetzner NixOS replacement before cutover |
-| — | `ssh rdev-exe` | Recovery path via exe.dev gateway |
-
-For the full command list, run `devhelp`. `rhwtcreate` and `rhsyncworktrees`
-use `rdev` preparation/registration without a second TUI when their remote
-session is absent. First-time machine add may perform SSH/bootstrap
-compatibility setup and prompt. `rherdr` is reserved for direct
-recovery/Moshi attachment. Normal preparation and the worktree
-hook only prune stale/missing Herdr workspaces and open the requested target;
-there is no bulk workspace sync. `hsyncworktrees` without an option (or with
-`--prune`) is the manual **expose all worktrees** escape hatch, not normal
-maintenance. `--prune-only` is the safe cleanup mode. `htrimworkspaces` previews
-idle candidates and, with `--apply`, asks for confirmation while protecting
-focused workspaces, agents, dirty Git worktrees, non-shell processes,
-background/descendant processes, and uncertain inspections. Opening a worktree
-automatically runs the same strict cleanup for sibling workspaces: only clean,
-shell-idle siblings can close; Git worktrees, focused workspaces, agents, dirty
-files, active commands, background/descendant jobs, and uncertain states are
-preserved. Closing a Herdr workspace never deletes its Git
-worktree.
-
-Rebuilds invoke `pireload`, which reloads only idle Pi agents with no child
-processes. Working, blocked, and background-task sessions are reported and left
-untouched; retry from the `Safe Pi Reload` Herdr action or run `pireload` later.
-
-Pi also receives the `herdr` skill on local and remote machines. It activates
-only when the user explicitly asks Pi to control Herdr. Project workspace creation routes through `hwtcreate`/`wtensure` instead of
-Herdr's default worktree layout and keeps the current workspace focused unless
-asked to switch. The worktree manager's `t` action runs the interactive trim helper; opening an
-existing worktree also runs the non-interactive strict cleanup. Its `s` action is
-the explicit full-sync escape hatch. Closing a workspace preserves the underlying
-Git worktree.
-Pi's internal subagents continue to use their normal runtime rather than Herdr
-workspaces.
-
-## Pi models and login
-
-Main and Worker use `claude-bridge/claude-opus-5-5` with high thinking.
-Run `/reload` in Pi after updating the extensions, then `/claude-login` to
-sign in through the bridge's Claude Code CLI. This command requires Pi's
-interactive terminal UI. Claude Code manages the credentials; Pi's `/login`
-for Anthropic is separate and does not authenticate the bridge.
-
-## Git worktrees
-
-```bash
-wtclone git@github.com:user/repo.git
-cd repo.git/main
-wtcreate feature-x
-wtcheckout 123
-wtclean
-```
-
-`wtclean` / `rwtclean` **delete worktree directories**, including ignored files;
-use `htrimworkspaces` when you only want to close idle workspaces. Cleanup asks
-for confirmation, protects live agents, and skips candidates whose Git status,
-agent state, or filesystem permissions cannot be verified. It requires Python
-3.8+, Herdr, and jq for read-only preflight and agent checks, including ignored
-directories and nested mounts on Linux. Permission blockers require manual review: cleanup never runs
-`sudo`, `chown`, or `chmod` to bypass them. Existing unregistered leftovers are
-not force-deleted.
-
-Clean candidates are removed without `--force`. Stale local changes require
-explicit confirmation and must still be older than `WTCLEAN_STALE_DAYS` (default
-7) after confirmation. Branch, commit, dirty state, agent state, and filesystem
-permissions are rechecked before removal; stale-dirty contents are fingerprinted
-so preserved timestamps cannot conceal new work. These checks reduce risk but are not
-atomic: Git deletion can still partially fail if the filesystem or another
-process changes after preflight. Unrelated Herdr workspaces are not globally
-pruned, and tmux sessions are not killed by cleanup.
-
-Common local commands:
 
 | Command | Purpose |
 | --- | --- |
-| `wtclone <url>` | Clone as bare repo plus `main` worktree |
-| `wtcreate <branch>` | Create branch worktree |
-| `wtcheckout <branch\|pr#>` | Checkout branch/PR worktree |
-| `wtensure <branch\|pr#>` | Ensure worktree exists and cd into it |
+| `rebuild` / `rrebuild [host]` | Rebuild this machine / force-sync dotfiles and rebuild the remote |
+| `rssh [dir]` | Plain remote shell |
+| `rauth [all\|gh\|pi\|claude\|mcp\|exa\|aws\|gcloud\|azure\|infisical]` | Copy local auth to the remote |
+| `ssh rdev-exe` | Recovery path via exe.dev gateway |
+
+Run `devhelp` for the full command list.
+
+## Pi models and login
+
+Pi is available as a T3 Code provider and in the terminal. Main and Worker use
+`claude-bridge/claude-opus-5-5` with high thinking. Run `/reload` in Pi after
+updating the extensions, then `/claude-login` to sign in through the bridge's
+Claude Code CLI. This command requires Pi's interactive terminal UI. Claude Code
+manages the credentials; Pi's `/login` for Anthropic is separate and does not
+authenticate the bridge.
 
 ## Git / PR review
 
@@ -257,6 +116,7 @@ Common local commands:
 | `review` | Open `tuicr` for the current repo |
 | `gpd [pr]` | Pipe `gh pr diff` into `diffnav` |
 | `gpr [-a] [-n] [-e] [-d] [-f issue]` | Commit/push/create PR helper |
+| `gclean` / `greset` | Delete merged branches / reset to the default branch |
 | `/pr [--all|-a] [--draft] [--fixes issue]` | Pi PR writer skill |
 | `lazygit` | Terminal Git UI |
 
