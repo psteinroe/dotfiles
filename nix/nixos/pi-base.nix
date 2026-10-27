@@ -8,6 +8,8 @@
 }:
 
 {
+  imports = [ ./pi-tailscale-join.nix ];
+
   nixpkgs.hostPlatform = "aarch64-linux";
 
   # The SD image module pulls in profiles/base.nix, which enables ZFS and with it
@@ -24,12 +26,12 @@
   #   };
   networking.firewall = {
     enable = true;
-    # SSH stays reachable on the LAN, which is the only way in before `tailscale up`
+    # SSH stays reachable on the LAN, the way in if the Pi never joined the tailnet
     allowedTCPPorts = [ 22 ];
     trustedInterfaces = [ "tailscale0" ];
   };
 
-  # Publishes <hostName>.local on the LAN for the first login
+  # Publishes <hostName>.local on the LAN as a fallback to Tailscale
   services.avahi = {
     enable = true;
     nssmdns4 = true;
