@@ -1,11 +1,4 @@
-# Rebuild the Raspberry Pi hub from this machine: evaluate here, build or substitute on the hub, activate there.
+# Rebuild the Raspberry Pi hub; shorthand for `pi-rebuild hub`.
 # Usage: hub-rebuild [switch|boot|test|dry-activate|...] [nixos-rebuild args...]
-local dotfiles="${DOTFILES_DIR:-$HOME/Developer/dotfiles}"
-source "$dotfiles/zsh/functions/_hub" || return
-local action="${1:-switch}"
-(( $# )) && shift
-
-# --no-reexec: re-exec would build the hub's aarch64-linux nixos-rebuild here
-nix run --inputs-from "$dotfiles" nixpkgs#nixos-rebuild-ng -- "$action" \
-  --flake "$dotfiles#hub" --target-host "$hub_ssh" --build-host "$hub_ssh" \
-  --elevate sudo --no-reexec "$@"
+autoload -Uz pi-rebuild
+pi-rebuild hub "$@"

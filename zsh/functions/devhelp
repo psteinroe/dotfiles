@@ -30,7 +30,8 @@ if [[ "$topic" == all || "$topic" == remote ]]; then
   _case_row "rrebuild [host]" "force-sync dotfiles on the remote and rebuild it"
   _case_row "rssh [dir]" "open a plain remote psteinroe shell"
   _case_row "ssh rdev-exe" "recovery path via exe.dev gateway"
-  _case_row "hub-rebuild [action]" "deploy the Raspberry Pi hub (nixos-rebuild, builds on the hub)"
+  _case_row "pi-rebuild <host> [action]" "deploy a Raspberry Pi: hub or office-connector (builds on the Pi)"
+  _case_row "hub-rebuild [action]" "shorthand for pi-rebuild hub"
   [[ "$topic" == all ]] && print
 fi
 
