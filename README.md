@@ -130,8 +130,8 @@ the Claude subscriptions only through Claude Code.
 
 Bootstrap:
 
-1. Run the `pi-images` workflow (Actions → pi-images → Run workflow, host `hub`)
-   and download the `hub-sd-image` artifact.
+1. Run the `pi-images` workflow (Actions → pi-images → Run workflow) and
+   download the `hub-sd-image` artifact.
 2. `zstd -d nixos-image-*.img.zst`, then flash it with Raspberry Pi Imager or
    `sudo dd if=nixos-image-*.img of=/dev/rdiskN bs=4m`.
 3. Boot the Pi on Ethernet and `ssh psteinroe@hub.local` (or its LAN IP).
@@ -162,33 +162,7 @@ start, so make config changes in `nix/nixos/hub/cliproxyapi.nix`, not the panel.
 
 ## Office connector
 
-A Raspberry Pi 4 in the office (`nixosConfigurations.office-connector`,
-`nix/nixos/connector/`) is a Tailscale
-[app connector](https://tailscale.com/kb/1281/app-connectors) in the
-hellomateo.de tailnet, tagged `tag:office-connector`. The devboxes on Hetzner
-run Claude Code and Codex on personal subscriptions; only the AI provider
-domains egress through this Pi, so that traffic leaves from the office IP. It is
-egress only: no credentials, no proxy. The domains, the tag owners, and the
-`autoApprovers` live in the tailnet policy in getmateo/devboxes, not here.
-
-Order: Raspberry Pi 4 Model B (2 GB), the official USB-C power supply, a case
-with cooling (fan or heatsink case), a high-endurance 32 GB microSD card, and
-an Ethernet cable. Wi-Fi is not configured.
-
-Bootstrap:
-
-1. Run the `pi-images` workflow (Actions → pi-images → Run workflow, host
-   `office-connector`) and download the `office-connector-sd-image` artifact.
-2. `zstd -d nixos-image-*.img.zst`, then flash it as for the hub.
-3. Boot the Pi on Ethernet and `ssh psteinroe@office-connector.local` (or its LAN IP).
-4. `sudo tailscale up --advertise-tags=tag:office-connector --advertise-connector`
-   and log in interactively as a hellomateo.de admin, or pass a tagged auth key
-   with `--auth-key=file:/path/to/key` so it stays out of shell history. Tags
-   can only be set with `tailscale up`; NixOS re-applies `--advertise-connector`
-   with `tailscale set` on every boot.
-
-Updates: `pi-rebuild office-connector` (`OFFICE_CONNECTOR_SSH` overrides the
-default `psteinroe@office-connector`).
+The office Tailscale app connector lives in getmateo/devboxes.
 
 ## Remote machine
 

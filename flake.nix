@@ -150,16 +150,11 @@
         isLinux = true;
       };
 
-      # Raspberry Pis: the home hub (Pi 3, CLIProxyAPI) and the office app connector (Pi 4).
-      # Build the SD images on an aarch64-linux machine (.github/workflows/pi-images.yml);
-      # deploy changes with pi-rebuild.
+      # Raspberry Pi 3 home hub (CLIProxyAPI). Build the SD image on an aarch64-linux
+      # machine (.github/workflows/pi-images.yml); deploy changes with hub-rebuild.
       nixosConfigurations.hub = mkPi ./nix/nixos/hub;
-      nixosConfigurations.office-connector = mkPi ./nix/nixos/connector;
 
-      packages.aarch64-linux = {
-        hub-sd-image = self.nixosConfigurations.hub.config.system.build.sdImage;
-        office-connector-sd-image = self.nixosConfigurations.office-connector.config.system.build.sdImage;
-      };
+      packages.aarch64-linux.hub-sd-image = self.nixosConfigurations.hub.config.system.build.sdImage;
 
       # Expose the package set
       darwinPackages = self.darwinConfigurations.${hostname}.pkgs;

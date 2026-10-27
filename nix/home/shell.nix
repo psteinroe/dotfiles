@@ -73,7 +73,6 @@ in
       autoload -Uz claude-login
       autoload -Uz claude-accounts
       autoload -Uz executor-login
-      autoload -Uz pi-rebuild
       autoload -Uz hub-rebuild
       autoload -Uz hub-login
       autoload -Uz hub-client

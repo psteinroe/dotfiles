@@ -1,4 +1,4 @@
-# Shared by every Raspberry Pi box (hub, office-connector): headless, SSH key-only,
+# Shared by the Raspberry Pis (currently only the hub): headless, SSH key-only,
 # reachable as <hostName>.local on the LAN until Tailscale is up. Imported together
 # with nixpkgs' sd-image-aarch64 module; each host sets networking.hostName.
 {
@@ -71,7 +71,7 @@
         "nix-command"
         "flakes"
       ];
-      # pi-rebuild copies closures as psteinroe and builds here
+      # hub-rebuild copies closures as psteinroe and builds here
       trusted-users = [
         "root"
         "@wheel"
