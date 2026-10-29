@@ -1,7 +1,8 @@
 # Shared by hub-login and hub-client. Source, then use:
 #   $hub_url   CLIProxyAPI on the hub, published by `tailscale serve`
 #   $hub_ssh   ssh destination of the hub
-# The hub lives in the personal tailnet and is shared into the work one, so it is
-# always addressed by its full MagicDNS name. Override with HUB_URL / HUB_SSH.
-hub_url="${HUB_URL:-https://hub.tail6aabd2.ts.net:8317}"
+# The hub is a tag:hub node in the work tailnet (the devboxes' one) and is shared to
+# the personal user, so it is always addressed by its full MagicDNS name.
+# Override with HUB_URL / HUB_SSH.
+hub_url="${HUB_URL:-https://hub.tail649856.ts.net:8317}"
 hub_ssh="${HUB_SSH:-psteinroe@${${hub_url#https://}%%[:/]*}}"

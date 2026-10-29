@@ -1,7 +1,7 @@
 # Point a second Claude Code and Codex config (~/.claude-hub, ~/.codex-hub) at the hub, here or on a remote.
 # The normal ~/.claude and ~/.codex logins stay untouched; use them via claude-hub and codex-hub.
 # The access key comes from this Mac's Keychain (CLIPROXY_ACCESS_KEY) and is never printed. Fetch it once:
-#   ssh psteinroe@hub.tail6aabd2.ts.net sudo cat /var/lib/cliproxyapi/access-key
+#   ssh psteinroe@hub.tail649856.ts.net sudo cat /var/lib/cliproxyapi/access-key
 #   set-keychain-environment-variable CLIPROXY_ACCESS_KEY    # paste it at the hidden prompt
 # Usage: hub-client [--host host]
 local usage="Usage: hub-client [--host host]"

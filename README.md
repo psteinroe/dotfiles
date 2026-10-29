@@ -210,58 +210,113 @@ workspaces.
 A Raspberry Pi 3 at home (`nixosConfigurations.hub`, `nix/nixos/hub/`) runs
 [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI), following
 [this guide](https://gist.github.com/t3dotgg/59a521d2ee8d70aaf90e280c175072af).
-Every Claude and Codex subscription logs in on the hub only; clients reach it at
-`https://hub.tail6aabd2.ts.net:8317` (`tailscale serve`, configured in
-`zsh/functions/_hub`). The hub lives in the personal tailnet and is shared into
-the work tailnet (Tailscale admin: Machines → hub → Share). Only users can
-accept a share, so this reaches user-owned devices such as this Mac. Tagged
-machines on the work tailnet, like the work devboxes, can't reach the hub
-through sharing; they need separately authorized cross-tailnet connectivity,
-which isn't set up.
+It is personal hardware serving personal Claude and Codex subscriptions to the
+owner's own machines only; it is not a team credential pool. The accounts log
+in on the hub only, and clients reach it at `https://hub.tail649856.ts.net:8317`
+(`tailscale serve`, configured in `zsh/functions/_hub`).
+
+The hub joins the work tailnet (the devboxes' one) as `tag:hub`, so that:
+
+- the work Mac (`philipp@hellomateo.de`) reaches the API on 8317 and Tailscale
+  SSH on 22;
+- the owner's devbox (`tag:devbox-psteinroe`, same tailnet) reaches the API on 8317
+  only;
+- CI (`tag:hub-deploy`) reaches Tailscale SSH on 22 only;
+- `rdev`, a user-owned machine of `psteinroe@github` in the personal tailnet,
+  reaches the API on 8317 only, through a share of the hub to that user. That
+  user's other devices in the personal tailnet get the same through the share.
+
+Other users and devboxes get no grant, and the hub itself gets no access to
+anything else. A share only reaches the user who accepts it, so it is not a way
+to reach tagged machines in another tailnet.
 
 Two rules: never serve other people's traffic with these subscriptions, and use
 the Claude subscriptions only through Claude Code.
 
-Bootstrap (no SSH, no browser login, no commands on the Pi):
+### Tailnet policy
+
+The work tailnet's policy is managed in getmateo/devboxes, never in the admin
+console. A separate devboxes PR adds the hub's narrow rules; merge it before
+creating the hub's tagged auth key (Bootstrap step 3) or its trust credential.
+It needs:
+
+- `tagOwners` for `tag:hub` and `tag:hub-deploy`;
+- grants to `tag:hub`: `philipp@hellomateo.de` on `tcp:8317` and `tcp:22`,
+  `tag:devbox-psteinroe` on `tcp:8317`, `autogroup:shared` on `tcp:8317` (the
+  hub is shared only with `psteinroe@github`), `tag:hub-deploy` on `tcp:22`;
+- Tailscale SSH to `tag:hub` as `psteinroe`: `check` for
+  `philipp@hellomateo.de`, `accept` for `tag:hub-deploy`; none for shared users
+  or devboxes;
+- no grants with `tag:hub` as source and no app connector grants for it, so the
+  hub's provider traffic leaves from the home connection; no other users or
+  devboxes.
+
+`ssh psteinroe@hub.local` on the LAN stays plain OpenSSH.
+
+### Bootstrap
+
+No SSH, no browser login, no commands on the Pi:
 
 1. Run the `pi-images` workflow (Actions → pi-images → Run workflow) and
    download the `hub-sd-image` artifact, or take it from an earlier run.
 2. `zstd -d nixos-image-*.img.zst`, then flash the `.img` with Raspberry Pi
    Imager (Use custom, no OS customisation) or balenaEtcher.
-3. Create a one-off auth key in the personal tailnet: Tailscale admin →
-   Settings → Keys → Generate auth key, not reusable, not ephemeral,
-   pre-approved if device approval is on, and tagged `tag:hub` (the tag has to
-   exist first, see [Deploy setup](#deploy-setup)). Reinsert the SD card and save
-   the key as `tailscale-authkey` on its FAT partition (`FIRMWARE`), e.g.
+3. Once the [policy PR](#tailnet-policy) is merged, create a one-off auth key in
+   the work tailnet: Tailscale admin → Settings → Keys → Generate auth key, not
+   reusable, not ephemeral, pre-approved if device approval is on, and tagged
+   `tag:hub`. Reinsert the SD card and save the key as `tailscale-authkey` on its
+   FAT partition (`FIRMWARE`), e.g.
    `pbpaste > /Volumes/FIRMWARE/tailscale-authkey && diskutil eject /Volumes/FIRMWARE`.
 4. Put the card in the Pi and plug in Ethernet and power. On first boot it joins
-   the tailnet as `hub` with Tailscale SSH on and deletes the key file
+   the work tailnet as `hub` with `--ssh` and `tag:hub` and deletes the key file
    (`nix/nixos/pi-tailscale-join.nix`). If it doesn't show up in the admin
    within a few minutes, `ssh psteinroe@hub.local` and
-   `journalctl -u tailscale-join`.
+   `journalctl -u tailscale-join`. If the name `hub` is taken it gets another
+   one; set `HUB_URL` (and the workflow's `TARGET`) to match.
 
 Then:
 
-1. Enable HTTPS certificates in the personal tailnet's admin (DNS → HTTPS
-   Certificates) and share the machine into the work tailnet (Machines → hub →
-   Share). The hub starts `tailscale serve` by itself once HTTPS is enabled;
-   `systemctl status cliproxyapi-tailscale-serve` finishes when it is up.
-2. Store the access key in this Mac's Keychain (it is generated on the hub and
-   never leaves it otherwise):
-   `ssh psteinroe@hub.tail6aabd2.ts.net sudo cat /var/lib/cliproxyapi/access-key`,
+1. The hub starts `tailscale serve` by itself once the work tailnet has HTTPS
+   certificates enabled; `systemctl status cliproxyapi-tailscale-serve` finishes
+   when it is up.
+2. Share the hub (Machines → hub → Share) with `psteinroe@github` only and
+   accept the invite as that user, so `rdev` can reach the API.
+3. Store the access key in the work Mac's Keychain (it is generated on the hub
+   and otherwise never leaves it):
+   `ssh psteinroe@hub.tail649856.ts.net sudo cat /var/lib/cliproxyapi/access-key`,
    then `set-keychain-environment-variable CLIPROXY_ACCESS_KEY` and paste it.
-3. Add accounts, one run per account: `hub-login claude`, `hub-login codex`.
-4. Point this Mac at the hub: `hub-client`. This writes
-   `~/.claude-hub/settings.json` and `~/.codex-hub/config.toml` only; normal
-   logins stay. Use `claude-hub` / `codex-hub` in the terminal.
-   `hub-client --host <host>` writes the same files on another machine but
-   doesn't make the hub reachable from there; it only helps on user-owned
-   devices that already reach the hub. The tagged work devboxes are blocked
-   (see above).
-5. Verify: `curl -s https://hub.tail6aabd2.ts.net:8317/v1/models -H "Authorization: Bearer $(keychain-environment-variable CLIPROXY_ACCESS_KEY)" | head -c 300`
+4. On the Mac, add the accounts, one run per account (see below).
+5. Point each machine at the hub with `hub-client` (see below).
+6. Verify: `curl -s https://hub.tail649856.ts.net:8317/v1/models -H "Authorization: Bearer $(keychain-environment-variable CLIPROXY_ACCESS_KEY)" | head -c 300`
 
-The T3 instances "Claude (Hub)" and "Codex (Hub)" in `agents/t3/settings.json`
-stay disabled until the hub works; enable them in the T3 UI afterwards. The
+### `hub-login` vs `hub-client`
+
+`hub-login` adds a subscription account to the hub. It runs on the Mac, opens
+the provider's login there, and runs CLIProxyAPI's login on the hub over
+Tailscale SSH, so the new OAuth credentials are created and stored on the hub
+only. Only the Mac has SSH to the hub; `rdev` and the devbox use the API only, so
+run every login from the Mac.
+
+```bash
+hub-login claude   # personal Claude account, browser OAuth (callback port forwarded to the hub)
+hub-login codex    # personal ChatGPT account, device code
+```
+
+`hub-client` points a machine at the hub. It writes only the isolated
+`~/.claude-hub/settings.json` and `~/.codex-hub/config.toml` with the hub's URL
+and access key. The key goes from the Mac's Keychain over stdin (through ssh for
+`--host`), never in arguments. Normal `~/.claude` and `~/.codex` logins stay
+untouched, and no OAuth credential is ever copied off the hub.
+
+```bash
+hub-client                                    # the Mac
+hub-client --host rdev                        # rdev, through the share
+hub-client --host psteinroe@devbox-psteinroe  # the owner's devbox
+```
+
+Then use `claude-hub` / `codex-hub` on that machine, or the T3 instances
+"Claude (Hub)" and "Codex (Hub)" in `agents/t3/settings.json`; they stay
+disabled until the hub works, enable them in the T3 UI afterwards. The
 management panel is at `/management.html` with the key in
 `/var/lib/cliproxyapi/management-key`.
 
@@ -269,13 +324,13 @@ management panel is at `/management.html` with the key in
 
 Merges to main that touch the hub (`nix/nixos/**`, `nix/keys/**`, `flake.nix`,
 `flake.lock`) run `.github/workflows/hub-deploy.yml`: a GitHub ARM runner
-evaluates and builds the whole system, joins the personal tailnet as
+evaluates and builds the whole system, joins the work tailnet as
 `tag:hub-deploy`, copies the finished closure to the Pi over Tailscale SSH (the
 Pi fetches what cache.nixos.org has itself) and activates it with sudo. The Pi
 never evaluates or compiles anything (`nix.settings.max-jobs = 0`, so
 `nixos-rebuild` on the Pi itself fails), has no nightly updater and never
 reboots by itself: a new kernel takes effect after
-`ssh psteinroe@hub.tail6aabd2.ts.net sudo reboot` (the run summary says when).
+`ssh psteinroe@hub.tail649856.ts.net sudo reboot` (the run summary says when).
 Nothing updates on its own either: a new CLIProxyAPI release needs
 `scripts/update-cliproxyapi [tag]` and a merge, newer system packages a
 `flake.lock` bump and a merge.
@@ -289,48 +344,32 @@ start, so make config changes in `nix/nixos/hub/cliproxyapi.nix`, not the panel.
 ### Deploy setup
 
 None of this is configured yet; until the last step, runs only report that the
-deployment was skipped. All of it happens in the personal tailnet and this
-repository, never with team credentials or the work tailnet's policy.
+deployment was skipped.
 
-1. Tailnet policy (Access controls): add the entries below to the existing
-   policy, keeping everything already there. Tailscale SSH now answers on the
-   hub's port 22 over the tailnet, so your own devices need an SSH rule for
-   `tag:hub` as well (and network access to it, if the grants are restricted);
-   `ssh psteinroe@hub.local` on the LAN stays plain OpenSSH.
-
-   ```jsonc
-   "tagOwners": {
-     "tag:hub": ["autogroup:admin"],
-     "tag:hub-deploy": ["autogroup:admin"],
-   },
-   "grants": [
-     { "src": ["tag:hub-deploy"], "dst": ["tag:hub"], "ip": ["tcp:22"] },
-   ],
-   "ssh": [
-     { "action": "accept", "src": ["tag:hub-deploy"], "dst": ["tag:hub"], "users": ["psteinroe"] },
-     // your own access, e.g.
-     // { "action": "check", "src": ["autogroup:member"], "dst": ["tag:hub"], "users": ["psteinroe"] },
-   ],
-   ```
-
-2. The hub joins with the `tag:hub` boot key from Bootstrap step 3 and runs with
-   `--ssh`. A hub that joined before this: give it `tag:hub` (Machines → hub →
-   Edit ACL tags) and run `ssh psteinroe@hub.local sudo tailscale set --ssh`
-   once.
-3. Tailscale trust credential (Settings → Trust credentials → OpenID Connect,
-   issuer GitHub): subject `repo:psteinroe/dotfiles:environment:hub`, scope Auth
-   Keys write, restricted to `tag:hub-deploy`. It has no long-lived secret; note
-   its client ID and audience.
-4. GitHub environment `hub` (Settings → Environments), deployment branches
+1. The [policy PR](#tailnet-policy) is merged, and the hub runs with `tag:hub`
+   and `--ssh` (Bootstrap).
+2. A dedicated Tailscale trust credential in the work tailnet (Settings → Trust
+   credentials → OpenID Connect, issuer GitHub): subject
+   `repo:psteinroe/dotfiles:environment:hub`, scope Auth Keys write, restricted
+   to `tag:hub-deploy`. It is only for this repository's `hub` environment;
+   never reuse the team's CI credential. It has no long-lived secret; note its
+   client ID and audience.
+3. GitHub environment `hub` (Settings → Environments), deployment branches
    limited to `main`, with the variables `HUB_TS_OAUTH_CLIENT_ID` and
-   `HUB_TS_OIDC_AUDIENCE` from step 3.
-5. Once all of the above is in place, enable deploys:
+   `HUB_TS_OIDC_AUDIENCE` from step 2.
+4. Once all of the above is in place, enable deploys:
    `gh variable set HUB_DEPLOY_ENABLED --repo psteinroe/dotfiles --body true`,
    then `hub-rebuild` for the first one.
 
 ## Office connector
 
-The office Tailscale app connector lives in getmateo/devboxes.
+The office Tailscale app connector lives in getmateo/devboxes, and provider
+traffic from the devboxes, mine included, still goes through it. That stays
+until the hub is online, its logins work and the clients above are verified.
+The planned cutover is a separate, reviewed devboxes change that removes only
+`tag:devbox-psteinroe` from the two office grants; teammates stay routed
+through the office. The hub has no connector grants, so its provider traffic
+leaves from the home connection.
 
 ## Pi models and login
 

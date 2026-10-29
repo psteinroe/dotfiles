@@ -1,8 +1,9 @@
 # Deploys the Raspberry Pi hub from main: a native aarch64-linux runner evaluates and
 # builds the whole system, then copies the finished closure to the Pi over Tailscale
 # SSH and activates it with sudo. The Pi (1 GB) never evaluates or builds and is never
-# rebooted. Off until the tailnet trust is set up and the repository variable
-# HUB_DEPLOY_ENABLED is "true" (README, Home hub). hub-rebuild dispatches it.
+# rebooted. Off until the work tailnet's trust credential for this repository's hub
+# environment is set up and the repository variable HUB_DEPLOY_ENABLED is "true"
+# (README, Home hub). hub-rebuild dispatches it.
 name: hub-deploy
 
 on:
@@ -20,7 +21,7 @@ permissions:
   contents: read
 
 env:
-  TARGET: psteinroe@hub.tail6aabd2.ts.net
+  TARGET: psteinroe@hub.tail649856.ts.net
 
 jobs:
   not-deployed:

@@ -21,8 +21,8 @@ in
   # compiling on 1 GB of RAM, so `nixos-rebuild` on the Pi itself doesn't work.
   nix.settings.max-jobs = 0;
 
-  # Tailscale SSH is how CI reaches the hub (tag:hub-deploy → tag:hub in the tailnet
-  # policy). OpenSSH stays for the LAN.
+  # Tailscale SSH is how CI reaches the hub (tag:hub-deploy → tag:hub in the work
+  # tailnet's policy, managed in getmateo/devboxes). OpenSSH stays for the LAN.
   services.tailscale.extraSetFlags = [ "--ssh" ];
   # The boot auth key must carry tag:hub
   my.pi.tailscaleUpFlags = [
