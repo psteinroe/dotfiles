@@ -236,7 +236,8 @@ the Claude subscriptions only through Claude Code.
 ### Tailnet policy
 
 The work tailnet's policy is managed in getmateo/devboxes, never in the admin
-console. A separate devboxes PR adds the hub's narrow rules; merge it before
+console. [devboxes#61](https://github.com/getmateo/devboxes/pull/61) adds the hub's
+narrow rules; merge it before
 creating the hub's tagged auth key (Bootstrap step 3) or its trust credential.
 It needs:
 
