@@ -72,6 +72,7 @@ if [[ "$topic" == all || "$topic" == remote ]]; then
   _case_row "rpushdev [repo] [msg]" "commit/push, then prepare/register with rdev and return"
   _case_row "rherdr <repo> [branch|pr]" "direct remote recovery/Moshi attach (explicit TUI)"
   _case_row "ssh rdev-exe" "recovery path via exe.dev gateway"
+  _case_row "hub-rebuild [action]" "deploy the Raspberry Pi hub (nixos-rebuild, builds on the hub)"
   [[ "$topic" == all ]] && print
 fi
 
@@ -79,5 +80,8 @@ if [[ "$topic" == all || "$topic" == auth ]]; then
   _case_header "Auth/helper utilities"
   _case_row "gh" "wrap gh to auto-use exe.dev integration hosts from origin"
   _case_row "rauth [spec...]" "copy local auth bundle to the remote"
+  _case_row "hub-login claude|codex" "add a Claude or Codex account to the hub's CLIProxyAPI"
+  _case_row "hub-client [--host h]" "point ~/.claude-hub and ~/.codex-hub at the hub"
+  _case_row "claude-hub / codex-hub" "run Claude Code / Codex through the hub"
   _case_row "devhelp [topic]" "show this command reference"
 fi

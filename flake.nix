@@ -120,6 +120,17 @@
           };
           modules = [ ./nix/home ];
         };
+
+      # The sd-image-aarch64 module boots Pi 3 and Pi 4 (firmware, U-Boot, device trees).
+      mkPi =
+        module:
+        nixpkgs.lib.nixosSystem {
+          specialArgs = { inherit username; };
+          modules = [
+            "${nixpkgs}/nixos/modules/installer/sd-card/sd-image-aarch64.nix"
+            module
+          ];
+        };
     in
     {
       darwinConfigurations.${hostname} = nix-darwin.lib.darwinSystem {
@@ -205,6 +216,13 @@
           program = "${inputs.nixos-anywhere.packages.${system}.default}/bin/nixos-anywhere";
         };
       });
+
+      # Raspberry Pi 3 home hub (CLIProxyAPI). Build the SD image on an aarch64-linux
+      # machine (.github/workflows/pi-images.yml); it upgrades itself from main daily, and
+      # hub-rebuild deploys changes right away.
+      nixosConfigurations.hub = mkPi ./nix/nixos/hub;
+
+      packages.aarch64-linux.hub-sd-image = self.nixosConfigurations.hub.config.system.build.sdImage;
 
       # Expose the package set
       darwinPackages = self.darwinConfigurations.${hostname}.pkgs;

@@ -205,6 +205,74 @@ Git worktree.
 Pi's internal subagents continue to use their normal runtime rather than Herdr
 workspaces.
 
+## Home hub
+
+A Raspberry Pi 3 at home (`nixosConfigurations.hub`, `nix/nixos/hub/`) runs
+[CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI), following
+[this guide](https://gist.github.com/t3dotgg/59a521d2ee8d70aaf90e280c175072af).
+Every Claude and Codex subscription logs in on the hub only; the Mac, rdev, and
+the devbox reach it at `https://hub.tail6aabd2.ts.net:8317` (`tailscale serve`,
+configured in `zsh/functions/_hub`). The hub lives in the personal tailnet and is
+shared into the work tailnet (Tailscale admin: Machines → hub → Share).
+
+Two rules: never serve other people's traffic with these subscriptions, and use
+the Claude subscriptions only through Claude Code.
+
+Bootstrap (no SSH, no browser login, no commands on the Pi):
+
+1. Run the `pi-images` workflow (Actions → pi-images → Run workflow) and
+   download the `hub-sd-image` artifact, or take it from an earlier run.
+2. `zstd -d nixos-image-*.img.zst`, then flash the `.img` with Raspberry Pi
+   Imager (Use custom, no OS customisation) or balenaEtcher.
+3. Create a one-off auth key in the personal tailnet: Tailscale admin →
+   Settings → Keys → Generate auth key, not reusable, not ephemeral, and
+   pre-approved if device approval is on. Reinsert the SD card and save the key
+   as `tailscale-authkey` on its FAT partition (`FIRMWARE`), e.g.
+   `pbpaste > /Volumes/FIRMWARE/tailscale-authkey && diskutil eject /Volumes/FIRMWARE`.
+4. Put the card in the Pi and plug in Ethernet and power. On first boot it joins
+   the tailnet as `hub` and deletes the key file
+   (`nix/nixos/pi-tailscale-join.nix`). If it doesn't show up in the admin
+   within a few minutes, `ssh psteinroe@hub.local` and
+   `journalctl -u tailscale-join`.
+
+Then:
+
+1. Enable HTTPS certificates in the personal tailnet's admin (DNS → HTTPS
+   Certificates) and share the machine into the work tailnet (Machines → hub →
+   Share). The hub starts `tailscale serve` by itself once HTTPS is enabled;
+   `systemctl status cliproxyapi-tailscale-serve` finishes when it is up.
+2. Store the access key in this Mac's Keychain (it is generated on the hub and
+   never leaves it otherwise):
+   `ssh psteinroe@hub.tail6aabd2.ts.net sudo cat /var/lib/cliproxyapi/access-key`,
+   then `set-keychain-environment-variable CLIPROXY_ACCESS_KEY` and paste it.
+3. Add accounts, one run per account: `hub-login claude`, `hub-login codex`.
+4. Point clients at the hub: `hub-client` (this Mac), `hub-client --host rdev`,
+   `hub-client --host psteinroe@devbox-psteinroe`. This writes
+   `~/.claude-hub/settings.json` and `~/.codex-hub/config.toml` only; normal
+   logins stay. Use `claude-hub` / `codex-hub` in the terminal.
+5. Verify: `curl -s https://hub.tail6aabd2.ts.net:8317/v1/models -H "Authorization: Bearer $(keychain-environment-variable CLIPROXY_ACCESS_KEY)" | head -c 300`
+
+The T3 instances "Claude (Hub)" and "Codex (Hub)" in `agents/t3/settings.json`
+stay disabled until the hub works; enable them in the T3 UI afterwards. The
+management panel is at `/management.html` with the key in
+`/var/lib/cliproxyapi/management-key`.
+
+Updates are automatic: every night (04:00 plus up to 45 minutes) the hub
+switches to `github:psteinroe/dotfiles#hub`, i.e. main of this public repo, so
+merged changes land by the next morning. Until the hub is on main, that run
+fails without changing anything. It never reboots; a new kernel takes effect at
+the next power cycle (`ssh psteinroe@hub.tail6aabd2.ts.net sudo reboot`).
+`scripts/update-cliproxyapi [tag]` pins a new release. `hub-rebuild` deploys
+the local checkout right away (it evaluates on the Mac and builds or
+substitutes on the Pi); the next nightly run goes back to main, so merge
+anything that should stay. `/var/lib/cliproxyapi/config.yaml` is re-rendered
+from Nix on every service start, so make config changes in
+`nix/nixos/hub/cliproxyapi.nix`, not the panel.
+
+## Office connector
+
+The office Tailscale app connector lives in getmateo/devboxes.
+
 ## Pi models and login
 
 Main and Worker use `claude-bridge/claude-opus-5-5` with high thinking.
