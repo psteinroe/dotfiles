@@ -1,4 +1,4 @@
-# Shared by cliproxy-login and cliproxy-client. Source, then use:
+# Used by cliproxy-login. Source, then use:
 #   $cliproxy_url   CLIProxyAPI on the cliproxy Pi, published by `tailscale serve`
 #   $cliproxy_ssh   ssh destination of the cliproxy Pi
 # Each owner runs their own proxy as cliproxy-<owner> (tag:cliproxy-<owner>) in the work

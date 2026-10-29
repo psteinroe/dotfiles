@@ -86,11 +86,6 @@ in
       autoload -Uz rrebuild
       autoload -Uz rauth
       autoload -Uz cliproxy-login
-      autoload -Uz cliproxy-client
-
-      # Second Claude Code and Codex configs that use the cliproxy Pi (cliproxy-client sets them up)
-      alias claude-cliproxy='CLAUDE_CONFIG_DIR="$HOME/.claude-cliproxy" claude'
-      alias codex-cliproxy='CODEX_HOME="$HOME/.codex-cliproxy" codex'
 
       if [[ $TERM != "dumb" ]]; then
         source ${starshipZshInit}

@@ -52,23 +52,6 @@
       "config": {
         "setupMode": "existing"
       }
-    },
-    "claudeCliproxy": {
-      "driver": "claudeAgent",
-      "displayName": "Claude (CLIProxy)",
-      "enabled": false,
-      "config": {
-        "homePath": "~/.claude-cliproxy"
-      }
-    },
-    "codexCliproxy": {
-      "driver": "codex",
-      "displayName": "Codex (CLIProxy)",
-      "enabled": false,
-      "config": {
-        "setupMode": "existing",
-        "homePath": "~/.codex-cliproxy"
-      }
     }
   }
 }

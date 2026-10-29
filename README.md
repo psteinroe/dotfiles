@@ -212,21 +212,31 @@ runs [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI), following
 [this guide](https://gist.github.com/t3dotgg/59a521d2ee8d70aaf90e280c175072af).
 It is personal hardware serving personal Claude and Codex subscriptions to the
 owner's own machines only; it is not a team credential pool. The accounts log
-in on the cliproxy Pi only, and clients reach it at
-`https://cliproxy-psteinroe.tail649856.ts.net:8317` (`tailscale serve`,
-configured in `zsh/functions/_cliproxy`).
+in on the cliproxy Pi only and their credentials stay there. The API is served
+privately on the work tailnet at
+`https://cliproxy-psteinroe.tail649856.ts.net:8317` (`tailscale serve`, also
+the default in `zsh/functions/_cliproxy`).
+
+This covers the server only: the image, its tailnet setup and adding provider
+accounts. No client uses it yet; no Claude Code, Codex, T3 or Pi config here
+points at it. A follow-up PR deploys the standard Claude and Codex configs on
+the Mac, `rdev` and the devbox so that every consumer there (the plain CLIs, T3,
+Pi's bridges where they apply) uses the proxy by default, without per-client
+provider logins or account switching. That deployment will also provision the
+proxy access key securely, rather than requiring manual edits on each machine.
+Initial provider logins on the Pi and occasional provider-required reauthorization
+remain necessary.
 
 The setup scales to one independent proxy per team member: each owner runs
 their own `cliproxy-<owner>` with their own hardware, `tag:cliproxy-<owner>`
 and personal accounts, never a shared service or account pool. Only
 `cliproxy-psteinroe` is configured here; this does not provision other members'
-instances. The helpers below can target another instance with `CLIPROXY_URL`
+instances. `cliproxy-login` can target another instance with `CLIPROXY_URL`
 (and `CLIPROXY_SSH`).
 
 Setup happens once: flash the image, let it join the work tailnet as
-`tag:cliproxy-psteinroe`, log in each of your own provider accounts with
-repeated `cliproxy-login`, point the Mac, `rdev` and your devbox at it with
-`cliproxy-client`, then use the isolated aliases.
+`tag:cliproxy-psteinroe`, then log in each of your own provider accounts with
+repeated `cliproxy-login`.
 
 The cliproxy Pi joins the work tailnet (the devboxes' one) as
 `cliproxy-psteinroe` with `tag:cliproxy-psteinroe`, so that:
@@ -291,52 +301,44 @@ No SSH, no browser login, no commands on the Pi:
 Then:
 
 1. The cliproxy Pi starts `tailscale serve` by itself once the work tailnet has
-   HTTPS certificates enabled; `systemctl status cliproxyapi-tailscale-serve`
-   finishes when it is up.
+   HTTPS certificates enabled.
 2. Share the proxy (Machines → cliproxy-psteinroe → Share) with
    `psteinroe@github` only and accept the invite as that user, so `rdev` can
    reach the API.
-3. Store the access key in the work Mac's Keychain (it is generated on the
-   cliproxy Pi and otherwise never leaves it):
-   `ssh psteinroe@cliproxy-psteinroe.tail649856.ts.net sudo cat /var/lib/cliproxyapi/access-key`,
-   then `set-keychain-environment-variable CLIPROXY_ACCESS_KEY` and paste it.
-4. On the Mac, add the accounts, one `cliproxy-login` run per account (see
+3. On the Mac, add the accounts, one `cliproxy-login` run per account (see
    below).
-5. Point each machine at the proxy with `cliproxy-client` (see below).
-6. Verify: `curl -s https://cliproxy-psteinroe.tail649856.ts.net:8317/v1/models -H "Authorization: Bearer $(keychain-environment-variable CLIPROXY_ACCESS_KEY)" | head -c 300`
+4. Verify the service (see below).
 
-### `cliproxy-login` vs `cliproxy-client`
+### Provider accounts
 
 `cliproxy-login` adds a subscription account to the cliproxy Pi. It runs on the
 Mac, opens the provider's login there, and runs CLIProxyAPI's login on the Pi
 over Tailscale SSH, so the new OAuth credentials are created and stored on the
-Pi only. Only the Mac has SSH to the Pi; `rdev` and the devbox use the API only,
-so run every login from the Mac. Repeat it for each of your own accounts;
-CLIProxyAPI round-robins across them and keeps a session on one account.
+Pi only. Only the Mac has SSH to the Pi, so run every login from the Mac.
+Repeat it for each of your own accounts; CLIProxyAPI round-robins across them
+and keeps a session on one account. Run it again when a provider requires a
+new login.
 
 ```bash
 cliproxy-login claude   # personal Claude account, browser OAuth (callback port forwarded to the Pi)
 cliproxy-login codex    # personal ChatGPT account, device code
 ```
 
-`cliproxy-client` points a machine at the proxy. It writes only the isolated
-`~/.claude-cliproxy/settings.json` and `~/.codex-cliproxy/config.toml` with the
-proxy's URL and access key. The key goes from the Mac's Keychain over stdin
-(through ssh for `--host`), never in arguments. Normal `~/.claude` and
-`~/.codex` logins stay untouched, and no OAuth credential is ever copied off the
-cliproxy Pi.
+### Verify
+
+These checks never print or copy the access key, which is generated on the
+cliproxy Pi and stays in `/var/lib/cliproxyapi`:
 
 ```bash
-cliproxy-client                                    # the Mac
-cliproxy-client --host rdev                        # rdev, through the share
-cliproxy-client --host psteinroe@devbox-psteinroe  # the owner's devbox
+# Service up, served on the tailnet, and the logged-in accounts
+ssh psteinroe@cliproxy-psteinroe.tail649856.ts.net \
+  'systemctl is-active cliproxyapi; sudo tailscale serve status; ls /var/lib/cliproxyapi/auths'
+# Reachable over the tailnet and rejects requests without the key: prints 401
+curl -s -o /dev/null -w '%{http_code}\n' https://cliproxy-psteinroe.tail649856.ts.net:8317/v1/models
 ```
 
-Then use `claude-cliproxy` / `codex-cliproxy` on that machine, or the T3
-instances "Claude (CLIProxy)" and "Codex (CLIProxy)" in
-`agents/t3/settings.json`; they stay disabled until the proxy works, enable them
-in the T3 UI afterwards. The management panel is at `/management.html` with the
-key in `/var/lib/cliproxyapi/management-key`.
+The management panel is at `/management.html` with the key in
+`/var/lib/cliproxyapi/management-key`.
 
 ### Updates
 
@@ -349,9 +351,9 @@ it, keeping `/var/lib/cliproxyapi` (accounts, keys) and `/var/lib/tailscale`
 Reflashing the SD card is not an update path: it wipes those accounts and the
 tailnet identity.
 
-`scripts/update-cliproxyapi [tag]` optionally bumps the pinned CLIProxyAPI
-release in `nix/nixos/cliproxy/cliproxyapi.nix`; it only edits the pin and
-deploys nothing. `/var/lib/cliproxyapi/config.yaml` is re-rendered from Nix on
+To move to another CLIProxyAPI release, edit `cliproxyapiVersion` and the
+tarball `hash` in `nix/nixos/cliproxy/cliproxyapi.nix` by hand, then build and
+switch as above. `/var/lib/cliproxyapi/config.yaml` is re-rendered from Nix on
 every service start, so make config changes in
 `nix/nixos/cliproxy/cliproxyapi.nix`, not the panel.
 
@@ -359,11 +361,11 @@ every service start, so make config changes in
 
 The office Tailscale app connector lives in getmateo/devboxes, and provider
 traffic from the devboxes, mine included, still goes through it. That stays
-until the cliproxy Pi is online, its logins work and the clients above are
-verified. The planned cutover is a separate, reviewed devboxes change that
-removes only `tag:devbox-psteinroe` from the two office grants; teammates stay
-routed through the office. The cliproxy Pi has no connector grants, so its
-provider traffic leaves from the home connection.
+until the cliproxy Pi works and the follow-up client cutover is verified. The
+planned cutover is a separate, reviewed devboxes change that removes only
+`tag:devbox-psteinroe` from the two office grants; teammates stay routed
+through the office. The cliproxy Pi has no connector grants, so its provider
+traffic leaves from the home connection.
 
 ## Pi models and login
 
