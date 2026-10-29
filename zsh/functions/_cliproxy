@@ -1,0 +1,9 @@
+# Used by cliproxy-login. Source, then use:
+#   $cliproxy_url   CLIProxyAPI on the cliproxy Pi, published by `tailscale serve`
+#   $cliproxy_ssh   ssh destination of the cliproxy Pi
+# Each owner runs their own proxy as cliproxy-<owner> (tag:cliproxy-<owner>) in the work
+# tailnet (the devboxes' one); this one is shared to the personal user, so it is always
+# addressed by its full MagicDNS name.
+# Override with CLIPROXY_URL / CLIPROXY_SSH to reach another instance.
+cliproxy_url="${CLIPROXY_URL:-https://cliproxy-psteinroe.tail649856.ts.net:8317}"
+cliproxy_ssh="${CLIPROXY_SSH:-psteinroe@${${cliproxy_url#https://}%%[:/]*}}"

@@ -120,6 +120,17 @@
           };
           modules = [ ./nix/home ];
         };
+
+      # The sd-image-aarch64 module boots Pi 3 and Pi 4 (firmware, U-Boot, device trees).
+      mkPi =
+        module:
+        nixpkgs.lib.nixosSystem {
+          specialArgs = { inherit username; };
+          modules = [
+            "${nixpkgs}/nixos/modules/installer/sd-card/sd-image-aarch64.nix"
+            module
+          ];
+        };
     in
     {
       darwinConfigurations.${hostname} = nix-darwin.lib.darwinSystem {
@@ -205,6 +216,14 @@
           program = "${inputs.nixos-anywhere.packages.${system}.default}/bin/nixos-anywhere";
         };
       });
+
+      # Raspberry Pi 3 running CLIProxyAPI (cliproxy-psteinroe). Build the SD image on an
+      # aarch64-linux machine (.github/workflows/pi-images.yml). Nothing deploys or updates it
+      # automatically; updates are occasional and manual (README, CLIProxy).
+      nixosConfigurations.cliproxy = mkPi ./nix/nixos/cliproxy;
+
+      packages.aarch64-linux.cliproxy-sd-image =
+        self.nixosConfigurations.cliproxy.config.system.build.sdImage;
 
       # Expose the package set
       darwinPackages = self.darwinConfigurations.${hostname}.pkgs;

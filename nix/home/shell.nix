@@ -85,6 +85,7 @@ in
       autoload -Uz rssh
       autoload -Uz rrebuild
       autoload -Uz rauth
+      autoload -Uz cliproxy-login
 
       if [[ $TERM != "dumb" ]]; then
         source ${starshipZshInit}
