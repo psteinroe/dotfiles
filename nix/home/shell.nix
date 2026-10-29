@@ -85,7 +85,6 @@ in
       autoload -Uz rssh
       autoload -Uz rrebuild
       autoload -Uz rauth
-      autoload -Uz hub-rebuild
       autoload -Uz hub-login
       autoload -Uz hub-client
 

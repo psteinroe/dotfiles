@@ -1,11 +1,8 @@
 # Raspberry Pi 3 (1 GB) home hub: an always-on box at home that runs CLIProxyAPI
 # behind Tailscale. Imported together with nixpkgs' sd-image-aarch64 module.
 #
-# Deployed by .github/workflows/hub-deploy.yml: a GitHub aarch64-linux runner
-# evaluates and builds every merge to main, then copies the finished closure here
-# over Tailscale SSH and activates it with sudo. The Pi never evaluates or builds,
-# has no nightly updater and never reboots by itself; a new kernel takes effect at
-# the next manual reboot.
+# No automated updates: no CI deploys, no nightly updater, no reboots by itself.
+# Software and OS updates are occasional and manual (README, Home hub).
 let
   hostName = "hub";
 in
@@ -17,12 +14,12 @@ in
 
   networking.hostName = hostName;
 
-  # No local builds: anything not copied in or substituted fails instead of
-  # compiling on 1 GB of RAM, so `nixos-rebuild` on the Pi itself doesn't work.
+  # Don't compile locally on 1 GB of RAM; anything not substituted or copied in
+  # fails instead of building here.
   nix.settings.max-jobs = 0;
 
-  # Tailscale SSH is how CI reaches the hub (tag:hub-deploy → tag:hub in the work
-  # tailnet's policy, managed in getmateo/devboxes). OpenSSH stays for the LAN.
+  # Tailscale SSH is how hub-login reaches the hub (work tailnet policy in
+  # getmateo/devboxes). OpenSSH stays for the LAN.
   services.tailscale.extraSetFlags = [ "--ssh" ];
   # The boot auth key must carry tag:hub
   my.pi.tailscaleUpFlags = [

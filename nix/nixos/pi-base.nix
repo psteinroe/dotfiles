@@ -73,7 +73,7 @@
         "nix-command"
         "flakes"
       ];
-      # CI copies closures it built (unsigned) as psteinroe
+      # Lets psteinroe copy in closures built elsewhere (unsigned) for manual updates
       trusted-users = [
         "root"
         "@wheel"
