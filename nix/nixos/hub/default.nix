@@ -1,5 +1,11 @@
 # Raspberry Pi 3 (1 GB) home hub: an always-on box at home that runs CLIProxyAPI
 # behind Tailscale. Imported together with nixpkgs' sd-image-aarch64 module.
+#
+# Deployed by .github/workflows/hub-deploy.yml: a GitHub aarch64-linux runner
+# evaluates and builds every merge to main, then copies the finished closure here
+# over Tailscale SSH and activates it with sudo. The Pi never evaluates or builds,
+# has no nightly updater and never reboots by itself; a new kernel takes effect at
+# the next manual reboot.
 let
   hostName = "hub";
 in
@@ -11,17 +17,16 @@ in
 
   networking.hostName = hostName;
 
-  # Pulls main of the public repo every night and switches to it (evaluated and
-  # built on the Pi, mostly substituted). No reboots: a new kernel takes effect at
-  # the next power cycle. allowReboot = true would reboot only when the kernel,
-  # modules or initrd changed. hub-rebuild still deploys right away.
-  system.autoUpgrade = {
-    enable = true;
-    flake = "github:psteinroe/dotfiles#${hostName}";
-    # The flake's own lock file pins nixpkgs; --upgrade would only touch channels
-    upgrade = false;
-    dates = "04:00";
-    randomizedDelaySec = "45min";
-    allowReboot = false;
-  };
+  # No local builds: anything not copied in or substituted fails instead of
+  # compiling on 1 GB of RAM, so `nixos-rebuild` on the Pi itself doesn't work.
+  nix.settings.max-jobs = 0;
+
+  # Tailscale SSH is how CI reaches the hub (tag:hub-deploy → tag:hub in the tailnet
+  # policy). OpenSSH stays for the LAN.
+  services.tailscale.extraSetFlags = [ "--ssh" ];
+  # The boot auth key must carry tag:hub
+  my.pi.tailscaleUpFlags = [
+    "--ssh"
+    "--advertise-tags=tag:hub"
+  ];
 }

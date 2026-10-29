@@ -1,11 +1,14 @@
-# Rebuild the Raspberry Pi hub from this machine: evaluate here, build or substitute on the hub, activate there.
-# Usage: hub-rebuild [switch|boot|test|dry-activate|...] [nixos-rebuild args...]
-local dotfiles="${DOTFILES_DIR:-$HOME/Developer/dotfiles}"
-source "$dotfiles/zsh/functions/_hub" || return
-local action="${1:-switch}"
-(( $# )) && shift
+# Deploy the Raspberry Pi hub: runs the hub-deploy workflow on main, which builds on
+# GitHub's ARM runners and switches the Pi. Nothing is built here or on the Pi.
+# Usage: hub-rebuild [-h|--help]
+local usage="Usage: hub-rebuild [-h|--help]"
+case "$#:$1" in
+  0:) ;;
+  1:-h|1:--help) echo "$usage"; echo "Deploys committed main through GitHub Actions (hub-deploy)."; return 0 ;;
+  *) echo "$usage" >&2; return 1 ;;
+esac
 
-# --no-reexec: re-exec would build the hub's aarch64-linux nixos-rebuild here
-nix run --inputs-from "$dotfiles" nixpkgs#nixos-rebuild-ng -- "$action" \
-  --flake "$dotfiles#hub" --target-host "$hub_ssh" --build-host "$hub_ssh" \
-  --elevate sudo --no-reexec "$@"
+echo "Deploy committed main through GitHub Actions; local edits are not deployed."
+# command: the gh wrapper would pick GH_HOST from the current repo's origin
+command gh workflow run hub-deploy.yml --repo psteinroe/dotfiles --ref main || return
+echo "Follow it with: gh run list --repo psteinroe/dotfiles --workflow hub-deploy.yml"

@@ -218,8 +218,8 @@
       });
 
       # Raspberry Pi 3 home hub (CLIProxyAPI). Build the SD image on an aarch64-linux
-      # machine (.github/workflows/pi-images.yml); it upgrades itself from main daily, and
-      # hub-rebuild deploys changes right away.
+      # machine (.github/workflows/pi-images.yml); .github/workflows/hub-deploy.yml builds
+      # main on GitHub's ARM runners and switches the Pi to it (hub-rebuild triggers it).
       nixosConfigurations.hub = mkPi ./nix/nixos/hub;
 
       packages.aarch64-linux.hub-sd-image = self.nixosConfigurations.hub.config.system.build.sdImage;

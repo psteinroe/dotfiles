@@ -72,7 +72,7 @@ if [[ "$topic" == all || "$topic" == remote ]]; then
   _case_row "rpushdev [repo] [msg]" "commit/push, then prepare/register with rdev and return"
   _case_row "rherdr <repo> [branch|pr]" "direct remote recovery/Moshi attach (explicit TUI)"
   _case_row "ssh rdev-exe" "recovery path via exe.dev gateway"
-  _case_row "hub-rebuild [action]" "deploy the Raspberry Pi hub (nixos-rebuild, builds on the hub)"
+  _case_row "hub-rebuild" "deploy committed main to the Raspberry Pi hub (GitHub Actions builds it)"
   [[ "$topic" == all ]] && print
 fi
 

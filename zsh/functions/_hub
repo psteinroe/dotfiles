@@ -1,4 +1,4 @@
-# Shared by hub-rebuild, hub-login and hub-client. Source, then use:
+# Shared by hub-login and hub-client. Source, then use:
 #   $hub_url   CLIProxyAPI on the hub, published by `tailscale serve`
 #   $hub_ssh   ssh destination of the hub
 # The hub lives in the personal tailnet and is shared into the work one, so it is

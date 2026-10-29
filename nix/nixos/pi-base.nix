@@ -73,7 +73,7 @@
         "nix-command"
         "flakes"
       ];
-      # hub-rebuild copies closures as psteinroe and builds here
+      # CI copies closures it built (unsigned) as psteinroe
       trusted-users = [
         "root"
         "@wheel"
