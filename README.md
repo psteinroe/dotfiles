@@ -214,8 +214,7 @@ It is personal hardware serving personal Claude and Codex subscriptions to the
 owner's own machines only; it is not a team credential pool. The accounts log
 in on the cliproxy Pi only and their credentials stay there. The API is served
 privately on the work tailnet at
-`https://cliproxy-psteinroe.tail649856.ts.net:8317` (`tailscale serve`, also
-the default in `zsh/functions/_cliproxy`).
+`https://cliproxy-psteinroe.tail649856.ts.net:8317` (`tailscale serve`).
 
 This covers the server only: the image, its tailnet setup and adding provider
 accounts. No client uses it yet; no Claude Code, Codex, T3 or Pi config here
@@ -231,12 +230,11 @@ The setup scales to one independent proxy per team member: each owner runs
 their own `cliproxy-<owner>` with their own hardware, `tag:cliproxy-<owner>`
 and personal accounts, never a shared service or account pool. Only
 `cliproxy-psteinroe` is configured here; this does not provision other members'
-instances. `cliproxy-login` can target another instance with `CLIPROXY_URL`
-(and `CLIPROXY_SSH`).
+instances.
 
 Setup happens once: flash the image, let it join the work tailnet as
-`tag:cliproxy-psteinroe`, then log in each of your own provider accounts with
-repeated `cliproxy-login`.
+`tag:cliproxy-psteinroe`, then authorize your provider accounts in the management
+UI. No local provider-login helpers are needed.
 
 The cliproxy Pi joins the work tailnet (the devboxes' one) as
 `cliproxy-psteinroe` with `tag:cliproxy-psteinroe`, so that:
@@ -295,8 +293,8 @@ No SSH, no browser login, no commands on the Pi:
    `tag:cliproxy-psteinroe` and deletes the key file
    (`nix/nixos/pi-tailscale-join.nix`). If it doesn't show up in the admin
    within a few minutes, `ssh psteinroe@cliproxy-psteinroe.local` and
-   `journalctl -u tailscale-join`. If the name `cliproxy-psteinroe` is taken it
-   gets another one; set `CLIPROXY_URL` to match.
+   `journalctl -u tailscale-join`. If the name `cliproxy-psteinroe` is taken,
+   use the actual MagicDNS name shown in the admin for the URLs below.
 
 Then:
 
@@ -305,24 +303,32 @@ Then:
 2. Share the proxy (Machines → cliproxy-psteinroe → Share) with
    `psteinroe@github` only and accept the invite as that user, so `rdev` can
    reach the API.
-3. On the Mac, add the accounts, one `cliproxy-login` run per account (see
+3. On the Mac, open the management UI and add your provider accounts (see
    below).
 4. Verify the service (see below).
 
 ### Provider accounts
 
-`cliproxy-login` adds a subscription account to the cliproxy Pi. It runs on the
-Mac, opens the provider's login there, and runs CLIProxyAPI's login on the Pi
-over Tailscale SSH, so the new OAuth credentials are created and stored on the
-Pi only. Only the Mac has SSH to the Pi, so run every login from the Mac.
-Repeat it for each of your own accounts; CLIProxyAPI round-robins across them
-and keeps a session on one account. Run it again when a provider requires a
-new login.
+On the Mac, connected to the work tailnet, open the
+[management UI](https://cliproxy-psteinroe.tail649856.ts.net:8317/management.html).
+Copy its management key to the clipboard without displaying it:
 
 ```bash
-cliproxy-login claude   # personal Claude account, browser OAuth (callback port forwarded to the Pi)
-cliproxy-login codex    # personal ChatGPT account, device code
+ssh psteinroe@cliproxy-psteinroe.tail649856.ts.net \
+  'cat /var/lib/cliproxyapi/management-key' | pbcopy
 ```
+
+Paste it into the UI, then use the Claude or Codex OAuth flow for each of your
+own accounts. Provider credentials stay on the Pi; add accounts and reauthorize
+them here, not on each client. CLIProxyAPI refreshes tokens, round-robins across
+eligible accounts and keeps a session on one account. No extra routing settings
+are needed for this setup.
+
+Claude and Codex share the same server and API access key, but use their native
+API paths: Claude's base URL is the server root (`/v1/messages` requests); Codex's
+base URL includes `/v1` (`/v1/responses` requests). Requests use the matching
+provider's account pool; adding Codex accounts does not increase Claude quota.
+The management key is separate from the API access key used by clients.
 
 ### Verify
 

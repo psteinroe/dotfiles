@@ -18,7 +18,7 @@ in
   # fails instead of building here.
   nix.settings.max-jobs = 0;
 
-  # Tailscale SSH is how cliproxy-login reaches the Pi (work tailnet policy in
+  # Tailscale SSH is for administering the Pi (work tailnet policy in
   # getmateo/devboxes). OpenSSH stays for the LAN.
   services.tailscale.extraSetFlags = [ "--ssh" ];
   # The boot auth key must carry the owner-scoped tag:cliproxy-psteinroe
