@@ -137,8 +137,9 @@ in
   '';
 
   # Registers Pi's executor MCP server with Claude Code (user scope, in ~/.claude and the
-  # ~/.claude-hub config that hub-client points at the home hub) and Codex, which run under
-  # T3 Code. Only adds a missing entry, so an existing one and its OAuth login stay untouched.
+  # ~/.claude-cliproxy config that cliproxy-client points at the cliproxy Pi) and Codex, which
+  # run under T3 Code. Only adds a missing entry, so an existing one and its OAuth login stay
+  # untouched.
   # Codex's entry is appended directly: `codex mcp add` starts a blocking OAuth login.
   home.activation.agentMcpServers = lib.hm.dag.entryAfter [ "agentConfigs" "installPackages" ] ''
     bin="${config.home.profileDirectory}/bin"
@@ -159,7 +160,7 @@ in
       }
 
       add_claude_executor ""
-      add_claude_executor "$HOME/.claude-hub"
+      add_claude_executor "$HOME/.claude-cliproxy"
 
       if ! grep -q '^\[mcp_servers\.executor\]' "$HOME/.codex/config.toml" 2>/dev/null; then
         $DRY_RUN_CMD mkdir -p "$HOME/.codex"

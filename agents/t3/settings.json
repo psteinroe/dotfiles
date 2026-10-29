@@ -53,21 +53,21 @@
         "setupMode": "existing"
       }
     },
-    "claudeHub": {
+    "claudeCliproxy": {
       "driver": "claudeAgent",
-      "displayName": "Claude (Hub)",
+      "displayName": "Claude (CLIProxy)",
       "enabled": false,
       "config": {
-        "homePath": "~/.claude-hub"
+        "homePath": "~/.claude-cliproxy"
       }
     },
-    "codexHub": {
+    "codexCliproxy": {
       "driver": "codex",
-      "displayName": "Codex (Hub)",
+      "displayName": "Codex (CLIProxy)",
       "enabled": false,
       "config": {
         "setupMode": "existing",
-        "homePath": "~/.codex-hub"
+        "homePath": "~/.codex-cliproxy"
       }
     }
   }

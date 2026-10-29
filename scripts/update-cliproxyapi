@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Pin nix/nixos/hub/cliproxyapi.nix to a CLIProxyAPI release: the latest one, or the tag given as $1.
+# Pin nix/nixos/cliproxy/cliproxyapi.nix to a CLIProxyAPI release: the latest one, or the tag given as $1.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
-file=nix/nixos/hub/cliproxyapi.nix
+file=nix/nixos/cliproxy/cliproxyapi.nix
 repo=router-for-me/CLIProxyAPI
 
 tag=${1:-$(gh release view -R "$repo" --json tagName -q .tagName)}

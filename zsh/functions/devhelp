@@ -79,8 +79,8 @@ if [[ "$topic" == all || "$topic" == auth ]]; then
   _case_header "Auth/helper utilities"
   _case_row "gh" "wrap gh to auto-use exe.dev integration hosts from origin"
   _case_row "rauth [spec...]" "copy local auth bundle to the remote"
-  _case_row "hub-login claude|codex" "add a Claude or Codex account to the hub's CLIProxyAPI"
-  _case_row "hub-client [--host h]" "point ~/.claude-hub and ~/.codex-hub at the hub"
-  _case_row "claude-hub / codex-hub" "run Claude Code / Codex through the hub"
+  _case_row "cliproxy-login claude|codex" "add a Claude or Codex account to the cliproxy Pi's CLIProxyAPI"
+  _case_row "cliproxy-client [--host h]" "point ~/.claude-cliproxy and ~/.codex-cliproxy at the cliproxy Pi"
+  _case_row "claude-cliproxy / codex-cliproxy" "run Claude Code / Codex through the cliproxy Pi"
   _case_row "devhelp [topic]" "show this command reference"
 fi

@@ -1,4 +1,4 @@
-# Shared by the Raspberry Pis (currently only the hub): headless, SSH key-only,
+# Shared by the Raspberry Pis (currently only cliproxy): headless, SSH key-only,
 # reachable as <hostName>.local on the LAN until Tailscale is up. Imported together
 # with nixpkgs' sd-image-aarch64 module; each host sets networking.hostName.
 {

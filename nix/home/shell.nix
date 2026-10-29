@@ -85,12 +85,12 @@ in
       autoload -Uz rssh
       autoload -Uz rrebuild
       autoload -Uz rauth
-      autoload -Uz hub-login
-      autoload -Uz hub-client
+      autoload -Uz cliproxy-login
+      autoload -Uz cliproxy-client
 
-      # Second Claude Code and Codex configs that use the home hub (hub-client sets them up)
-      alias claude-hub='CLAUDE_CONFIG_DIR="$HOME/.claude-hub" claude'
-      alias codex-hub='CODEX_HOME="$HOME/.codex-hub" codex'
+      # Second Claude Code and Codex configs that use the cliproxy Pi (cliproxy-client sets them up)
+      alias claude-cliproxy='CLAUDE_CONFIG_DIR="$HOME/.claude-cliproxy" claude'
+      alias codex-cliproxy='CODEX_HOME="$HOME/.codex-cliproxy" codex'
 
       if [[ $TERM != "dumb" ]]; then
         source ${starshipZshInit}

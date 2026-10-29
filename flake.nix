@@ -217,12 +217,13 @@
         };
       });
 
-      # Raspberry Pi 3 home hub (CLIProxyAPI). Build the SD image on an aarch64-linux
-      # machine (.github/workflows/pi-images.yml). Nothing deploys or updates it
-      # automatically; updates are occasional and manual (README, Home hub).
-      nixosConfigurations.hub = mkPi ./nix/nixos/hub;
+      # Raspberry Pi 3 running CLIProxyAPI (cliproxy-psteinroe). Build the SD image on an
+      # aarch64-linux machine (.github/workflows/pi-images.yml). Nothing deploys or updates it
+      # automatically; updates are occasional and manual (README, CLIProxy).
+      nixosConfigurations.cliproxy = mkPi ./nix/nixos/cliproxy;
 
-      packages.aarch64-linux.hub-sd-image = self.nixosConfigurations.hub.config.system.build.sdImage;
+      packages.aarch64-linux.cliproxy-sd-image =
+        self.nixosConfigurations.cliproxy.config.system.build.sdImage;
 
       # Expose the package set
       darwinPackages = self.darwinConfigurations.${hostname}.pkgs;

@@ -1,8 +1,8 @@
-# Add a Claude or Codex subscription account to CLIProxyAPI on the hub.
-# Claude forwards the OAuth callback port to the hub and opens the authorize URL here.
+# Add a Claude or Codex subscription account to CLIProxyAPI on the cliproxy Pi.
+# Claude forwards the OAuth callback port to the cliproxy Pi and opens the authorize URL here.
 # Codex uses a device code by default; --browser uses the OAuth callback flow instead.
-# Usage: hub-login [--host host] claude | codex [--device|--browser]
-local usage="Usage: hub-login [--host host] claude | codex [--device|--browser]"
+# Usage: cliproxy-login [--host host] claude | codex [--device|--browser]
+local usage="Usage: cliproxy-login [--host host] claude | codex [--device|--browser]"
 local host="" provider="" mode=""
 while (( $# )); do
   case "$1" in
@@ -17,12 +17,12 @@ done
 [[ -n "$provider" ]] || { echo "$usage" >&2; return 1; }
 
 local dotfiles="${DOTFILES_DIR:-$HOME/Developer/dotfiles}"
-source "$dotfiles/zsh/functions/_hub" || return
-host="${host:-$hub_ssh}"
+source "$dotfiles/zsh/functions/_cliproxy" || return
+host="${host:-$cliproxy_ssh}"
 
 local login port pattern
 if [[ "$provider" == claude ]]; then
-  [[ "$mode" == device ]] && { echo "Claude has no device login; run hub-login claude" >&2; return 1; }
+  [[ "$mode" == device ]] && { echo "Claude has no device login; run cliproxy-login claude" >&2; return 1; }
   login="cliproxy -claude-login -no-browser" port=54545
   pattern='https://[^[:space:]]+authorize\?[^[:space:]]+'
 elif [[ "$mode" == browser ]]; then
@@ -33,7 +33,7 @@ else
   pattern='https://[^[:space:]]+'
 fi
 
-print -P "%F{yellow}Sign in with the ${(C)provider} account you want to ADD to the hub (check which account this browser is signed in to).%f"
+print -P "%F{yellow}Sign in with the ${(C)provider} account you want to ADD to the cliproxy Pi (check which account this browser is signed in to).%f"
 [[ -n "$port" ]] && echo "The callback port $port is forwarded to $host; ignore the ssh -L instructions below."
 [[ -z "$port" ]] && echo "Enter the device code printed below on the page that opens."
 
@@ -58,7 +58,7 @@ log=$(mktemp) || return
 watcher=$!
 
 {
-  # A terminal on the hub keeps the login's "paste the callback URL" fallback usable
+  # A terminal on the cliproxy Pi keeps the login's "paste the callback URL" fallback usable
   if [[ -n "$port" ]]; then
     ssh -t -o ExitOnForwardFailure=yes -o ControlMaster=no -o ControlPath=none \
       -L "$port:127.0.0.1:$port" "$host" "$login" | tee "$log"

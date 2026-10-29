@@ -205,33 +205,41 @@ Git worktree.
 Pi's internal subagents continue to use their normal runtime rather than Herdr
 workspaces.
 
-## Home hub
+## CLIProxy
 
-A Raspberry Pi 3 at home (`nixosConfigurations.hub`, `nix/nixos/hub/`) runs
-[CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI), following
+A Raspberry Pi 3 at home (`nixosConfigurations.cliproxy`, `nix/nixos/cliproxy/`)
+runs [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI), following
 [this guide](https://gist.github.com/t3dotgg/59a521d2ee8d70aaf90e280c175072af).
 It is personal hardware serving personal Claude and Codex subscriptions to the
 owner's own machines only; it is not a team credential pool. The accounts log
-in on the hub only, and clients reach it at `https://hub.tail649856.ts.net:8317`
-(`tailscale serve`, configured in `zsh/functions/_hub`).
+in on the cliproxy Pi only, and clients reach it at
+`https://cliproxy-psteinroe.tail649856.ts.net:8317` (`tailscale serve`,
+configured in `zsh/functions/_cliproxy`).
 
-Setup happens once: flash the image, let it join the work tailnet as `tag:hub`,
-log in each of your own provider accounts with repeated `hub-login`, point the
-Mac, `rdev` and your devbox at it with `hub-client`, then use the isolated
-aliases.
+The setup scales to one independent proxy per team member: each owner runs
+their own `cliproxy-<owner>` with their own hardware, `tag:cliproxy-<owner>`
+and personal accounts, never a shared service or account pool. Only
+`cliproxy-psteinroe` exists so far; the helpers below reach another instance
+with `CLIPROXY_URL` (and `CLIPROXY_SSH`).
 
-The hub joins the work tailnet (the devboxes' one) as `tag:hub`, so that:
+Setup happens once: flash the image, let it join the work tailnet as
+`tag:cliproxy-psteinroe`, log in each of your own provider accounts with
+repeated `cliproxy-login`, point the Mac, `rdev` and your devbox at it with
+`cliproxy-client`, then use the isolated aliases.
+
+The cliproxy Pi joins the work tailnet (the devboxes' one) as
+`cliproxy-psteinroe` with `tag:cliproxy-psteinroe`, so that:
 
 - the work Mac (`philipp@hellomateo.de`) reaches the API on 8317 and Tailscale
   SSH on 22;
-- the owner's devbox (`tag:devbox-psteinroe`, same tailnet) reaches the API on 8317
-  only;
+- the owner's devbox (`tag:devbox-psteinroe`, same tailnet) reaches the API on
+  8317 only;
 - `rdev`, a user-owned machine of `psteinroe@github` in the personal tailnet,
-  reaches the API on 8317 only, through a share of the hub to that user. That
+  reaches the API on 8317 only, through a share of the proxy to that user. That
   user's other devices in the personal tailnet get the same through the share.
 
-Other users and devboxes get no grant, CI has no access to the Pi, and the hub
-itself gets no access to anything else. A share only reaches the user who
+Other users and devboxes get no grant, CI has no access to the Pi, and the
+proxy itself gets no access to anything else. A share only reaches the user who
 accepts it, so it is not a way to reach tagged machines in another tailnet.
 
 Two rules: never serve other people's traffic with these subscriptions, and use
@@ -240,94 +248,99 @@ the Claude subscriptions only through Claude Code.
 ### Tailnet policy
 
 The work tailnet's policy is managed in getmateo/devboxes, never in the admin
-console. [devboxes#61](https://github.com/getmateo/devboxes/pull/61) adds the hub's
-narrow rules; merge it before creating the hub's tagged auth key (Bootstrap
-step 3). It needs:
+console. [devboxes#61](https://github.com/getmateo/devboxes/pull/61) adds the
+proxy's narrow rules; merge it before creating its tagged auth key (Bootstrap
+step 3). Every proxy has its own owner-scoped `tag:cliproxy-<owner>`, and no tag
+or grant spans several owners' proxies. For `tag:cliproxy-psteinroe` it needs:
 
-- `tagOwners` for `tag:hub`;
-- grants to `tag:hub`: `philipp@hellomateo.de` on `tcp:8317` and `tcp:22`,
-  `tag:devbox-psteinroe` on `tcp:8317`, `autogroup:shared` on `tcp:8317` (the
-  hub is shared only with `psteinroe@github`);
-- Tailscale SSH to `tag:hub` as `psteinroe`: `check` for
+- `tagOwners` for `tag:cliproxy-psteinroe`;
+- grants to `tag:cliproxy-psteinroe`: `philipp@hellomateo.de` on `tcp:8317` and
+  `tcp:22`, `tag:devbox-psteinroe` on `tcp:8317`, `autogroup:shared` on
+  `tcp:8317` (the proxy is shared only with `psteinroe@github`);
+- Tailscale SSH to `tag:cliproxy-psteinroe` as `psteinroe`: `check` for
   `philipp@hellomateo.de`; none for shared users or devboxes;
-- no grants with `tag:hub` as source and no app connector grants for it, so the
-  hub's provider traffic leaves from the home connection; no other users or
-  devboxes.
+- no grants with `tag:cliproxy-psteinroe` as source and no app connector grants
+  for it, so the proxy's provider traffic leaves from the home connection; no
+  other users or devboxes.
 
-`ssh psteinroe@hub.local` on the LAN stays plain OpenSSH.
+`ssh psteinroe@cliproxy-psteinroe.local` on the LAN stays plain OpenSSH.
 
 ### Bootstrap
 
 No SSH, no browser login, no commands on the Pi:
 
 1. Run the `pi-images` workflow (Actions → pi-images → Run workflow) and
-   download the `hub-sd-image` artifact, or take it from an earlier run.
+   download the `cliproxy-sd-image` artifact, or take it from an earlier run.
 2. `zstd -d nixos-image-*.img.zst`, then flash the `.img` with Raspberry Pi
    Imager (Use custom, no OS customisation) or balenaEtcher.
 3. Once the [policy PR](#tailnet-policy) is merged, create a one-off auth key in
    the work tailnet: Tailscale admin → Settings → Keys → Generate auth key, not
    reusable, not ephemeral, pre-approved if device approval is on, and tagged
-   `tag:hub`. Reinsert the SD card and save the key as `tailscale-authkey` on its
-   FAT partition (`FIRMWARE`), e.g.
+   `tag:cliproxy-psteinroe`. Reinsert the SD card and save the key as
+   `tailscale-authkey` on its FAT partition (`FIRMWARE`), e.g.
    `pbpaste > /Volumes/FIRMWARE/tailscale-authkey && diskutil eject /Volumes/FIRMWARE`.
 4. Put the card in the Pi and plug in Ethernet and power. On first boot it joins
-   the work tailnet as `hub` with `--ssh` and `tag:hub` and deletes the key file
+   the work tailnet as `cliproxy-psteinroe` with `--ssh` and
+   `tag:cliproxy-psteinroe` and deletes the key file
    (`nix/nixos/pi-tailscale-join.nix`). If it doesn't show up in the admin
-   within a few minutes, `ssh psteinroe@hub.local` and
-   `journalctl -u tailscale-join`. If the name `hub` is taken it gets another
-   one; set `HUB_URL` to match.
+   within a few minutes, `ssh psteinroe@cliproxy-psteinroe.local` and
+   `journalctl -u tailscale-join`. If the name `cliproxy-psteinroe` is taken it
+   gets another one; set `CLIPROXY_URL` to match.
 
 Then:
 
-1. The hub starts `tailscale serve` by itself once the work tailnet has HTTPS
-   certificates enabled; `systemctl status cliproxyapi-tailscale-serve` finishes
-   when it is up.
-2. Share the hub (Machines → hub → Share) with `psteinroe@github` only and
-   accept the invite as that user, so `rdev` can reach the API.
-3. Store the access key in the work Mac's Keychain (it is generated on the hub
-   and otherwise never leaves it):
-   `ssh psteinroe@hub.tail649856.ts.net sudo cat /var/lib/cliproxyapi/access-key`,
+1. The cliproxy Pi starts `tailscale serve` by itself once the work tailnet has
+   HTTPS certificates enabled; `systemctl status cliproxyapi-tailscale-serve`
+   finishes when it is up.
+2. Share the proxy (Machines → cliproxy-psteinroe → Share) with
+   `psteinroe@github` only and accept the invite as that user, so `rdev` can
+   reach the API.
+3. Store the access key in the work Mac's Keychain (it is generated on the
+   cliproxy Pi and otherwise never leaves it):
+   `ssh psteinroe@cliproxy-psteinroe.tail649856.ts.net sudo cat /var/lib/cliproxyapi/access-key`,
    then `set-keychain-environment-variable CLIPROXY_ACCESS_KEY` and paste it.
-4. On the Mac, add the accounts, one `hub-login` run per account (see below).
-5. Point each machine at the hub with `hub-client` (see below).
-6. Verify: `curl -s https://hub.tail649856.ts.net:8317/v1/models -H "Authorization: Bearer $(keychain-environment-variable CLIPROXY_ACCESS_KEY)" | head -c 300`
+4. On the Mac, add the accounts, one `cliproxy-login` run per account (see
+   below).
+5. Point each machine at the proxy with `cliproxy-client` (see below).
+6. Verify: `curl -s https://cliproxy-psteinroe.tail649856.ts.net:8317/v1/models -H "Authorization: Bearer $(keychain-environment-variable CLIPROXY_ACCESS_KEY)" | head -c 300`
 
-### `hub-login` vs `hub-client`
+### `cliproxy-login` vs `cliproxy-client`
 
-`hub-login` adds a subscription account to the hub. It runs on the Mac, opens
-the provider's login there, and runs CLIProxyAPI's login on the hub over
-Tailscale SSH, so the new OAuth credentials are created and stored on the hub
-only. Only the Mac has SSH to the hub; `rdev` and the devbox use the API only, so
-run every login from the Mac. Repeat it for each of your own accounts;
+`cliproxy-login` adds a subscription account to the cliproxy Pi. It runs on the
+Mac, opens the provider's login there, and runs CLIProxyAPI's login on the Pi
+over Tailscale SSH, so the new OAuth credentials are created and stored on the
+Pi only. Only the Mac has SSH to the Pi; `rdev` and the devbox use the API only,
+so run every login from the Mac. Repeat it for each of your own accounts;
 CLIProxyAPI round-robins across them and keeps a session on one account.
 
 ```bash
-hub-login claude   # personal Claude account, browser OAuth (callback port forwarded to the hub)
-hub-login codex    # personal ChatGPT account, device code
+cliproxy-login claude   # personal Claude account, browser OAuth (callback port forwarded to the Pi)
+cliproxy-login codex    # personal ChatGPT account, device code
 ```
 
-`hub-client` points a machine at the hub. It writes only the isolated
-`~/.claude-hub/settings.json` and `~/.codex-hub/config.toml` with the hub's URL
-and access key. The key goes from the Mac's Keychain over stdin (through ssh for
-`--host`), never in arguments. Normal `~/.claude` and `~/.codex` logins stay
-untouched, and no OAuth credential is ever copied off the hub.
+`cliproxy-client` points a machine at the proxy. It writes only the isolated
+`~/.claude-cliproxy/settings.json` and `~/.codex-cliproxy/config.toml` with the
+proxy's URL and access key. The key goes from the Mac's Keychain over stdin
+(through ssh for `--host`), never in arguments. Normal `~/.claude` and
+`~/.codex` logins stay untouched, and no OAuth credential is ever copied off the
+cliproxy Pi.
 
 ```bash
-hub-client                                    # the Mac
-hub-client --host rdev                        # rdev, through the share
-hub-client --host psteinroe@devbox-psteinroe  # the owner's devbox
+cliproxy-client                                    # the Mac
+cliproxy-client --host rdev                        # rdev, through the share
+cliproxy-client --host psteinroe@devbox-psteinroe  # the owner's devbox
 ```
 
-Then use `claude-hub` / `codex-hub` on that machine, or the T3 instances
-"Claude (Hub)" and "Codex (Hub)" in `agents/t3/settings.json`; they stay
-disabled until the hub works, enable them in the T3 UI afterwards. The
-management panel is at `/management.html` with the key in
-`/var/lib/cliproxyapi/management-key`.
+Then use `claude-cliproxy` / `codex-cliproxy` on that machine, or the T3
+instances "Claude (CLIProxy)" and "Codex (CLIProxy)" in
+`agents/t3/settings.json`; they stay disabled until the proxy works, enable them
+in the T3 UI afterwards. The management panel is at `/management.html` with the
+key in `/var/lib/cliproxyapi/management-key`.
 
 ### Updates
 
-Nothing updates the hub automatically: no CI deploys, no nightly updater, no
-reboots by itself. The Pi doesn't compile anything locally
+Nothing updates the cliproxy Pi automatically: no CI deploys, no nightly
+updater, no reboots by itself. The Pi doesn't compile anything locally
 (`nix.settings.max-jobs = 0`). Occasional software and OS updates are still
 needed and are done by hand: build the new system elsewhere and switch the Pi to
 it, keeping `/var/lib/cliproxyapi` (accounts, keys) and `/var/lib/tailscale`
@@ -336,20 +349,20 @@ Reflashing the SD card is not an update path: it wipes those accounts and the
 tailnet identity.
 
 `scripts/update-cliproxyapi [tag]` optionally bumps the pinned CLIProxyAPI
-release in `nix/nixos/hub/cliproxyapi.nix`; it only edits the pin and deploys
-nothing. `/var/lib/cliproxyapi/config.yaml` is re-rendered from Nix on every
-service start, so make config changes in `nix/nixos/hub/cliproxyapi.nix`, not
-the panel.
+release in `nix/nixos/cliproxy/cliproxyapi.nix`; it only edits the pin and
+deploys nothing. `/var/lib/cliproxyapi/config.yaml` is re-rendered from Nix on
+every service start, so make config changes in
+`nix/nixos/cliproxy/cliproxyapi.nix`, not the panel.
 
 ## Office connector
 
 The office Tailscale app connector lives in getmateo/devboxes, and provider
 traffic from the devboxes, mine included, still goes through it. That stays
-until the hub is online, its logins work and the clients above are verified.
-The planned cutover is a separate, reviewed devboxes change that removes only
-`tag:devbox-psteinroe` from the two office grants; teammates stay routed
-through the office. The hub has no connector grants, so its provider traffic
-leaves from the home connection.
+until the cliproxy Pi is online, its logins work and the clients above are
+verified. The planned cutover is a separate, reviewed devboxes change that
+removes only `tag:devbox-psteinroe` from the two office grants; teammates stay
+routed through the office. The cliproxy Pi has no connector grants, so its
+provider traffic leaves from the home connection.
 
 ## Pi models and login
 

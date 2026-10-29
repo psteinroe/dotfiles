@@ -1,5 +1,5 @@
-# CLIProxyAPI on the hub: every Claude and Codex subscription logs in here only, and
-# other machines reach it at https://<hub>.<tailnet>.ts.net:8317 via `tailscale serve`.
+# CLIProxyAPI on the cliproxy Pi: every Claude and Codex subscription logs in here only,
+# and other machines reach it at https://<hostName>.<tailnet>.ts.net:8317 via `tailscale serve`.
 {
   config,
   lib,
