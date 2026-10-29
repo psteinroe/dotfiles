@@ -219,8 +219,9 @@ configured in `zsh/functions/_cliproxy`).
 The setup scales to one independent proxy per team member: each owner runs
 their own `cliproxy-<owner>` with their own hardware, `tag:cliproxy-<owner>`
 and personal accounts, never a shared service or account pool. Only
-`cliproxy-psteinroe` exists so far; the helpers below reach another instance
-with `CLIPROXY_URL` (and `CLIPROXY_SSH`).
+`cliproxy-psteinroe` is configured here; this does not provision other members'
+instances. The helpers below can target another instance with `CLIPROXY_URL`
+(and `CLIPROXY_SSH`).
 
 Setup happens once: flash the image, let it join the work tailnet as
 `tag:cliproxy-psteinroe`, log in each of your own provider accounts with
