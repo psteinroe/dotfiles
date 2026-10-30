@@ -10,7 +10,7 @@
       "extensions": []
     }
   ],
-  "lastChangelogVersion": "0.75.3",
+  "lastChangelogVersion": "1.0.0",
   "theme": "gruvbox-high-contrast",
   "defaultProvider": "claude-bridge",
   "defaultModel": "claude-opus-5-5",
