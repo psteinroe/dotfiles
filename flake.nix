@@ -37,6 +37,12 @@
       flake = false;
     };
 
+    # Claude Code and Codex skills (full-send, babysit-pr, council, ...)
+    tstack = {
+      url = "github:t3dotgg/tstack";
+      flake = false;
+    };
+
     # Rust toolchain (declarative, replaces rustup)
     rust-overlay = {
       url = "github:oxalica/rust-overlay";

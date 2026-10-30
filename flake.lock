@@ -228,7 +228,8 @@
         "nix-homebrew": "nix-homebrew",
         "nixpkgs": "nixpkgs",
         "nixpkgs-devenv": "nixpkgs-devenv",
-        "rust-overlay": "rust-overlay"
+        "rust-overlay": "rust-overlay",
+        "tstack": "tstack"
       }
     },
     "rust-overlay": {
@@ -284,6 +285,22 @@
       "original": {
         "owner": "numtide",
         "repo": "treefmt-nix",
+        "type": "github"
+      }
+    },
+    "tstack": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1793089639,
+        "narHash": "sha256-p9iCzX1nYN/0bwukHQ/MyDKc9nm2noP8vZFAZt7WarE=",
+        "owner": "t3dotgg",
+        "repo": "tstack",
+        "rev": "92e38e2cf677a84a142e8df296861c588542135c",
+        "type": "github"
+      },
+      "original": {
+        "owner": "t3dotgg",
+        "repo": "tstack",
         "type": "github"
       }
     }

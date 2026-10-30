@@ -170,4 +170,31 @@ in
         ${pkgs.bash}/bin/bash ${../../scripts/cliproxy-clients.sh}
     fi
   '';
+
+  # Each skills directory keeps a manifest so removed upstream skills are cleaned
+  # up without deleting unrelated skills. Use the standard client homes only.
+  home.activation.tstackSkills = lib.hm.dag.entryAfter [ "agentConfigs" ] ''
+    deploy_tstack() {
+      dst="$1/skills"
+      manifest="$dst/.tstack-managed"
+      $DRY_RUN_CMD mkdir -p "$dst"
+      if [ -f "$manifest" ]; then
+        while IFS= read -r old; do
+          [ -n "$old" ] && [ ! -d "${inputs.tstack}/skills/$old" ] && $DRY_RUN_CMD rm -rf "$dst/$old"
+        done <"$manifest"
+      fi
+      for skill in "${inputs.tstack}"/skills/*/; do
+        name=$(basename "$skill")
+        $DRY_RUN_CMD rm -rf "$dst/$name"
+        $DRY_RUN_CMD cp -R "$skill" "$dst/$name"
+        $DRY_RUN_CMD chmod -R u+w "$dst/$name"
+      done
+      if [ -z "''${DRY_RUN:-}" ]; then
+        ls "${inputs.tstack}/skills" >"$manifest"
+      fi
+    }
+
+    deploy_tstack "$HOME/.claude"
+    deploy_tstack "$HOME/.codex"
+  '';
 }

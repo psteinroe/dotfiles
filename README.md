@@ -82,6 +82,12 @@ can be transferred over SSH with private file permissions; MCP/provider/GitHub
 OAuth is never copied. Use the account intended for the named machine. Setup
 creates a host-local SSH signing key; register its public key with GitHub if needed.
 
+[tstack](https://github.com/t3dotgg/tstack) is pinned as a flake input. Each
+switch copies its skills into the standard `~/.claude/skills` and
+`~/.codex/skills` directories, so T3 sessions get them. Skills dropped upstream
+are removed; unrelated skills in those directories stay. Update with
+`nix flake update tstack`.
+
 T3 release versions/hashes live in `nix/t3code-release.nix`; edit them manually.
 Align desktop/mobile versions before upgrading the server. A version-changing
 `remote deploy` requires `--allow-t3-update`: it stops T3 and backs up `~/.t3`
