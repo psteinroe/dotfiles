@@ -271,8 +271,8 @@ test_restart_only_on_change() {
   contains "$TEST_LOG" 'systemctl --user start t3code'
   not_contains "$TEST_LOG" 'restart t3code'
   : >"$TEST_LOG"
-  # The switch writes a new tailnet address for T3's drop-in.
-  mock nix 'printf "nix %s\n" "$*" >>"$TEST_LOG"; if [[ $1 == run ]]; then printf "T3CODE_HOST=100.64.0.9\n" >"$HOME/.config/dotfiles/t3code.env"; fi'
+  # The switch writes a new tailnet address into T3's service.env.
+  mock nix 'printf "nix %s\n" "$*" >>"$TEST_LOG"; if [[ $1 == run ]]; then mkdir -p "$HOME/.t3"; printf "T3CODE_HOST=100.64.0.9\n" >"$HOME/.t3/service.env"; fi'
   deploy
   contains "$TEST_LOG" 'systemctl --user restart t3code'
 }

@@ -51,8 +51,8 @@ Then use `remote setup user@host --nixos-flake /etc/nixos#hostname`. The named
 flake remains host-owned. Use `--ref BRANCH` for a deliberate non-main deployment.
 Deploy stops on dirty checkouts (including UI settings) or divergent history;
 commit/stash first. `--force` explicitly discards tracked **and untracked** files.
-A switch restarts T3, interrupting its agents, only when its address or the
-dotfiles drop-in changes. No automatic deployments run.
+A switch restarts T3 only when its address or the dotfiles drop-in changes;
+T3 resumes interrupted threads afterwards. No automatic deployments run.
 The prebuilt agent packages use the pinned Numtide binary cache.
 
 Tailscale must be enrolled before connecting. T3 binds only its tailnet IPv4
@@ -93,10 +93,12 @@ T3 keeps itself up to date; dotfiles pins no version. The Mac app updates
 itself (or use Check for Updates), and T3's apps update a server on another
 version to their own. On Linux, setup installs T3 with its official installer at
 the Mac app's version and runs `t3 service install`; both are skipped once
-present. `t3 update` on the host does the same by hand. A dotfiles drop-in
-(`~/.config/systemd/user/t3code.service.d/dotfiles.conf`) only adds the agent
-`PATH`, nix-ld and the tailnet address. T3 downgrades can't undo database
-migrations, so back up `~/.t3` before one.
+present. `t3 update` on the host does the same by hand. Each switch writes the
+tailnet address into T3's `~/.t3/service.env`, keeping its other entries, and a
+drop-in (`~/.config/systemd/user/t3code.service.d/dotfiles.conf`) adds the agent
+`PATH` and nix-ld, which `service.env` can't set. T3 snapshots its database for
+each update and rolls back a failed one; a later downgrade can't undo
+migrations, so back up `~/.t3` first.
 
 ## Personal CLIProxy
 

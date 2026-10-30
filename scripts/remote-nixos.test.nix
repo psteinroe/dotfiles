@@ -32,7 +32,7 @@ let
     assert config.services.tailscale.enable;
     assert config.programs.nix-ld.enable;
     assert lib.hasInfix ''Environment="NIX_LD=/run/current-system/sw/share/nix-ld/lib/ld.so"'' dropIn;
-    assert lib.hasInfix "EnvironmentFile=-%h/.config/dotfiles/t3code.env" dropIn;
+    assert lib.hasInfix "PATH=/home/fixture/.local/bin:" dropIn;
     assert !(config.home-manager.users.fixture.systemd.user.services ? t3code);
     assert config.networking.firewall.interfaces.tailscale0.allowedTCPPorts == [ 3773 ];
     assert config.home-manager.users.fixture.home.homeDirectory == "/home/fixture";

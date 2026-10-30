@@ -175,8 +175,8 @@ fi
 if [[ -n $t3_version && ! -x $HOME/.local/bin/t3 ]]; then
   printf '%s\n' "$t3_version" >"$state/t3-install-version"
 fi
-# T3's own service only restarts when dotfiles' drop-in or address change.
-t3_config() { cat "$HOME/.config/systemd/user/t3code.service.d/dotfiles.conf" "$state/t3code.env" 2>/dev/null || true; }
+# T3's own service only restarts when dotfiles' drop-in or T3's service.env change.
+t3_config() { cat "$HOME/.config/systemd/user/t3code.service.d/dotfiles.conf" "$HOME/.t3/service.env" 2>/dev/null || true; }
 t3_before=$(t3_config)
 
 # Refresh only the local checkout reference, never upstream pins. Existing NixOS

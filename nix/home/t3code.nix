@@ -41,8 +41,8 @@ let
   t3ProjectsDir = "${homeDirectory}/Developer/t3";
 in
 {
-  # T3's own service unit stays T3's. This drop-in only adds the agent environment and
-  # binds the tailnet address written below; without it T3 stays on 127.0.0.1.
+  # T3's own service unit stays T3's. service.env can't set PATH, so this drop-in adds
+  # the agent environment; the address goes into T3's service.env below.
   xdg.configFile."systemd/user/t3code.service.d/dotfiles.conf".text = ''
     [Service]
     ExecStartPre=${waitForTailscale}
@@ -50,7 +50,6 @@ in
     # Needed on NixOS even without a PAM login; ignored by native glibc on other hosts.
     Environment="NIX_LD=/run/current-system/sw/share/nix-ld/lib/ld.so"
     Environment="NIX_LD_LIBRARY_PATH=/run/current-system/sw/share/nix-ld/lib"
-    EnvironmentFile=-%h/.config/dotfiles/t3code.env
   '';
 
   # Installs T3 and its service only when missing: reinstalling restarts the service and
@@ -61,11 +60,18 @@ in
       state="$HOME/.config/dotfiles"
       mkdir -p "$state"
 
-      # Tailnet addresses are stable per node; record this one for the drop-in.
+      # T3 reads its address from service.env; keep any other entries there. Tailnet
+      # addresses are stable per node, and T3's default would also answer on the LAN.
       ip=$(${pkgs.tailscale}/bin/tailscale ip -4 2>/dev/null | head -n 1 || true)
       case "$ip" in
-        100.*) (umask 077; printf 'T3CODE_HOST=%s\nT3CODE_PORT=3773\n' "$ip" >"$state/t3code.env") ;;
-        *) echo "warning: Tailscale has no address yet; T3 stays on 127.0.0.1 until the next switch" >&2 ;;
+        100.*)
+          env="$HOME/.t3/service.env"
+          mkdir -p "$HOME/.t3"
+          (umask 077; { grep -vE '^(T3CODE_HOST|T3CODE_PORT)=' "$env" 2>/dev/null || true
+            printf 'T3CODE_HOST=%s\nT3CODE_PORT=3773\n' "$ip"; } >"$env.tmp")
+          mv "$env.tmp" "$env"
+          ;;
+        *) echo "warning: Tailscale has no address yet; T3 keeps its previous address" >&2 ;;
       esac
 
       if [ ! -x "${t3}" ]; then
