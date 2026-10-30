@@ -27,7 +27,7 @@ let
     exit 1
   '';
 
-  # T3 projects get their own clones, apart from any <repo>.git worktrees in ~/Developer
+  # T3 projects get their own clones; T3 keeps its worktrees for them under ~/.t3
   t3Projects = {
     hellomateo = "https://github.com/getmateo/hellomateo.git";
     postgres-conductor = "https://github.com/psteinroe/postgres-conductor.git";
