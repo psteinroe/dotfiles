@@ -27,11 +27,6 @@
     };
 
     # Remote skill sources
-    getsentry-skills = {
-      url = "github:getsentry/skills";
-      flake = false;
-    };
-
     gh-stack-skills = {
       url = "github:github/gh-stack";
       flake = false;
@@ -79,6 +74,7 @@
         {
           system,
           homeDirectory,
+          username ? "psteinroe",
           isDarwin ? false,
           isLinux ? false,
         }:
@@ -113,6 +109,13 @@
         };
     in
     {
+      lib = {
+        inherit mkHome;
+        t3Version = (import ./nix/t3code-release.nix).version;
+      };
+
+      nixosModules.remote = import ./nix/nixos/remote.nix { inherit inputs; };
+
       darwinConfigurations.${hostname} = nix-darwin.lib.darwinSystem {
         system = darwinSystem;
         specialArgs = darwinSpecialArgs;
@@ -149,6 +152,15 @@
         homeDirectory = "/home/${username}";
         isLinux = true;
       };
+
+      homeConfigurations."${username}@linux-aarch64" = mkHome {
+        system = "aarch64-linux";
+        homeDirectory = "/home/${username}";
+        isLinux = true;
+      };
+
+      packages.x86_64-linux.home-manager = home-manager.packages.x86_64-linux.home-manager;
+      packages.aarch64-linux.home-manager = home-manager.packages.aarch64-linux.home-manager;
 
       # Raspberry Pi 3 running CLIProxyAPI (cliproxy-psteinroe). Build the SD image on an
       # aarch64-linux machine (.github/workflows/pi-images.yml). Nothing deploys or updates it

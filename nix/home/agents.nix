@@ -115,12 +115,16 @@ in
         }
 
         mkdir -p "$HOME/.pi/agent"
-        link_optional_path "${agentsDir}/pi/AGENTS.md" "$HOME/.pi/agent/AGENTS.md"
+        # Retire only the links this repository used to own; preserve personal files.
+        for retired in AGENTS.md models.json provider-failover.json; do
+          target="$HOME/.pi/agent/$retired"
+          if [ -L "$target" ] && [ "$(readlink "$target")" = "${agentsDir}/pi/$retired" ]; then
+            rm "$target"
+          fi
+        done
         link_optional_path "${agentsDir}/pi/SYSTEM.md" "$HOME/.pi/agent/SYSTEM.md"
         link_optional_path "${piSettings}" "$HOME/.pi/agent/settings.json"
-        link_optional_path "${agentsDir}/pi/provider-failover.json" "$HOME/.pi/agent/provider-failover.json"
         link_optional_path "${agentsDir}/pi/claude-bridge.json" "$HOME/.pi/agent/claude-bridge.json"
-        link_optional_path "${agentsDir}/pi/models.json" "$HOME/.pi/agent/models.json"
         link_optional_path "${agentsDir}/pi/mcp.json" "$HOME/.pi/agent/mcp.json"
         link_optional_path "${agentsDir}/pi/themes" "$HOME/.pi/agent/themes"
         deploy_extension_dir "${agentsDir}/pi/extensions" "$HOME/.pi/agent/extensions"

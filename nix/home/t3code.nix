@@ -7,33 +7,7 @@
 }:
 
 let
-  t3codeVersion = "0.1.0";
-  t3code = pkgs.stdenvNoCC.mkDerivation {
-    pname = "t3code";
-    version = t3codeVersion;
-
-    src = pkgs.fetchurl {
-      url = "https://github.com/pingdotgg/t3code/releases/download/v${t3codeVersion}/t3-${t3codeVersion}-linux-x64.tar.gz";
-      hash = "sha256-93A/8buPYkNYAFizzPLAKrti66S5keJrux2iL0tW2bE=";
-    };
-    sourceRoot = "t3-${t3codeVersion}-linux-x64";
-
-    dontConfigure = true;
-    dontBuild = true;
-    dontCheck = true;
-    dontFixup = true;
-
-    installPhase = ''
-      runHook preInstall
-      mkdir -p "$out/libexec/t3code" "$out/bin"
-      # Keep the Bun-compiled ELF byte-for-byte intact and beside its client
-      # assets. Patchelf changes this executable's embedded payload offsets.
-      cp -a . "$out/libexec/t3code/"
-      chmod 0755 "$out/libexec/t3code/t3"
-      ln -s "$out/libexec/t3code/t3" "$out/bin/t3"
-      runHook postInstall
-    '';
-  };
+  t3code = pkgs.callPackage ../t3code-package.nix { };
 
   # Agent processes inherit this PATH, so keep the complete managed development
   # environment plus OS-installed provider CLIs such as /usr/local/bin/codex.
@@ -126,15 +100,16 @@ in
     };
 
     Service = {
-      # Binds only the host's 100.x tailnet address, never its public interface;
-      # Tailscale still encrypts and authorizes the traffic. exe.dev's Tailscale
-      # Serve path drops large post-quantum TLS handshakes, so it isn't used.
+      # Bind only the tailnet address; Tailscale encrypts and authorizes traffic.
       ExecStartPre = waitForTailscale;
       ExecStart = startDirect;
       Environment = [
         "T3CODE_HOME=${homeDirectory}/.t3"
         "HOME=${homeDirectory}"
         "PATH=${managedUserPath}"
+        # Needed on NixOS even without a PAM login; ignored by native glibc on other hosts.
+        "NIX_LD=/run/current-system/sw/share/nix-ld/lib/ld.so"
+        "NIX_LD_LIBRARY_PATH=/run/current-system/sw/share/nix-ld/lib"
       ];
       WorkingDirectory = homeDirectory;
       Restart = "always";

@@ -39,7 +39,7 @@ import {
   resolveSubagentLifecycleExtensionPaths,
   type Model,
 } from "../shared/subagent-models.ts";
-import { promptSubagentWithFailover } from "../shared/subagent-failover.ts";
+import { promptSubagent } from "../shared/subagent-prompt.ts";
 import {
   createExecutorMcpIntegration,
   EXECUTOR_MCP_TOOLS,
@@ -242,7 +242,7 @@ export default function delegatesExtension(pi: ExtensionAPI, registerSession?: S
       if (options.signal?.aborted) throw new Error(`${options.name} was aborted.`);
 
       created.executorMcp.assertOpen();
-      await promptSubagentWithFailover(child, options.task, {
+      await promptSubagent(child, options.task, {
         models: created.models,
         thinkingLevel: policy.thinking,
         signal: options.signal ? AbortSignal.any([options.signal, created.executorMcp.signal]) : created.executorMcp.signal,

@@ -1,49 +1,13 @@
-# List dotfiles helper commands and what they do.
-# Usage: devhelp [remote|git|auth|all]
-local topic="${1:-all}"
-
-if [[ $# -gt 1 ]]; then
-  echo "Usage: devhelp [remote|git|auth|all]" >&2
-  return 1
-fi
-
-_case_header() {
-  print -P "%F{cyan}$1%f"
-}
-
-_case_row() {
-  printf '  %-32s %s\n' "$1" "$2"
-}
-
-case "$topic" in
-  all|remote|git|auth) ;;
-  *)
-    echo "Unknown devhelp topic: $topic" >&2
-    echo "Usage: devhelp [remote|git|auth|all]" >&2
-    return 1
-    ;;
-esac
-
-if [[ "$topic" == all || "$topic" == remote ]]; then
-  _case_header "Machines"
-  _case_row "rebuild [-u]" "rebuild this machine (-u updates flake inputs first)"
-  _case_row "rrebuild [host]" "force-sync dotfiles on the remote and rebuild it"
-  _case_row "rssh [dir]" "open a plain remote psteinroe shell"
-  _case_row "ssh rdev-exe" "recovery path via exe.dev gateway"
-  [[ "$topic" == all ]] && print
-fi
-
-if [[ "$topic" == all || "$topic" == git ]]; then
-  _case_header "Git"
-  _case_row "gpr [-a] [-n] [-e] [-d]" "commit, push and open a PR with a generated title/body"
-  _case_row "gclean" "delete local branches merged into the default branch"
-  _case_row "greset" "check out the default branch, pull, and gclean"
-  [[ "$topic" == all ]] && print
-fi
-
-if [[ "$topic" == all || "$topic" == auth ]]; then
-  _case_header "Auth"
-  _case_row "rauth [spec...]" "copy local auth (gh, Pi, Claude, MCP, Exa, AWS, gcloud, Azure, Infisical) to the remote"
-  _case_row "gh" "wrap gh to auto-use exe.dev integration hosts from origin"
-  _case_row "devhelp [topic]" "show this command reference"
-fi
+# Usage: devhelp
+printf '%s\n' \
+  'rebuild [-u]                       Rebuild this machine (-u updates inputs)' \
+  'remote setup HOST                 Add an existing NixOS dev machine' \
+  'remote setup HOST --home-manager  Add an existing non-NixOS dev machine' \
+  'remote deploy HOST                Fast-forward clean dotfiles and switch' \
+  'remote status HOST                Check checkout, Tailscale and T3' \
+  'remote connect HOST               Generate a one-time T3 pairing link' \
+  'remote shell HOST                 Open an SSH shell' \
+  'remote auth HOST gh               Independent GitHub login' \
+  'remote auth HOST mcp executor     Independent MCP login (default: Pi)' \
+  'remote auth HOST aws              Transfer cloud auth (also gcloud/azure/infisical/exa)' \
+  'gclean / greset                   Clean merged branches / return to default branch'

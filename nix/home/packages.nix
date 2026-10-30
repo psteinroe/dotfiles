@@ -3,7 +3,6 @@
   lib,
   inputs,
   system,
-  isLinux ? false,
   ...
 }:
 
@@ -73,7 +72,6 @@ in
         globalNode
         go
         lua
-        beamPackages.elixir
         # ruby  # conflicts with gotools (both have bin/bundle)
         (rust-bin.stable.latest.default.override {
           extensions = [
@@ -83,7 +81,8 @@ in
           ];
         })
 
-        # Python
+        # Python (also runs the remote-management CLI)
+        python3
         uv
 
         # Editor
@@ -96,9 +95,6 @@ in
         postgresql
         just
         devenv
-        hugo
-        presenterm
-        cmake
         ffmpeg
         imagemagick
         awscli2
@@ -139,16 +135,10 @@ in
         # Debuggers
         # codelldb: run `uv tool install codelldb` or use Mason for now
 
-        # Rust tools
-        cargo-expand
-        cargo-insta
-        llvmPackages.lld # fast linker for Rust
-
         # Version control
         diffnav # GitHub-like diff pager for git/gh PR diffs
 
       ]
-      ++ lib.optional isLinux tmux
       ++ optionalPackage tuicr
       ++ optionalPackage claudeCode
       ++ optionalPackage codex
@@ -169,7 +159,7 @@ in
           "$HOME/.pi/agent/extensions/web-tools/node_modules"
       fi
 
-      for extension in ask-user workflows; do
+      for extension in ask-user; do
         if [ -d "$HOME/.pi/agent/extensions/$extension" ]; then
           $DRY_RUN_CMD ln -sfn ${piExtensionNodeModules}/node_modules \
             "$HOME/.pi/agent/extensions/$extension/node_modules"

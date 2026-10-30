@@ -36,6 +36,6 @@ Completion is delivered automatically when the coordinator is idle. End the turn
 
 ## Lifecycle
 
-Tasks survive `/reload` in the same Pi process and session, including reloads sent by `rebuild`/`rrebuild`. They remain available under their original IDs and deliver completions to the reloaded runtime. Exiting Pi or switching sessions (`/new`, `/resume`, `/fork`) aborts subagents and terminates command process trees. Tasks do not survive Pi process exit.
+Tasks survive `/reload` in the same Pi process and session, including reloads sent after a configuration update. They remain available under their original IDs and deliver completions to the reloaded runtime. Exiting Pi or switching sessions (`/new`, `/resume`, `/fork`) aborts subagents and terminates command process trees. Tasks do not survive Pi process exit.
 
 Librarian, Oracle, and Worker receive the configured Executor MCP direct tools. Mapper is deliberately limited to the local read/search tools (`read`, `grep`, `find`, `ls`) and receives no Executor MCP tools. Oracle's read-only behavior remains a policy constraint because Executor itself can expose mutating integrations.

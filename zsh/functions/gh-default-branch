@@ -2,8 +2,7 @@
 # Usage: gh-default-branch [owner/repo]
 #
 # If no repo is passed, derive owner/repo and GH_HOST from origin.
-# This supports exe.dev integration remotes like:
-#   https://hellomateo.int.exe.xyz/getmateo/hellomateo.git
+# Git metadata is preferred; the GitHub API is only a fallback.
 local repo="${1:-}"
 local host=""
 

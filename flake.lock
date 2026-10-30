@@ -72,22 +72,6 @@
         "type": "github"
       }
     },
-    "getsentry-skills": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1787668428,
-        "narHash": "sha256-2RqeYJcjYjcEcYGWGy7hDaxOIadOMnCb2F6bZ5+eVgc=",
-        "owner": "getsentry",
-        "repo": "skills",
-        "rev": "c2f99a5b04b4cd992ec3022d7c2c3e23e938d241",
-        "type": "github"
-      },
-      "original": {
-        "owner": "getsentry",
-        "repo": "skills",
-        "type": "github"
-      }
-    },
     "gh-stack-skills": {
       "flake": false,
       "locked": {
@@ -236,7 +220,6 @@
     },
     "root": {
       "inputs": {
-        "getsentry-skills": "getsentry-skills",
         "gh-stack-skills": "gh-stack-skills",
         "home-manager": "home-manager",
         "llm-agents": "llm-agents",

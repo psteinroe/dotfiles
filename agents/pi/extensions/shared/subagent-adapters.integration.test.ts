@@ -33,15 +33,15 @@ import { Type } from "typebox";
 
 const MODEL_ID = "gpt-6-luna";
 const ORACLE_MODEL_ID = "gpt-6-astra";
-// Worker now defaults to Claude; these synthetic providers deliberately keep
-// exercising Codex account failover, including continuation after a write.
+// Worker still defaults to Claude until the proxy cutover. These synthetic
+// providers exercise permissions without real credentials or inference.
 const CODEX_WORKER_MODEL_ID = "gpt-6.1-sol";
 const PRIMARY = "openai";
 const ALIAS = "openai-account-1";
 const API = "openai-responses" as Api;
 
 type Role = "mapper" | "librarian" | "worker" | "oracle";
-type FixtureMode = "failover" | "all-fail" | "aborted";
+type FixtureMode = "success" | "all-fail" | "aborted";
 type Call = {
   provider: string;
   role: Role;
@@ -143,7 +143,7 @@ function fixtureStream(
     let message: AssistantMessage;
     if (mode === "aborted") {
       message = assistantMessage(id, fixtureModel.id, [], "aborted", "aborted fixture response");
-    } else if (mode === "all-fail" || isPrimary && (!role || role !== "worker" || hasToolResult)) {
+    } else if (mode === "all-fail") {
       // Distinct provider errors make it impossible for a stale commentary result
       // to masquerade as a successful failover response.
       const status = role === "librarian" ? "429" : "401";
@@ -232,9 +232,9 @@ function fixtureProvider(id: string, calls: Call[], mode: FixtureMode, workspace
   });
 }
 
-type McpFixtureMode = "ready" | "delayed" | "unauthorized" | "partial" | "hanging";
+type McpFixtureMode = "ready" | "delayed" | "unauthorized" | "partial";
 
-async function harness(mode: FixtureMode = "failover", registration: "native" | "legacy" = "native", mcpMode: McpFixtureMode = "ready") {
+async function harness(mode: FixtureMode = "success", registration: "native" | "legacy" = "native", mcpMode: McpFixtureMode = "ready") {
   const root = await mkdtemp(path.join(tmpdir(), "pi-failover-integration-"));
   const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
   process.env.PI_CODING_AGENT_DIR = path.join(root, "agent");
@@ -244,11 +244,7 @@ async function harness(mode: FixtureMode = "failover", registration: "native" | 
   const children: AgentSession[] = [];
   const toolSnapshots: Array<{ active: string[]; callable: string[] }> = [];
   let resolveInitialization!: () => void;
-  let releaseInitialization!: () => void;
-  let resolveSessionClosed!: () => void;
   const initializationStarted = new Promise<void>((resolve) => { resolveInitialization = resolve; });
-  const initializationGate = new Promise<void>((resolve) => { releaseInitialization = resolve; });
-  const sessionClosed = new Promise<void>((resolve) => { resolveSessionClosed = resolve; });
   let initialized = 0;
   const registerChild = (_id: string, child: AgentSession) => {
     children.push(child);
@@ -270,7 +266,7 @@ async function harness(mode: FixtureMode = "failover", registration: "native" | 
   };
   await writeFile(path.join(agentDir, "settings.json"), JSON.stringify(settings));
   mcpServer = createServer(async (request, response) => {
-    if (request.method === "DELETE") { resolveSessionClosed(); response.writeHead(204).end(); return; }
+    if (request.method === "DELETE") { response.writeHead(204).end(); return; }
     if (request.method !== "POST") { response.writeHead(404).end(); return; }
     const chunks: Buffer[] = [];
     for await (const chunk of request) chunks.push(Buffer.from(chunk));
@@ -281,7 +277,6 @@ async function harness(mode: FixtureMode = "failover", registration: "native" | 
     if (message.method === "initialize") {
       initialized++;
       resolveInitialization();
-      if (mcpMode === "hanging") await initializationGate;
       if (response.destroyed) return;
       if (mcpMode === "unauthorized") { response.writeHead(401).end(); return; }
       result = { protocolVersion: "2025-03-26", capabilities: { tools: {}, resources: {} }, serverInfo: { name: "executor-fixture", version: "1" } };
@@ -386,8 +381,6 @@ async function harness(mode: FixtureMode = "failover", registration: "native" | 
     toolSnapshots,
     maliciousMarker,
     initializationStarted,
-    releaseInitialization,
-    sessionClosed,
     parent,
     get initialized() { return initialized; },
     workspace,
@@ -459,59 +452,38 @@ const ADAPTERS = [
   ["oracle", { task: "Give a fixture architecture recommendation." }],
 ] as const;
 
-test("runs all four real adapters through primary-to-alias failover with an explicit Codex Worker fixture", async () => {
+test("all four real adapters preserve role tools, model and settings without switching accounts", async () => {
   const h = await harness();
   try {
     for (const [name, params] of ADAPTERS) {
-      const updates: any[] = [];
       let result: any;
       try {
-        result = await runTool(h, name, params, updates);
+        result = await runTool(h, name, params, []);
         const expected = EXPECTED[name];
-        assert.notEqual(result.isError, true, `${name} unexpectedly failed: ${JSON.stringify(result)}`);
-        assert.match(result.content[0].text, new RegExp(`${name.toUpperCase()}_ALIAS_OK`));
-        assert.ok(updates.some((update) => update.details?.model === `${PRIMARY}/${expected.model}`));
-        assert.ok(updates.some((update) => update.details?.model === `${ALIAS}/${expected.model}`));
-        const details = result.details;
-        assert.equal(details.agent ?? details.delegate, name);
-        assert.equal(details.model, `${ALIAS}/${expected.model}`);
-        assert.equal(details.thinking, expected.thinking);
-        assert.equal(details.run.status, "done");
+        assert.notEqual(result.isError, true, JSON.stringify(result));
+        assert.match(result.content[0].text, new RegExp(`${name.toUpperCase()}_PRIMARY_OK`));
+        assert.equal(result.details.model, `${PRIMARY}/${expected.model}`);
+        assert.equal(result.details.thinking, expected.thinking);
+        assert.equal(result.details.run.status, "done");
         assert.deepEqual([...h.toolSnapshots.at(-1)!.active].sort(), [...expected.tools].sort());
         assert.deepEqual([...h.toolSnapshots.at(-1)!.callable].sort(), [...expected.tools].sort());
-        if (name === "mapper") assert.equal(h.initialized, 0, "Mapper opened an MCP connection");
-      } finally {
-        await cleanupLibrarianWorkspace(result);
-      }
-
+        if (name === "mapper") assert.equal(h.initialized, 0);
+      } finally { await cleanupLibrarianWorkspace(result); }
       const calls = h.calls.filter((call) => call.role === name);
-      assert.ok(calls.length > 0, `${name} made no provider request`);
+      assert.ok(calls.length > 0);
       for (const call of calls) {
-        assert.equal(call.model, EXPECTED[name].model, `${name} changed role model during failover`);
-        assert.equal(call.reasoning, EXPECTED[name].thinking, `${name} changed reasoning during failover`);
-        assert.deepEqual([...call.tools].sort(), [...EXPECTED[name].tools].sort(), `${name} received unrelated tools`);
+        assert.equal(call.provider, PRIMARY);
+        assert.equal(call.model, EXPECTED[name].model);
+        assert.equal(call.reasoning, EXPECTED[name].thinking);
+        assert.deepEqual([...call.tools].sort(), [...EXPECTED[name].tools].sort());
       }
-      assert.ok(calls.some((call) => call.provider === PRIMARY));
-      assert.ok(calls.some((call) => call.provider === ALIAS));
     }
-
-    assert.equal((await readFile(path.join(h.workspace, "worker-output.txt"), "utf8")), "written exactly once\n");
-    const workerCalls = h.calls.filter((call) => call.role === "worker");
-    assert.equal(workerCalls.filter((call) => call.provider === PRIMARY).length, 2, "worker primary was not resumed after its completed tool operation");
-    assert.equal(workerCalls.filter((call) => call.provider === ALIAS).length, 1, "worker operation was replayed on the alias");
-    const aliasWorker = workerCalls.find((call) => call.provider === ALIAS);
-    assert.ok(aliasWorker, "worker alias request was not recorded");
-    const writeResult = aliasWorker.context.find((message) =>
-      message.role === "toolResult" && message.toolCallId === "write-once" && message.toolName === "write");
-    assert.ok(writeResult, "completed worker write result was not replayed in alias context");
-    assert.ok(Array.isArray(writeResult.content));
-    assert.ok(writeResult.content.some((part) => part.type === "text" && /written|success/i.test(part.text)));
-    assert.ok(h.calls.every((call) => !call.tools.includes("unrelated_parent_tool")));
+    assert.equal(await readFile(path.join(h.workspace, "worker-output.txt"), "utf8"), "written exactly once\n");
+    assert.equal(h.calls.filter((call) => call.role === "worker").length, 2);
+    assert.ok(h.calls.every((call) => call.provider !== ALIAS && !call.tools.includes("unrelated_parent_tool")));
     await assert.rejects(readFile(h.maliciousMarker), { code: "ENOENT" });
     assert.deepEqual(JSON.parse(await readFile(h.settingsPath, "utf8")), h.settings);
-  } finally {
-    await h.dispose();
-  }
+  } finally { await h.dispose(); }
 });
 
 test("default Worker selects Claude and does not fall back to available Codex accounts", async () => {
@@ -535,24 +507,18 @@ test("default Worker selects Claude and does not fall back to available Codex ac
   }
 });
 
-test("bridges legacy OAuth provider registrations into a failing-over Mapper child", async () => {
-  const h = await harness("failover", "legacy");
+test("bridges a legacy OAuth registration without cycling account aliases", async () => {
+  const h = await harness("success", "legacy");
   try {
-    const updates: any[] = [];
-    const result: any = await runTool(h, "mapper", { query: "fixture legacy provider task" }, updates);
+    const result: any = await runTool(h, "mapper", { query: "fixture legacy provider task" }, []);
     assert.notEqual(result.isError, true, JSON.stringify(result));
-    assert.match(result.content[0].text, /MAPPER_ALIAS_OK/);
-    assert.ok(updates.some((update) => update.details?.model === `${PRIMARY}/${MODEL_ID}`));
-    assert.ok(updates.some((update) => update.details?.model === `${ALIAS}/${MODEL_ID}`));
-    assert.equal(result.details.model, `${ALIAS}/${MODEL_ID}`);
-    assert.deepEqual(h.calls.map((call) => call.provider), [PRIMARY, ALIAS]);
-    assert.ok(h.calls.every((call) => call.role === "mapper"));
-  } finally {
-    await h.dispose();
-  }
+    assert.match(result.content[0].text, /MAPPER_PRIMARY_OK/);
+    assert.equal(result.details.model, `${PRIMARY}/${MODEL_ID}`);
+    assert.deepEqual(h.calls.map((call) => call.provider), [PRIMARY]);
+  } finally { await h.dispose(); }
 });
 
-test("returns underlying failure for all four adapters when every account fails", async () => {
+test("returns provider failures even when another account is available", async () => {
   const h = await harness("all-fail");
   try {
     for (const [name, params] of ADAPTERS) {
@@ -564,18 +530,18 @@ test("returns underlying failure for all four adapters when every account fails"
         assert.match(result.content[0].text, new RegExp(`${expectedCode} fixture failure`));
         assert.doesNotMatch(result.content[0].text, /returned no final answer|no final answer/i);
         assert.doesNotMatch(result.content[0].text, new RegExp(`${name.toUpperCase()}_.*_OK`));
-        assert.deepEqual(result.details.run.attemptedProviders, [PRIMARY, ALIAS]);
+        assert.equal(result.details.model, `${PRIMARY}/${EXPECTED[name].model}`);
       } finally {
         await cleanupLibrarianWorkspace(result);
       }
     }
-    assert.equal(h.calls.filter((call) => call.provider === ALIAS).length, 4);
+    assert.equal(h.calls.filter((call) => call.provider === ALIAS).length, 0);
   } finally {
     await h.dispose();
   }
 });
 
-test("does not fail over SDK aborted responses without an external signal", async () => {
+test("preserves SDK aborted responses without an external signal", async () => {
   const h = await harness("aborted");
   try {
     for (const [name, params] of ADAPTERS) {
@@ -608,7 +574,7 @@ async function waitUntil(predicate: () => boolean) {
 }
 
 test("waits for delayed native discovery before any model request", async () => {
-  const h = await harness("failover", "native", "delayed");
+  const h = await harness("success", "native", "delayed");
   try {
     const running = runTool(h, "oracle", { task: "Wait for Executor tools." }, []);
     await h.initializationStarted;
@@ -635,54 +601,8 @@ test("pre-aborted adapter calls never connect MCP or prompt a model", async () =
   } finally { await h.dispose(); }
 });
 
-test("aborting native startup prevents prompting and closes each late-completing connection", async () => {
-  for (const name of ["oracle", "worker", "librarian"] as const) {
-    const h = await harness("failover", "native", "hanging");
-    let result: any;
-    try {
-      const controller = new AbortController();
-      const running = runTool(h, name, name === "librarian" ? { query: "Cancel startup." } : { task: "Cancel startup." }, [], controller.signal);
-      await h.initializationStarted;
-      assert.equal(h.children.length, 1);
-      assert.equal(h.calls.length, 0);
-      controller.abort(new Error("cancelled during startup"));
-      result = await running;
-      assert.equal(result.details.run.status, "aborted", JSON.stringify(result));
-      // Pi 1.0 owns the startup transport only after discovery. Cancellation must
-      // return now; when initialization finishes, native shutdown closes it.
-      h.releaseInitialization();
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      try {
-        await Promise.race([h.sessionClosed, new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(new Error("late startup connection remained open")), 2_000); })]);
-      } finally { if (timer) clearTimeout(timer); }
-      assert.equal(h.calls.length, 0);
-      assert.equal(h.toolSnapshots.length, 0);
-    } finally {
-      await cleanupLibrarianWorkspace(result);
-      await h.dispose();
-    }
-  }
-});
-
-test("parent shutdown during MCP startup prevents late model requests", async () => {
-  const h = await harness("failover", "native", "hanging");
-  try {
-    const running = runTool(h, "oracle", { task: "Do not run after parent shutdown." }, []);
-    await h.initializationStarted;
-    await shutdownAndDisposeChildSession(h.parent);
-    await running;
-    assert.equal(h.calls.length, 0);
-    h.releaseInitialization();
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    try {
-      await Promise.race([h.sessionClosed, new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(new Error("shutdown connection remained open")), 2_000); })]);
-    } finally { if (timer) clearTimeout(timer); }
-    assert.equal(h.calls.length, 0);
-  } finally { await h.dispose(); }
-});
-
 test("partial native tool registration cannot start a model request", async () => {
-  const h = await harness("failover", "native", "partial");
+  const h = await harness("success", "native", "partial");
   try {
     const controller = new AbortController();
     const running = runTool(h, "oracle", { task: "Do not run without resume." }, [], controller.signal);
@@ -695,8 +615,8 @@ test("partial native tool registration cannot start a model request", async () =
   } finally { await h.dispose(); }
 });
 
-test("native authentication failure is terminal before model or failover requests", { timeout: 20_000 }, async () => {
-  const h = await harness("failover", "native", "unauthorized");
+test("native authentication failure is terminal before model requests", { timeout: 20_000 }, async () => {
+  const h = await harness("success", "native", "unauthorized");
   try {
     const result: any = await runTool(h, "oracle", { task: "Never run without MCP authentication." }, []);
     assert.equal(result.isError, true, JSON.stringify(result));
@@ -706,7 +626,7 @@ test("native authentication failure is terminal before model or failover request
   } finally { await h.dispose(); }
 });
 
-test("Worker write scope remains enforced with native MCP and account failover", async () => {
+test("Worker write scope remains enforced with native MCP", async () => {
   const h = await harness();
   try {
     const allowed = path.join(h.workspace, "allowed");

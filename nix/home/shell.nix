@@ -54,15 +54,10 @@ in
       autoload -Uz video_to_gif
       autoload -Uz rebuild
       autoload -Uz devhelp
-      autoload -Uz coffee
-      autoload -Uz gh
       autoload -Uz gh-default-branch
       autoload -Uz cpi
-      autoload -Uz gpr
       autoload -Uz gclean
       autoload -Uz greset
-      autoload -Uz rssh
-      autoload -Uz rrebuild
       autoload -Uz rauth
 
       if [[ $TERM != "dumb" ]]; then

@@ -25,8 +25,8 @@ case "$OSTYPE" in
   linux*)
     export PGT_LOG_PATH="${XDG_CACHE_HOME:-$HOME/.cache}/dev.supabase-community.pgt/pgt-logs"
 
-    # exe.dev's SSH daemon does not run through PAM, so direct SSH shells do
-    # not receive the systemd user runtime environment automatically.
+    # Headless SSH sessions may not receive the systemd user runtime
+    # environment automatically.
     runtime_dir="/run/user/$EUID"
     if [[ -d "$runtime_dir" ]]; then
       export XDG_RUNTIME_DIR="$runtime_dir"

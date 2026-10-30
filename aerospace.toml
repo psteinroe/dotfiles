@@ -5,13 +5,11 @@ config-version = 2
 
 start-at-login = true
 
-# Keep tiled layouts predictable and enforce the two-column helper whenever a
-# workspace becomes active.
+# Use native AeroSpace layouts and app-to-workspace rules.
 enable-normalization-flatten-containers = true
 enable-normalization-opposite-orientation-for-nested-containers = true
 default-root-container-layout = 'tiles'
 default-root-container-orientation = 'horizontal'
-exec-on-workspace-change = ['/bin/bash', '-lc', '/Users/psteinroe/Developer/dotfiles/bin/aerospace-pinned-app-guard; /Users/psteinroe/Developer/dotfiles/bin/aerospace-grid-2col focused']
 
 # Single-monitor setup: no monitor-follow mouse behavior needed
 on-focused-monitor-changed = []
@@ -49,7 +47,6 @@ alt-slash = 'layout tiles horizontal vertical'
 alt-comma = 'layout accordion horizontal vertical'
 alt-f = 'fullscreen --no-outer-gaps'
 alt-shift-f = 'layout floating tiling'
-alt-g = 'exec-and-forget /Users/psteinroe/Developer/dotfiles/bin/aerospace-grid-2col focused'
 
 # Focus
 alt-h = 'focus left'

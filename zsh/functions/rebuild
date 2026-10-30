@@ -24,7 +24,20 @@ case "$(uname -s)" in
     '
     ;;
   Linux)
-    home-manager switch --flake "$dotfiles#psteinroe@linux-x86_64"
+    if [[ -f "$HOME/.config/dotfiles/remote.env" ]]; then
+      # Deployed targets may be NixOS or Home Manager, on either architecture.
+      source "$HOME/.config/dotfiles/remote.env"
+      nix flake lock --update-input dotfiles "${target%%#*}" || return
+      if [[ "$mode" == nixos ]]; then
+        sudo nixos-rebuild switch --impure --flake "$target"
+      else
+        home-manager switch --flake "$target"
+      fi
+    else
+      local arch="$(uname -m)"
+      [[ "$arch" == aarch64 ]] || arch=x86_64
+      home-manager switch --flake "$dotfiles#psteinroe@linux-$arch"
+    fi
     ;;
   *)
     echo "Unsupported platform: $(uname -s)" >&2

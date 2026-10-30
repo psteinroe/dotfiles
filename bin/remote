@@ -1,0 +1,137 @@
+#!/usr/bin/env python3
+"""Manage an explicitly named, existing SSH development machine."""
+import argparse
+import os
+from pathlib import Path
+import re
+import shlex
+import subprocess
+import sys
+import tempfile
+from urllib.parse import parse_qs, urlparse
+import webbrowser
+
+ROOT = Path(__file__).resolve().parent.parent
+
+
+def ssh(host, *args, **kwargs):
+    return subprocess.run(["ssh", host, *args], check=True, **kwargs)
+
+
+def login(host, client, server):
+    """Native OAuth on the remote; only its browser approval runs locally."""
+    if client == "gh":
+        command = ["gh", "auth", "login", "--hostname", "github.com", "--git-protocol", "https", "--web"]
+    else:
+        if not server or not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_-]*", server):
+            raise ValueError("MCP login requires a server name (e.g. executor).")
+        command = [client, "mcp", "login", server]
+        if client != "pi":
+            command.append("--no-browser")
+    print(f"Sign in for {client} on {host}; use the account intended for this remote.", flush=True)
+    print("OAuth credentials stay on that machine. Paste the callback URL there if forwarding is unavailable.", flush=True)
+    prefix = 'export PATH="$HOME/.local/bin:$HOME/.nix-profile/bin:/etc/profiles/per-user/$(id -un)/bin:/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin:$PATH"; export BROWSER=true; '
+    with tempfile.TemporaryDirectory(prefix="remote-oauth-") as temp:
+        control = str(Path(temp) / "ssh")
+        forwarded = False
+        opened = set()
+        proc = subprocess.Popen(["ssh", "-tt", host, prefix + shlex.join(command)], stdout=subprocess.PIPE)
+        line = ""
+        try:
+            while True:
+                char = proc.stdout.read(1)
+                if not char:
+                    break
+                sys.stdout.buffer.write(char)
+                sys.stdout.buffer.flush()
+                line += char.decode("utf-8", errors="replace")
+                if char not in (b"\n", b"\r", b" "):
+                    continue
+                for url in re.findall(r"https://[^\s\x1b]+", line):
+                    if url in opened:
+                        continue
+                    parsed = urlparse(url)
+                    redirect = parse_qs(parsed.query).get("redirect_uri", [""])[0]
+                    callback = urlparse(redirect)
+                    device = parsed.hostname == "github.com" and parsed.path == "/login/device"
+                    if not device and callback.hostname not in ("localhost", "127.0.0.1", "::1"):
+                        continue
+                    if callback.port and not forwarded:
+                        bind = "[::1]" if callback.hostname == "::1" else callback.hostname
+                        forward = f"{bind}:{callback.port}:{bind}:{callback.port}"
+                        result = subprocess.run(["ssh", "-fNT", "-M", "-S", control,
+                            "-o", "ControlPersist=no", "-o", "ExitOnForwardFailure=yes", "-L", forward, host])
+                        forwarded = result.returncode == 0
+                    webbrowser.open(url)
+                    opened.add(url)
+                if char in (b"\n", b"\r") or len(line) > 16384:
+                    line = ""
+            if proc.wait():
+                raise subprocess.CalledProcessError(proc.returncode, command)
+        finally:
+            if proc.poll() is None:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait()
+            proc.stdout.close()
+            if forwarded:
+                subprocess.run(["ssh", "-S", control, "-O", "exit", host],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    subs = parser.add_subparsers(dest="action", required=True)
+    for action in ("setup", "deploy", "status", "connect", "shell", "auth"):
+        sub = subs.add_parser(action)
+        sub.add_argument("host", help="SSH alias or user@host; no implicit rdev target")
+        if action in ("setup", "deploy"):
+            sub.add_argument("--ref", help="dotfiles branch to deploy (setup default: main)")
+            sub.add_argument("--force", action="store_true", help="discard tracked and untracked checkout changes")
+            sub.add_argument("--allow-t3-update", action="store_true", help="back up T3 state and permit a version change")
+        if action == "setup":
+            mode = sub.add_mutually_exclusive_group()
+            mode.add_argument("--home-manager", action="store_true", help="manage only the home, not the OS")
+            mode.add_argument("--nixos-flake", help="existing remote NixOS flake#host that imports nixosModules.remote")
+        if action == "auth":
+            sub.add_argument("kind", choices=["gh", "mcp", "exa", "aws", "gcloud", "azure", "infisical"])
+            sub.add_argument("server", nargs="?", help="MCP server name")
+            sub.add_argument("--client", choices=["pi", "claude", "codex"], default="pi")
+    args = parser.parse_args(argv)
+    if not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.@:-]*", args.host):
+        parser.error("Use an SSH alias or user@host, not SSH flags or shell syntax.")
+    if args.action == "setup" and args.nixos_flake and not re.fullmatch(r"/[A-Za-z0-9_./-]+#[A-Za-z0-9_-]+", args.nixos_flake):
+        parser.error("--nixos-flake must name an absolute remote directory and host: /etc/nixos#hostname")
+    if args.action == "auth":
+        if args.kind in ("gh", "mcp"):
+            login(args.host, "gh" if args.kind == "gh" else args.client, args.server)
+        else:
+            identity = ssh(args.host, 'printf "%s\\n%s\\n" "$(id -un)" "$HOME"', capture_output=True, text=True).stdout.splitlines()
+            if len(identity) != 2:
+                raise ValueError("Could not determine the remote user and home.")
+            subprocess.run(["zsh", "-fc", 'fpath=("$1/zsh/functions" $fpath); autoload -Uz rauth; shift; rauth "$@"',
+                "remote", str(ROOT), "--host", args.host, "--user", identity[0], "--home", identity[1], args.kind], check=True)
+        return
+    if args.action == "shell":
+        os.execvp("ssh", ["ssh", "-t", args.host,
+            'export PATH="$HOME/.nix-profile/bin:/etc/profiles/per-user/$(id -un)/bin:$PATH"; exec zsh -l'])
+    if args.action == "connect":
+        # Pairing material goes straight to the user's terminal, never to a log or file.
+        os.execvp("ssh", ["ssh", "-t", args.host,
+            'export PATH="$HOME/.nix-profile/bin:/etc/profiles/per-user/$(id -un)/bin:$PATH"; exec t3 pair'])
+    flags = [args.action, getattr(args, "ref", None) or "", str(int(getattr(args, "force", False))),
+             str(int(getattr(args, "home_manager", False))), getattr(args, "nixos_flake", None) or "",
+             str(int(getattr(args, "allow_t3_update", False)))]
+    ssh(args.host, "bash -s -- " + shlex.join(flags), input=(ROOT / "scripts/remote.sh").read_bytes())
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (ValueError, subprocess.CalledProcessError) as error:
+        sys.exit(str(error))
+    except KeyboardInterrupt:
+        sys.exit(130)

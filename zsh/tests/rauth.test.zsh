@@ -71,8 +71,8 @@ autoload -Uz rauth
 
 output=$(
   HOME="$local_home" \
-    RDEV_REMOTE_USER="$USER" \
-    rauth --host fixture-host --home "$remote_home" aws
+     \
+    rauth --host fixture-host --user "$USER" --home "$remote_home" aws
 )
 
 [[ "$output" == *"Copied AWS auth to fixture-host:$USER:$remote_home/.aws"* ]]
@@ -82,8 +82,8 @@ cmp "$local_home/.aws/sso/cache/fixture.json" "$remote_home/.aws/sso/cache/fixtu
 
 gcloud_output=$(
   HOME="$local_home" \
-    RDEV_REMOTE_USER="$USER" \
-    rauth --host fixture-host --home "$remote_home" gcloud
+     \
+    rauth --host fixture-host --user "$USER" --home "$remote_home" gcloud
 )
 [[ "$gcloud_output" == *"Copied gcloud auth to fixture-host:$USER:$remote_home/.config/gcloud"* ]]
 cmp "$local_home/.config/gcloud/credentials.db" "$remote_home/.config/gcloud/credentials.db"
@@ -95,8 +95,8 @@ cmp "$local_home/.config/gcloud/configurations/config_default" "$remote_home/.co
 
 azure_output=$(
   HOME="$local_home" \
-    RDEV_REMOTE_USER="$USER" \
-    rauth --host fixture-host --home "$remote_home" azure
+     \
+    rauth --host fixture-host --user "$USER" --home "$remote_home" azure
 )
 [[ "$azure_output" == *"Copied Azure CLI auth to fixture-host:$USER:$remote_home/.azure"* ]]
 cmp "$local_home/.azure/azureProfile.json" "$remote_home/.azure/azureProfile.json"
@@ -107,76 +107,11 @@ cmp "$local_home/.azure/msal_token_cache.json" "$remote_home/.azure/msal_token_c
 [[ -f "$remote_home/.azure/logs/remote.log" ]]
 
 mkdir -p "$fixture/no-azure-home"
-if azure_missing=$(HOME="$fixture/no-azure-home" rauth --host fixture-host --home "$remote_home" azure 2>&1); then
+if azure_missing=$(HOME="$fixture/no-azure-home" rauth --host fixture-host --user "$USER" --home "$remote_home" azure 2>&1); then
   print -u2 'rauth azure succeeded without a local login'
   exit 1
 fi
 [[ "$azure_missing" == *'No Azure CLI login found'*'Run: az login'* ]]
-
-claude_output=$(
-  HOME="$local_home" \
-    CLAUDE_CREDENTIALS_FILE="$local_home/.claude/.credentials.json" \
-    RDEV_REMOTE_USER="$USER" \
-    rauth --host fixture-host --home "$remote_home" claude
-)
-[[ "$claude_output" == *"Copied Claude Code OAuth credentials for pi-claude-bridge to fixture-host:$USER:$remote_home/.claude/.credentials.json"* ]]
-[[ "$(jq -r '.claudeAiOauth.accessToken' "$remote_home/.claude/.credentials.json")" == claude-access ]]
-[[ "$(jq -r '.claudeAiOauth.refreshToken' "$remote_home/.claude/.credentials.json")" == claude-refresh ]]
-[[ "$(jq -r '.claudeAiOauth.expiresAt' "$remote_home/.claude/.credentials.json")" == 123 ]]
-[[ "$(jq -r '.claudeAiOauth | has("stale")' "$remote_home/.claude/.credentials.json")" == false ]]
-[[ "$(jq -r '.mcpOAuth | has("remote-preserved")' "$remote_home/.claude/.credentials.json")" == true ]]
-[[ "$(jq -r '.mcpOAuth | has("local-only")' "$remote_home/.claude/.credentials.json")" == false ]]
-if [[ "$OSTYPE" == darwin* ]]; then
-  [[ "$(stat -f '%Lp' "$remote_home/.claude/.credentials.json")" == 600 ]]
-else
-  [[ "$(stat -c '%a' "$remote_home/.claude/.credentials.json")" == 600 ]]
-fi
-[[ ! -s "$fixture/security-trace" ]]
-
-keychain_home="$fixture/keychain-home"
-mkdir -p "$keychain_home"
-HOME="$local_home" RDEV_REMOTE_USER="$USER" \
-  rauth --host fixture-host --home "$keychain_home" claude >/dev/null
-[[ "$(jq -r '.claudeAiOauth.accessToken' "$keychain_home/.claude/.credentials.json")" == keychain-access ]]
-[[ -s "$fixture/security-trace" ]]
-
-keychain_mode=malformed
-fallback_home="$fixture/fallback-home"
-mkdir -p "$fallback_home"
-HOME="$local_home" RDEV_REMOTE_USER="$USER" \
-  rauth --host fixture-host --home "$fallback_home" claude >/dev/null
-[[ "$(jq -r '.claudeAiOauth.accessToken' "$fallback_home/.claude/.credentials.json")" == claude-access ]]
-
-bridge_home="$fixture/bridge-home"
-mkdir -p "$bridge_home"
-HOME="$local_home" \
-  CLAUDE_CREDENTIALS_FILE="$local_home/.claude/.credentials.json" \
-  RDEV_REMOTE_USER="$USER" \
-  rauth --host fixture-host --home "$bridge_home" bridge >/dev/null
-[[ "$(jq -r '.claudeAiOauth.accessToken' "$bridge_home/.claude/.credentials.json")" == claude-access ]]
-
-# OpenAI must be copied by both the default Pi spec and the full auth bundle.
-mkdir -p "$local_home/.pi/agent" "$remote_home/.pi/agent" "$remote_home/.local/bin"
-print -r -- '{"openai":{"type":"oauth","access":"openai-access","refresh":"openai-refresh","expires":123,"clientId":"fixture-client","scopes":["api.model.read","api.model.request"]},"openai-codex":{"type":"oauth","access":"old-codex"}}' > "$local_home/.pi/agent/auth.json"
-print -r -- '{"mcp__executor|https://fixture.invalid":{"accessToken":"mcp-fixture"}}' > "$local_home/.pi/agent/mcp-auth.json"
-print -r -- '#!/usr/bin/env bash
-set -euo pipefail
-case "$*" in
-  "auth token "*) printf "%s\\n" "github-fixture" ;;
-  "auth login "*) cat >/dev/null ;;
-esac
-exit 0' > "$remote_home/.local/bin/gh"
-chmod +x "$remote_home/.local/bin/gh"
-
-HOME="$local_home" RDEV_REMOTE_USER="$USER" \
-  rauth --host fixture-host --home "$remote_home" pi >/dev/null
-[[ "$(jq -r '.openai.access' "$remote_home/.pi/agent/auth.json")" == openai-access ]]
-[[ "$(jq -r 'has("openai-codex")' "$remote_home/.pi/agent/auth.json")" == false ]]
-
-# The old shorthand is safe too: it now selects OpenAI rather than Codex.
-HOME="$local_home" RDEV_REMOTE_USER="$USER" \
-  rauth --host fixture-host --home "$remote_home" codex >/dev/null
-[[ "$(jq -r 'has("openai-codex")' "$remote_home/.pi/agent/auth.json")" == false ]]
 
 # Infisical: macOS Keychain (go-keyring) login -> remote encrypted file vault.
 decrypt_infisical_vault() {
@@ -201,12 +136,13 @@ mkdir -p "$local_home/.infisical"
 print -r -- '{"loggedInUserEmail":"dev@example.com","LoggedInUserDomain":"https://eu.infisical.com/api"}' \
   > "$local_home/.infisical/infisical-config.json"
 infisical_home="$fixture/infisical-home"
+mkdir -p "$remote_home/.local/bin"
 # The remote runner uses a fixed PATH; expose this machine's node there.
 mkdir -p "$infisical_home/.local/bin"
 ln -s "$(command -v node)" "$infisical_home/.local/bin/node"
 ln -s "$(command -v node)" "$remote_home/.local/bin/node"
-infisical_output=$(HOME="$local_home" RDEV_REMOTE_USER="$USER" \
-  rauth --host fixture-host --home "$infisical_home" infisical)
+infisical_output=$(HOME="$local_home"  \
+  rauth --host fixture-host --user "$USER" --home "$infisical_home" infisical)
 [[ "$infisical_output" == *"Copied Infisical login for dev@example.com"* ]]
 [[ "$(decrypt_infisical_vault "$infisical_home")" == "$(infisical_credentials)" ]]
 jq -e '.vaultBackendType == "file" and .loggedInUserEmail == "dev@example.com"
@@ -224,8 +160,8 @@ fi
 jq '.telemetry = "keep"' "$infisical_home/.infisical/infisical-config.json" > "$fixture/infisical-config"
 mv "$fixture/infisical-config" "$infisical_home/.infisical/infisical-config.json"
 passphrase=$(jq -r .vaultBackendPassphrase "$infisical_home/.infisical/infisical-config.json")
-HOME="$local_home" RDEV_REMOTE_USER="$USER" \
-  rauth --host fixture-host --home "$infisical_home" infisical >/dev/null
+HOME="$local_home"  \
+  rauth --host fixture-host --user "$USER" --home "$infisical_home" infisical >/dev/null
 jq -e --arg p "$passphrase" '.vaultBackendPassphrase == $p and .telemetry == "keep" and (.loggedInUsers | length) == 1' \
   "$infisical_home/.infisical/infisical-config.json" >/dev/null
 [[ "$(decrypt_infisical_vault "$infisical_home")" == "$(infisical_credentials)" ]]
@@ -233,8 +169,8 @@ jq -e --arg p "$passphrase" '.vaultBackendPassphrase == $p and .telemetry == "ke
 # An expired local login is refused rather than copied.
 vault_before=$(cat "$infisical_home/infisical-keyring/dev@example.com")
 infisical_exp=1
-if HOME="$local_home" RDEV_REMOTE_USER="$USER" \
-  rauth --host fixture-host --home "$infisical_home" infisical 2>"$fixture/infisical-err"; then
+if HOME="$local_home"  \
+  rauth --host fixture-host --user "$USER" --home "$infisical_home" infisical 2>"$fixture/infisical-err"; then
   print -r -- 'expected an expired Infisical login to fail' >&2
   exit 1
 fi
@@ -243,25 +179,28 @@ grep -q 'Local Infisical login has expired' "$fixture/infisical-err"
 infisical_exp=4102444800
 
 all_output=$(
-  HOME="$local_home" RDEV_REMOTE_USER="$USER" \
+  HOME="$local_home"  \
     PATH="$remote_home/.local/bin:$PATH" \
     CLAUDE_CREDENTIALS_FILE="$local_home/.claude/.credentials.json" \
     EXA_API_KEY=exa-fixture \
-    rauth --host fixture-host --home "$remote_home" all
+    rauth --host fixture-host --user "$USER" --home "$remote_home" all
 )
-[[ "$all_output" == *"Copied all Pi auth providers"* ]]
+[[ "$all_output" == *"Copied Exa API key"* ]]
 [[ "$all_output" == *"Copied Infisical login for dev@example.com"* ]]
 [[ "$(decrypt_infisical_vault "$remote_home")" == "$(infisical_credentials)" ]]
-jq -e --slurpfile local "$local_home/.pi/agent/auth.json" '.openai == $local[0].openai' \
-  "$remote_home/.pi/agent/auth.json" >/dev/null
 
+# Provider, MCP and GitHub OAuth can never enter the copy path.
+for spec in pi pi:all claude bridge codex gh mcp mcp:executor; do
+  if rauth --host fixture-host --user "$USER" --home "$remote_home" "$spec" >/dev/null 2>&1; then
+    print -u2 "OAuth copy unexpectedly accepted: $spec"
+    exit 1
+  fi
+done
+[[ ! -e "$remote_home/.pi/agent/auth.json" && ! -e "$remote_home/.pi/agent/mcp-auth.json" ]]
+if rauth aws >/dev/null 2>&1; then
+  print -u2 'Expected host-less credential transfer to fail'
+  exit 1
+fi
 help=$(rauth --help 2>&1)
-[[ "$help" == *'copy default Pi provider auth (default: openai)'* ]]
-[[ "$help" == *'all                         copy gh, Pi, Claude/bridge, MCP, Exa, AWS, gcloud, Azure, and Infisical auth'* ]]
-[[ "$help" == *'azure, az                   copy the Azure CLI login and subscriptions to ~/.azure'* ]]
-[[ "$help" == *'gcloud                      copy Google Cloud CLI logins and configurations to ~/.config/gcloud'* ]]
-[[ "$help" == *'infisical                   copy the Infisical CLI login into the remote file vault'* ]]
-[[ "$help" == *'claude                      copy Claude Code OAuth used by pi-claude-bridge'* ]]
-[[ "$help" == *'aws                         copy AWS config and cached sessions to ~/.aws'* ]]
-
-print 'rauth OpenAI, Infisical, full bundle, AWS, gcloud, Azure and Claude Bridge auth copy tests passed'
+[[ "$help" == *'Never copies provider, MCP, or GitHub OAuth'* ]]
+print 'Cloud/API-key transfer, private file permissions, and OAuth copy rejection tests passed'
