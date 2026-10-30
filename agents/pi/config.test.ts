@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 import { DELEGATE_POLICIES } from "./extensions/delegates/policy.ts";
 
@@ -13,6 +13,7 @@ test("managed settings use native MCP, no multi-account, and the pinned Claude B
     const sources: string[] = settings.packages.map((entry: string | { source: string }) =>
       typeof entry === "string" ? entry : entry.source);
     assert.equal(settings.tuiMode, "regular");
+    assert.equal(settings.retry, undefined);
     assert.equal(settings.extensions?.includes("-builtin:mcp") ?? false, false);
     assert.equal(sources.some((source) => source.includes("pi-mcp-adapter") || source.includes("pi-multi-account")), false);
     assert.ok(sources.includes("git:github.com/elidickinson/pi-claude-bridge@227f5eb4450a070dfbc083a7fe75b8b35366b941"));
@@ -30,9 +31,10 @@ test("main and Worker retain Claude Bridge Opus 5.5 with high thinking on both p
   }
 });
 
-test("OpenAI is the only configured failover provider and owns model overrides", async () => {
-  assert.deepEqual((await jsonFile("provider-failover.json")).providerOrder, ["openai"]);
-  assert.deepEqual(Object.keys((await jsonFile("models.json")).providers), ["openai"]);
+test("OpenAI subagents use one provider without local failover or model overrides", async () => {
+  for (const name of ["provider-failover.json", "models.json"]) {
+    await assert.rejects(access(new URL(name, import.meta.url)), { code: "ENOENT" });
+  }
   assert.equal(DELEGATE_POLICIES.oracle.model, "openai/gpt-6-astra");
   assert.equal(DELEGATE_POLICIES.oracle.thinking, "xhigh");
   for (const role of ["finder", "librarian"]) {
@@ -43,8 +45,7 @@ test("OpenAI is the only configured failover provider and owns model overrides",
 
 test("native MCP keeps configured servers and exposes only the three Executor entrypoints", async () => {
   const config = await jsonFile("mcp.json");
-  assert.deepEqual(Object.keys(config.mcpServers).sort(), ["executor", "figma", "foilwick", "scryfall"]);
-  assert.equal(config.mcpServers.scryfall.enabled, false);
+  assert.deepEqual(Object.keys(config.mcpServers).sort(), ["executor", "figma", "foilwick"]);
   assert.equal(config.mcpServers.executor.exposure, "hidden");
   assert.deepEqual(config.mcpServers.executor.toolExposure, { execute: "direct", skills: "direct", resume: "direct" });
 });

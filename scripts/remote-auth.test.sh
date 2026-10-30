@@ -1,30 +1,30 @@
-#!/usr/bin/env zsh
+#!/usr/bin/env bash
 set -euo pipefail
 
-repo_root=${0:A:h:h:h}
+repo_root=$(cd "$(dirname "$0")/.." && pwd)
 fixture=$(mktemp -d)
 trap 'rm -rf "$fixture"' EXIT
 local_home="$fixture/local-home"
 remote_home="$fixture/remote-home"
 mkdir -p "$local_home/.aws/sso/cache" "$local_home/.claude" "$remote_home/.claude"
-print -r -- $'[default]\nregion = eu-central-1' > "$local_home/.aws/config"
-print -r -- '{"accessToken":"fixture-token"}' > "$local_home/.aws/sso/cache/fixture.json"
+printf '%s\n' $'[default]\nregion = eu-central-1' > "$local_home/.aws/config"
+printf '%s\n' '{"accessToken":"fixture-token"}' > "$local_home/.aws/sso/cache/fixture.json"
 mkdir -p "$local_home/.config/gcloud/configurations" "$local_home/.config/gcloud/logs" "$remote_home/.config/gcloud/logs"
-print -r -- fixture-credentials > "$local_home/.config/gcloud/credentials.db"
-print -r -- $'[core]\naccount = dev@example.com' > "$local_home/.config/gcloud/configurations/config_default"
-print -r -- local-log > "$local_home/.config/gcloud/logs/local.log"
-print -r -- True > "$local_home/.config/gcloud/gce"
-print -r -- remote-log > "$remote_home/.config/gcloud/logs/remote.log"
-print -r -- stale > "$remote_home/.config/gcloud/stale.db"
+printf '%s\n' fixture-credentials > "$local_home/.config/gcloud/credentials.db"
+printf '%s\n' $'[core]\naccount = dev@example.com' > "$local_home/.config/gcloud/configurations/config_default"
+printf '%s\n' local-log > "$local_home/.config/gcloud/logs/local.log"
+printf '%s\n' True > "$local_home/.config/gcloud/gce"
+printf '%s\n' remote-log > "$remote_home/.config/gcloud/logs/remote.log"
+printf '%s\n' stale > "$remote_home/.config/gcloud/stale.db"
 mkdir -p "$local_home/.azure/logs" "$remote_home/.azure/logs"
-print -r -- '{"subscriptions":[{"id":"fixture-subscription"}]}' > "$local_home/.azure/azureProfile.json"
-print -r -- '{"AccessToken":{}}' > "$local_home/.azure/msal_token_cache.json"
-print -r -- local-session > "$local_home/.azure/az.sess"
-print -r -- local-log > "$local_home/.azure/logs/local.log"
-print -r -- remote-log > "$remote_home/.azure/logs/remote.log"
-print -r -- '[{"client_id":"stale"}]' > "$remote_home/.azure/service_principal_entries.json"
-print -r -- '{"claudeAiOauth":{"accessToken":"claude-access","refreshToken":"claude-refresh","expiresAt":123},"mcpOAuth":{"local-only":{}}}' > "$local_home/.claude/.credentials.json"
-print -r -- '{"claudeAiOauth":{"accessToken":"old","refreshToken":"old","stale":"remove-me","expiresAt":999},"mcpOAuth":{"remote-preserved":{}}}' > "$remote_home/.claude/.credentials.json"
+printf '%s\n' '{"subscriptions":[{"id":"fixture-subscription"}]}' > "$local_home/.azure/azureProfile.json"
+printf '%s\n' '{"AccessToken":{}}' > "$local_home/.azure/msal_token_cache.json"
+printf '%s\n' local-session > "$local_home/.azure/az.sess"
+printf '%s\n' local-log > "$local_home/.azure/logs/local.log"
+printf '%s\n' remote-log > "$remote_home/.azure/logs/remote.log"
+printf '%s\n' '[{"client_id":"stale"}]' > "$remote_home/.azure/service_principal_entries.json"
+printf '%s\n' '{"claudeAiOauth":{"accessToken":"claude-access","refreshToken":"claude-refresh","expiresAt":123},"mcpOAuth":{"local-only":{}}}' > "$local_home/.claude/.credentials.json"
+printf '%s\n' '{"claudeAiOauth":{"accessToken":"old","refreshToken":"old","stale":"remove-me","expiresAt":999},"mcpOAuth":{"remote-preserved":{}}}' > "$remote_home/.claude/.credentials.json"
 : > "$fixture/ssh-trace"
 : > "$fixture/security-trace"
 keychain_mode=success
@@ -32,33 +32,37 @@ infisical_exp=4102444800
 
 infisical_credentials() {
   local claims
-  claims=$(print -rn -- "{\"exp\":$infisical_exp}" | base64 | tr '+/' '-_' | tr -d '=\n')
-  print -rn -- "{\"email\":\"dev@example.com\",\"privateKey\":\"\",\"JTWToken\":\"e30.$claims.sig\",\"RefreshToken\":\"\"}"
+  claims=$(printf '%s' "{\"exp\":$infisical_exp}" | base64 | tr '+/' '-_' | tr -d '=\n')
+  printf '%s' "{\"email\":\"dev@example.com\",\"privateKey\":\"\",\"JTWToken\":\"e30.$claims.sig\",\"RefreshToken\":\"\"}"
 }
 
 ssh() {
-  print -r -- "$*" >> "$fixture/ssh-trace"
-  [[ "${1:-}" != -t ]]
-  local runner=${@[-1]}
-  eval "$runner"
+  printf '%s\n' "$*" >> "$fixture/ssh-trace"
+  [[ $# == 2 && $1 == fixture-host ]] || { printf 'Unexpected SSH arguments\n' >&2; return 99; }
+  if [[ $2 == *'$(id -un)'* ]]; then
+    printf '%s\n%s\n' "$USER" "${AUTH_FIXTURE_HOME:-$fixture/remote-home}"
+    return
+  fi
+  [[ $2 == encoded=* ]] || { printf 'Unexpected SSH command\n' >&2; return 99; }
+  (eval "$2")
 }
 
 uname() {
-  [[ "${1:-}" == -s || $# -eq 0 ]] && print -r -- Darwin
+  [[ "${1:-}" == -s || $# -eq 0 ]] && printf '%s\n' Darwin
 }
 
 security() {
-  print -r -- "$*" >> "$fixture/security-trace"
+  printf '%s\n' "$*" >> "$fixture/security-trace"
   if [[ "$*" == *"-s infisical-cli"* ]]; then
-    print -r -- "go-keyring-base64:$(infisical_credentials | base64 | tr -d '\n')"
+    printf '%s\n' "go-keyring-base64:$(infisical_credentials | base64 | tr -d '\n')"
     return
   fi
   case "$keychain_mode" in
     success)
-      print -r -- '{"claudeAiOauth":{"accessToken":"keychain-access","refreshToken":"keychain-refresh"}}'
+      printf '%s\n' '{"claudeAiOauth":{"accessToken":"keychain-access","refreshToken":"keychain-refresh"}}'
       ;;
     malformed)
-      print -r -- '{"claudeAiOauth":{}}'
+      printf '%s\n' '{"claudeAiOauth":{}}'
       ;;
     *)
       return 1
@@ -66,13 +70,12 @@ security() {
   esac
 }
 
-fpath=("$repo_root/zsh/functions" $fpath)
-autoload -Uz rauth
+source "$repo_root/bin/remote"
 
 output=$(
   HOME="$local_home" \
      \
-    rauth --host fixture-host --user "$USER" --home "$remote_home" aws
+    _remote_main auth fixture-host aws
 )
 
 [[ "$output" == *"Copied AWS auth to fixture-host:$USER:$remote_home/.aws"* ]]
@@ -83,7 +86,7 @@ cmp "$local_home/.aws/sso/cache/fixture.json" "$remote_home/.aws/sso/cache/fixtu
 gcloud_output=$(
   HOME="$local_home" \
      \
-    rauth --host fixture-host --user "$USER" --home "$remote_home" gcloud
+    _remote_main auth fixture-host gcloud
 )
 [[ "$gcloud_output" == *"Copied gcloud auth to fixture-host:$USER:$remote_home/.config/gcloud"* ]]
 cmp "$local_home/.config/gcloud/credentials.db" "$remote_home/.config/gcloud/credentials.db"
@@ -96,7 +99,7 @@ cmp "$local_home/.config/gcloud/configurations/config_default" "$remote_home/.co
 azure_output=$(
   HOME="$local_home" \
      \
-    rauth --host fixture-host --user "$USER" --home "$remote_home" azure
+    _remote_main auth fixture-host azure
 )
 [[ "$azure_output" == *"Copied Azure CLI auth to fixture-host:$USER:$remote_home/.azure"* ]]
 cmp "$local_home/.azure/azureProfile.json" "$remote_home/.azure/azureProfile.json"
@@ -107,8 +110,8 @@ cmp "$local_home/.azure/msal_token_cache.json" "$remote_home/.azure/msal_token_c
 [[ -f "$remote_home/.azure/logs/remote.log" ]]
 
 mkdir -p "$fixture/no-azure-home"
-if azure_missing=$(HOME="$fixture/no-azure-home" rauth --host fixture-host --user "$USER" --home "$remote_home" azure 2>&1); then
-  print -u2 'rauth azure succeeded without a local login'
+if azure_missing=$(HOME="$fixture/no-azure-home" _remote_main auth fixture-host azure 2>&1); then
+  printf '%s\n' 'remote auth azure succeeded without a local login'
   exit 1
 fi
 [[ "$azure_missing" == *'No Azure CLI login found'*'Run: az login'* ]]
@@ -133,16 +136,18 @@ JS
 }
 
 mkdir -p "$local_home/.infisical"
-print -r -- '{"loggedInUserEmail":"dev@example.com","LoggedInUserDomain":"https://eu.infisical.com/api"}' \
+printf '%s\n' '{"loggedInUserEmail":"dev@example.com","LoggedInUserDomain":"https://eu.infisical.com/api"}' \
   > "$local_home/.infisical/infisical-config.json"
 infisical_home="$fixture/infisical-home"
 mkdir -p "$remote_home/.local/bin"
+ln -s "$(command -v jq)" "$remote_home/.local/bin/jq"
 # The remote runner uses a fixed PATH; expose this machine's node there.
 mkdir -p "$infisical_home/.local/bin"
+ln -s "$(command -v jq)" "$infisical_home/.local/bin/jq"
 ln -s "$(command -v node)" "$infisical_home/.local/bin/node"
 ln -s "$(command -v node)" "$remote_home/.local/bin/node"
 infisical_output=$(HOME="$local_home"  \
-  rauth --host fixture-host --user "$USER" --home "$infisical_home" infisical)
+  AUTH_FIXTURE_HOME="$infisical_home" _remote_main auth fixture-host infisical)
 [[ "$infisical_output" == *"Copied Infisical login for dev@example.com"* ]]
 [[ "$(decrypt_infisical_vault "$infisical_home")" == "$(infisical_credentials)" ]]
 jq -e '.vaultBackendType == "file" and .loggedInUserEmail == "dev@example.com"
@@ -161,7 +166,7 @@ jq '.telemetry = "keep"' "$infisical_home/.infisical/infisical-config.json" > "$
 mv "$fixture/infisical-config" "$infisical_home/.infisical/infisical-config.json"
 passphrase=$(jq -r .vaultBackendPassphrase "$infisical_home/.infisical/infisical-config.json")
 HOME="$local_home"  \
-  rauth --host fixture-host --user "$USER" --home "$infisical_home" infisical >/dev/null
+  AUTH_FIXTURE_HOME="$infisical_home" _remote_main auth fixture-host infisical >/dev/null
 jq -e --arg p "$passphrase" '.vaultBackendPassphrase == $p and .telemetry == "keep" and (.loggedInUsers | length) == 1' \
   "$infisical_home/.infisical/infisical-config.json" >/dev/null
 [[ "$(decrypt_infisical_vault "$infisical_home")" == "$(infisical_credentials)" ]]
@@ -170,8 +175,8 @@ jq -e --arg p "$passphrase" '.vaultBackendPassphrase == $p and .telemetry == "ke
 vault_before=$(cat "$infisical_home/infisical-keyring/dev@example.com")
 infisical_exp=1
 if HOME="$local_home"  \
-  rauth --host fixture-host --user "$USER" --home "$infisical_home" infisical 2>"$fixture/infisical-err"; then
-  print -r -- 'expected an expired Infisical login to fail' >&2
+  AUTH_FIXTURE_HOME="$infisical_home" _remote_main auth fixture-host infisical 2>"$fixture/infisical-err"; then
+  printf '%s\n' 'expected an expired Infisical login to fail' >&2
   exit 1
 fi
 grep -q 'Local Infisical login has expired' "$fixture/infisical-err"
@@ -183,7 +188,7 @@ all_output=$(
     PATH="$remote_home/.local/bin:$PATH" \
     CLAUDE_CREDENTIALS_FILE="$local_home/.claude/.credentials.json" \
     EXA_API_KEY=exa-fixture \
-    rauth --host fixture-host --user "$USER" --home "$remote_home" all
+    _remote_main auth fixture-host all
 )
 [[ "$all_output" == *"Copied Exa API key"* ]]
 [[ "$all_output" == *"Copied Infisical login for dev@example.com"* ]]
@@ -191,16 +196,16 @@ all_output=$(
 
 # Provider, MCP and GitHub OAuth can never enter the copy path.
 for spec in pi pi:all claude bridge codex gh mcp mcp:executor; do
-  if rauth --host fixture-host --user "$USER" --home "$remote_home" "$spec" >/dev/null 2>&1; then
-    print -u2 "OAuth copy unexpectedly accepted: $spec"
+  if ( _remote_auth_cloud fixture-host "$spec" ) >/dev/null 2>&1; then
+    printf '%s\n' "OAuth copy unexpectedly accepted: $spec" >&2
     exit 1
   fi
 done
 [[ ! -e "$remote_home/.pi/agent/auth.json" && ! -e "$remote_home/.pi/agent/mcp-auth.json" ]]
-if rauth aws >/dev/null 2>&1; then
-  print -u2 'Expected host-less credential transfer to fail'
+if ( _remote_main auth ) >/dev/null 2>&1; then
+  printf '%s\n' 'Expected host-less credential transfer to fail'
   exit 1
 fi
-help=$(rauth --help 2>&1)
+help=$(_remote_main --help 2>&1)
 [[ "$help" == *'Never copies provider, MCP, or GitHub OAuth'* ]]
-print 'Cloud/API-key transfer, private file permissions, and OAuth copy rejection tests passed'
+printf '%s\n' 'Cloud/API-key transfer, private file permissions, and OAuth copy rejection tests passed'

@@ -121,7 +121,7 @@ case $(uname -m) in
 esac
 user=$(id -un)
 # These strings enter a generated Nix expression; reject syntax rather than interpolate it.
-[[ $user =~ ^[a-z_][a-z0-9_-]*$ && $HOME =~ ^/[a-zA-Z0-9_/-]+$ ]] || fail 'Unsupported user/home syntax.'
+[[ $user =~ ^[a-z_][a-z0-9_-]*$ && $HOME =~ ^/[a-zA-Z0-9_./-]+$ ]] || fail 'Unsupported user/home syntax.'
 if [[ $action == setup ]]; then
   mkdir -p "$state"
   chmod 700 "$state"
@@ -131,6 +131,7 @@ if [[ $action == setup ]]; then
     target="$state/flake"
     mkdir -p "$target"
     if [[ $mode == nixos ]]; then
+      printf 'NixOS: this host switches to the dotfiles flake'\''s pinned nixpkgs-unstable, not its channel.\n'
       cat >"$target/flake.nix" <<EOF
 {
   inputs.dotfiles.url = "git+file://$checkout";
@@ -189,11 +190,18 @@ fi
 # Refresh only the local checkout reference, never upstream pins. Existing NixOS
 # flakes must declare their dotfiles input as the local checkout too.
 flake_dir=${target%%#*}
-nix flake lock --update-input dotfiles "$flake_dir"
+# sudo resets the environment; keep the flake toggle for a classic host's first switch.
+root=(sudo -n env "NIX_CONFIG=$NIX_CONFIG")
+if [[ -w $flake_dir ]]; then
+  nix flake lock --update-input dotfiles "$flake_dir"
+else
+  # A host-owned flake such as /etc/nixos is writable only by root.
+  "${root[@]}" nix flake lock --update-input dotfiles "$flake_dir"
+fi
 if [[ $mode == nixos ]]; then
   managed_user=$(nix eval --impure --raw "$flake_dir#nixosConfigurations.${target##*#}.config.dotfiles.remote.user")
   [[ $managed_user == "$user" ]] || fail "The NixOS target must import nixosModules.remote for $user."
-  sudo -n nixos-rebuild switch --impure --flake "$target"
+  "${root[@]}" nixos-rebuild switch --impure --flake "$target"
 else
   if [[ $(loginctl show-user "$user" --property=Linger --value 2>/dev/null || true) != yes ]]; then
     sudo -n loginctl enable-linger "$user" || fail "Ask the administrator to run: loginctl enable-linger $user"

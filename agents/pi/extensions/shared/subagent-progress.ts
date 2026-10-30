@@ -32,7 +32,6 @@ export interface SubagentRunDetails {
   /** undefined means that the adapter has no turn limit. */
   maxTurns: number | undefined;
   toolCalls: SubagentToolCall[];
-  /** Account attempts belong to this run, never to the parent's rotation state. */
   summaryText?: string;
   error?: string;
   terminationReason?: SubagentTerminationReason;

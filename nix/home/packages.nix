@@ -81,8 +81,7 @@ in
           ];
         })
 
-        # Python (also runs the remote-management CLI)
-        python3
+        # Python
         uv
 
         # Editor

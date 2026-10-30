@@ -1,6 +1,6 @@
 # Usage: devhelp
 printf '%s\n' \
-  'rebuild [-u]                       Rebuild this machine (-u updates inputs)' \
+  'rebuild [-u]                      Rebuild this machine (-u updates inputs)' \
   'remote setup HOST                 Add an existing NixOS dev machine' \
   'remote setup HOST --home-manager  Add an existing non-NixOS dev machine' \
   'remote deploy HOST                Fast-forward clean dotfiles and switch' \

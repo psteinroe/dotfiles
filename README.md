@@ -36,7 +36,9 @@ remote connect user@host                # one-time T3 pairing link; open in the 
 Setup uses `~/Developer/dotfiles` and records its mode/target under
 `~/.config/dotfiles`. Home Manager setup installs Nix if missing. NixOS setup
 wraps `/etc/nixos/configuration.nix` without replacing hardware, boot or SSH
-configuration. For an existing NixOS **flake**, add this input/module to it:
+configuration, but the whole OS then builds from this flake's pinned
+`nixpkgs-unstable` instead of the host's channel. Home Manager follows that pin.
+For an existing NixOS **flake**, add this input/module to it:
 
 ```nix
 inputs.dotfiles.url = "git+file:///home/psteinroe/Developer/dotfiles";

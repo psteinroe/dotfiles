@@ -58,7 +58,6 @@ in
       autoload -Uz cpi
       autoload -Uz gclean
       autoload -Uz greset
-      autoload -Uz rauth
 
       if [[ $TERM != "dumb" ]]; then
         source ${starshipZshInit}
