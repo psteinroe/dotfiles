@@ -24,19 +24,23 @@ let
         ];
       };
       config = evaluated.config;
+      # T3 owns its service unit; dotfiles only ships this drop-in.
+      dropIn =
+        config.home-manager.users.fixture.xdg.configFile."systemd/user/t3code.service.d/dotfiles.conf".text;
     in
     assert config.users.users.fixture.linger;
     assert config.services.tailscale.enable;
     assert config.programs.nix-ld.enable;
-    assert builtins.elem "NIX_LD=/run/current-system/sw/share/nix-ld/lib/ld.so"
-      config.home-manager.users.fixture.systemd.user.services.t3code.Service.Environment;
+    assert lib.hasInfix ''Environment="NIX_LD=/run/current-system/sw/share/nix-ld/lib/ld.so"'' dropIn;
+    assert lib.hasInfix "PATH=/home/fixture/.local/bin:" dropIn;
+    assert !(config.home-manager.users.fixture.systemd.user.services ? t3code);
     assert config.networking.firewall.interfaces.tailscale0.allowedTCPPorts == [ 3773 ];
     assert config.home-manager.users.fixture.home.homeDirectory == "/home/fixture";
     assert config.home-manager.users.fixture.home.username == "fixture";
     {
       toplevel = config.system.build.toplevel.drvPath;
       home = config.home-manager.users.fixture.home.activationPackage.drvPath;
-      service = config.home-manager.users.fixture.systemd.user.services.t3code.Service.ExecStart;
+      inherit dropIn;
     };
 in
 lib.genAttrs [ "x86_64-linux" "aarch64-linux" ] check

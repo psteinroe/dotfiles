@@ -7,7 +7,8 @@
 }:
 
 let
-  t3code = pkgs.callPackage ../t3code-package.nix { };
+  # T3 installs and updates itself here (`t3 update`; its apps update the server to their own version).
+  t3 = "${homeDirectory}/.local/bin/t3";
 
   # Agent processes inherit this PATH, so keep the complete managed development
   # environment plus OS-installed provider CLIs such as /usr/local/bin/codex.
@@ -26,18 +27,6 @@ let
     exit 1
   '';
 
-  startDirect = pkgs.writeShellScript "t3code-start-tailscale-direct" ''
-    set -euo pipefail
-
-    tailnet_ip="$(${pkgs.tailscale}/bin/tailscale ip -4 | ${pkgs.coreutils}/bin/head -n 1)"
-    if [[ ! "$tailnet_ip" =~ ^100\. ]]; then
-      echo "Could not determine this host's Tailscale IPv4 address" >&2
-      exit 1
-    fi
-
-    exec ${t3code}/bin/t3 serve --host "$tailnet_ip" --port 3773
-  '';
-
   # T3 projects get their own clones, apart from any <repo>.git worktrees in ~/Developer
   t3Projects = {
     hellomateo = "https://github.com/getmateo/hellomateo.git";
@@ -50,15 +39,60 @@ let
     ninjascale = "https://github.com/psteinroe/ninjascale.git";
   };
   t3ProjectsDir = "${homeDirectory}/Developer/t3";
-
 in
 {
-  # Nix owns the executable and service definition; T3 owns mutable pairing,
-  # provider, and session state under ~/.t3.
-  home.packages = [ t3code ];
+  # T3's own service unit stays T3's. service.env can't set PATH, so this drop-in adds
+  # the agent environment; the address goes into T3's service.env below.
+  xdg.configFile."systemd/user/t3code.service.d/dotfiles.conf".text = ''
+    [Service]
+    ExecStartPre=${waitForTailscale}
+    Environment="PATH=${managedUserPath}"
+    # Needed on NixOS even without a PAM login; ignored by native glibc on other hosts.
+    Environment="NIX_LD=/run/current-system/sw/share/nix-ld/lib/ld.so"
+    Environment="NIX_LD_LIBRARY_PATH=/run/current-system/sw/share/nix-ld/lib"
+  '';
+
+  # Installs T3 and its service only when missing: reinstalling restarts the service and
+  # interrupts agents. remote setup records the Mac app's version for the first install.
+  home.activation.t3code = lib.hm.dag.entryAfter [ "reloadSystemd" ] ''
+    if [ -z "''${DRY_RUN:-}" ]; then (
+      export PATH="${pkgs.curl}/bin:${pkgs.gnutar}/bin:${pkgs.gzip}/bin:${pkgs.coreutils}/bin:${pkgs.gnugrep}/bin:/run/current-system/sw/bin:/usr/bin:/bin:$PATH"
+      state="$HOME/.config/dotfiles"
+      mkdir -p "$state"
+
+      # T3 reads its address from service.env; keep any other entries there. Tailnet
+      # addresses are stable per node, and T3's default would also answer on the LAN.
+      ip=$(${pkgs.tailscale}/bin/tailscale ip -4 2>/dev/null | head -n 1 || true)
+      case "$ip" in
+        100.*)
+          env="$HOME/.t3/service.env"
+          mkdir -p "$HOME/.t3"
+          (umask 077; { grep -vE '^(T3CODE_HOST|T3CODE_PORT)=' "$env" 2>/dev/null || true
+            printf 'T3CODE_HOST=%s\nT3CODE_PORT=3773\n' "$ip"; } >"$env.tmp")
+          mv "$env.tmp" "$env"
+          ;;
+        *) echo "warning: Tailscale has no address yet; T3 keeps its previous address" >&2 ;;
+      esac
+
+      if [ ! -x "${t3}" ]; then
+        version=$(cat "$state/t3-install-version" 2>/dev/null || true)
+        installer=$(mktemp)
+        if curl -fsSL -o "$installer" https://t3.codes/install.sh &&
+          T3CODE_VERSION="$version" sh "$installer"; then
+          rm -f "$state/t3-install-version"
+        else
+          echo "warning: could not install T3 Code" >&2
+        fi
+        rm -f "$installer"
+      fi
+      if [ -x "${t3}" ] && [ ! -e "${config.xdg.configHome}/systemd/user/t3code.service" ]; then
+        "${t3}" service install || echo "warning: could not install the T3 Code service" >&2
+      fi
+    ) fi
+  '';
 
   # Clones and registers missing projects only; never re-clones, removes, or touches existing ones
-  home.activation.t3codeProjects = lib.hm.dag.entryAfter [ "reloadSystemd" ] (
+  home.activation.t3codeProjects = lib.hm.dag.entryAfter [ "t3code" ] (
     ''
       add_t3_project() {
         name="$1"
@@ -75,8 +109,8 @@ in
           fi
         fi
 
-        if [ -z "''${DRY_RUN:-}" ] &&
-          ! output=$(${t3code}/bin/t3 project add --title "$name" "$path" 2>&1) &&
+        if [ -z "''${DRY_RUN:-}" ] && [ -x "${t3}" ] &&
+          ! output=$(${t3} project add --title "$name" "$path" 2>&1) &&
           ! grep -q "already exists" <<<"$output"; then
           echo "warning: could not add $path to T3 Code: $output" >&2
         fi
@@ -89,40 +123,4 @@ in
       '') t3Projects
     )
   );
-
-  systemd.user.services.t3code = {
-    Unit = {
-      Description = "T3 Code remote server";
-      After = [ "network-online.target" ];
-      Wants = [ "network-online.target" ];
-      StartLimitIntervalSec = 300;
-      StartLimitBurst = 5;
-    };
-
-    Service = {
-      # Bind only the tailnet address; Tailscale encrypts and authorizes traffic.
-      ExecStartPre = waitForTailscale;
-      ExecStart = startDirect;
-      Environment = [
-        "T3CODE_HOME=${homeDirectory}/.t3"
-        "HOME=${homeDirectory}"
-        "PATH=${managedUserPath}"
-        # Needed on NixOS even without a PAM login; ignored by native glibc on other hosts.
-        "NIX_LD=/run/current-system/sw/share/nix-ld/lib/ld.so"
-        "NIX_LD_LIBRARY_PATH=/run/current-system/sw/share/nix-ld/lib"
-      ];
-      WorkingDirectory = homeDirectory;
-      Restart = "always";
-      RestartSec = "5s";
-      # T3 prints an initial pairing token on stdout. Do not persist that
-      # credential in the user journal; generate explicit one-time links with
-      # `t3 pair` instead. Keep stderr for operational failures.
-      StandardOutput = "null";
-      StandardError = "journal";
-      UMask = "0077";
-      TimeoutStopSec = "15s";
-    };
-
-    Install.WantedBy = [ "default.target" ];
-  };
 }

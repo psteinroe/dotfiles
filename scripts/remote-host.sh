@@ -10,7 +10,7 @@ ref=$2
 force=$3
 home_only=$4
 nixos_flake=$5
-allow_t3_update=$6
+t3_version=$6
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=$XDG_RUNTIME_DIR/bus}"
 state="$HOME/.config/dotfiles"
@@ -171,21 +171,13 @@ EOF
   printf 'mode=%q\ntarget=%q\nREMOTE_REF=%q\n' "$mode" "$target" "$ref" >"$state/remote.env"
 fi
 
-new_version=$(nix eval --raw "$checkout#lib.t3Version")
-old_version=${DEPLOYED_T3_VERSION:-}
-if [[ -z $old_version ]] && command -v t3 >/dev/null; then
-  old_version=$(t3 --version | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' | head -n1 || true)
+# T3 updates itself once installed; only its first install follows the Mac app's version.
+if [[ -n $t3_version && ! -x $HOME/.local/bin/t3 ]]; then
+  printf '%s\n' "$t3_version" >"$state/t3-install-version"
 fi
-if [[ -n $old_version && $old_version != "$new_version" ]]; then
-  [[ $allow_t3_update == 1 ]] || fail "T3 changes $old_version → $new_version. Align desktop/mobile versions, then use --allow-t3-update to back up state and stop the service before switching."
-  if [[ -d $HOME/.t3 ]]; then
-    backup="$HOME/.local/state/dotfiles/backups/t3-$old_version-$(date +%Y%m%dT%H%M%S)"
-    mkdir -p "$(dirname "$backup")"
-    systemctl --user stop t3code
-    cp -a "$HOME/.t3" "$backup"
-    printf 'T3 state backup: %s\n' "$backup"
-  fi
-fi
+# T3's own service only restarts when dotfiles' drop-in or T3's service.env change.
+t3_config() { cat "$HOME/.config/systemd/user/t3code.service.d/dotfiles.conf" "$HOME/.t3/service.env" 2>/dev/null || true; }
+t3_before=$(t3_config)
 
 # Refresh only the local checkout reference, never upstream pins. Existing NixOS
 # flakes must declare their dotfiles input as the local checkout too.
@@ -208,11 +200,15 @@ else
   fi
   nix run "$checkout#home-manager" -- switch --flake "$target"
 fi
-printf 'mode=%q\ntarget=%q\nREMOTE_REF=%q\nDEPLOYED_T3_VERSION=%q\n' "$mode" "$target" "$ref" "$new_version" >"$state/remote.env"
+printf 'mode=%q\ntarget=%q\nREMOTE_REF=%q\n' "$mode" "$target" "$ref" >"$state/remote.env"
 if ! tailscale status --json 2>/dev/null | grep -Eq '"BackendState"[[:space:]]*:[[:space:]]*"Running"'; then
   fail "Configuration applied. Enroll Tailscale with sudo tailscale up on this host, then run remote deploy HOST again."
 fi
 systemctl --user daemon-reload
-systemctl --user restart t3code
+if [[ $(t3_config) != "$t3_before" ]]; then
+  systemctl --user restart t3code
+else
+  systemctl --user start t3code
+fi
 systemctl --user is-active t3code
 printf '\nUse remote status HOST to verify T3, remote auth HOST for logins, then remote connect HOST.\n'
