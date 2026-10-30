@@ -1,0 +1,531 @@
+#!/usr/bin/env bash
+# Local entry point for an explicitly named, existing SSH development machine.
+set -euo pipefail
+
+REMOTE_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+REMOTE_PATH='export PATH="$HOME/.local/bin:$HOME/.nix-profile/bin:/etc/profiles/per-user/$(id -un)/bin:/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin:$PATH"; '
+
+_remote_die() { printf 'remote: %s\n' "$*" >&2; exit 1; }
+_remote_usage() {
+  printf '%s\n' \
+    'Usage: remote setup HOST [--home-manager | --nixos-flake /etc/nixos#HOST] [update flags]' \
+    '       remote deploy HOST [update flags]' \
+    '       remote status|connect|shell HOST' \
+    '       remote auth HOST gh' \
+    '       remote auth HOST mcp SERVER [--client pi|claude|codex]' \
+    '       remote auth HOST exa|aws|gcloud|azure|infisical|all' \
+    '' \
+    'Update flags: --ref BRANCH --force --allow-t3-update' \
+    'HOST is an explicit SSH alias or user@host; setup never replaces an OS.' \
+    'GitHub/MCP OAuth stays on each remote. Never copies provider, MCP, or GitHub OAuth.'
+}
+
+# Quote arguments for the remote login shell without eval or interpolating user input.
+_remote_quote() { printf '%q ' "$@"; }
+
+_remote_uri_decode() {
+  local value=${1//+/ } result='' byte hex
+  while [[ $value == *%* ]]; do
+    result+=${value%%\%*}
+    value=${value#*%}
+    hex=${value:0:2}
+    [[ $hex =~ ^[[:xdigit:]]{2}$ && $hex != 00 ]] || return 1
+    printf -v byte '%b' "\\x$hex"
+    result+=$byte
+    value=${value:2}
+  done
+  printf '%s' "$result$value"
+}
+
+# Only loopback callback listeners may be forwarded. Never follow arbitrary hosts.
+_remote_callback_forward() {
+  local query=${1#*\?} param redirect bind port
+  local pattern='^http://(localhost|127\.0\.0\.1|\[::1\]):([0-9]{1,5})(/|$)'
+  local -a params
+  [[ $query != "$1" ]] || return 1
+  query=${query%%#*}
+  IFS='&' read -r -a params <<< "$query"
+  for param in "${params[@]}"; do
+    [[ ${param%%=*} == redirect_uri ]] || continue
+    redirect=$(_remote_uri_decode "${param#*=}") || return 1
+    [[ $redirect =~ $pattern ]] || return 1
+    bind=${BASH_REMATCH[1]} port=${BASH_REMATCH[2]}
+    (( 10#$port > 0 && 10#$port <= 65535 )) || return 1
+    printf '%s:%s:%s:%s' "$bind" "$port" "$bind" "$port"
+    return
+  done
+  return 1
+}
+
+_remote_open_browser() {
+  if [[ $(uname -s) == Darwin ]]; then
+    open "$1"
+  elif command -v xdg-open >/dev/null 2>&1; then
+    xdg-open "$1"
+  else
+    printf '\nOpen the authorization URL above in your local browser.\n' >&2
+  fi
+}
+
+# Called during login, sharing its scoped tunnel/opened-URL state.
+_remote_oauth_urls() {
+  local rest=$1 url seen previous forward
+  local pattern='https://[^[:space:]]+'
+  while [[ $rest =~ $pattern ]]; do
+    url=${BASH_REMATCH[0]}
+    rest=${rest#*"$url"}
+    url=${url%%$'\033'*}
+    seen=0
+    for previous in "${opened_urls[@]-}"; do
+      [[ $previous != "$url" ]] || seen=1
+    done
+    [[ $seen == 0 ]] || continue
+    if forward=$(_remote_callback_forward "$url"); then
+      if [[ $forwarded == 0 ]]; then
+        if ssh -fNT -M -S "$control" -o ControlPersist=no -o ExitOnForwardFailure=yes -L "$forward" "$host"; then
+          forwarded=1
+        else
+          printf '\nCallback forwarding unavailable; use the native login fallback.\n' >&2
+        fi
+      fi
+    else
+      case $url in
+        https://github.com/login/device|https://github.com/login/device\?*) ;;
+        *) continue ;;
+      esac
+    fi
+    _remote_open_browser "$url" || printf '\nCould not open a browser; use the URL above.\n' >&2
+    opened_urls+=("$url")
+  done
+}
+
+_remote_login() {
+  local host=$1 client=$2 server=$3 temp control ssh_pid='' forwarded=0 line='' char status quoted
+  local -a command opened_urls=()
+  if [[ $client == gh ]]; then
+    command=(gh auth login --hostname github.com --git-protocol https --web)
+  else
+    [[ $server =~ ^[A-Za-z0-9_][A-Za-z0-9_-]*$ ]] || _remote_die 'MCP login requires a server name (e.g. executor).'
+    command=("$client" mcp login "$server")
+    [[ $client == pi ]] || command+=(--no-browser)
+  fi
+  printf 'Sign in for %s on %s; use the account intended for this remote.\n' "$client" "$host"
+  printf 'OAuth credentials stay on that machine. Paste the callback URL there if forwarding is unavailable.\n'
+  temp=$(mktemp -d "${TMPDIR:-/tmp}/remote-oauth.XXXXXX")
+  control=$temp/ssh
+  _remote_login_cleanup() {
+    local code=$?
+    trap - EXIT INT TERM
+    if [[ -n $ssh_pid ]]; then
+      kill "$ssh_pid" 2>/dev/null || true
+      wait "$ssh_pid" 2>/dev/null || true
+    fi
+    # Attempt this even if interrupted between starting the tunnel and recording success.
+    ssh -S "$control" -O exit "$host" >/dev/null 2>&1 || true
+    rm -rf "$temp"
+    exit "$code"
+  }
+  trap _remote_login_cleanup EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  mkfifo "$temp/output"
+  quoted=$(_remote_quote "${command[@]}")
+  # Preserve stdin for native prompts; only stdout is scanned, never saved to a log.
+  ssh -tt "$host" "${REMOTE_PATH}export BROWSER=true; $quoted" <&0 > "$temp/output" &
+  ssh_pid=$!
+  while IFS= read -r -n 1 char; do
+    if [[ -z $char ]]; then
+      printf '\n'
+      _remote_oauth_urls "$line"
+      line=''
+    else
+      printf '%s' "$char"
+      line+=$char
+      if [[ $char == ' ' || $char == $'\r' || $char == $'\t' ]]; then
+        _remote_oauth_urls "$line"
+      fi
+      [[ ${#line} -le 16384 && $char != $'\r' ]] || line=''
+    fi
+  done < "$temp/output"
+  _remote_oauth_urls "$line"
+  if wait "$ssh_pid"; then status=0; else status=$?; fi
+  ssh_pid=''
+  exit "$status"
+}
+
+# Cloud credentials/API keys only. Native provider, GitHub and MCP OAuth never enter this path.
+_remote_auth_cloud() {
+  local host=$1 kind=$2 identity remote_user remote_home remote_path
+  case $kind in
+    exa|aws|gcloud|azure|infisical|all) ;;
+    *) _remote_die 'Cloud/API-key transfer does not accept provider, MCP or GitHub OAuth.' ;;
+  esac
+  identity=$(ssh "$host" 'printf "%s\n%s\n" "$(id -un)" "$HOME"') || return
+  remote_user=${identity%%$'\n'*}
+  remote_home=${identity#*$'\n'}
+  [[ $identity != "$remote_user" && $remote_user =~ ^[A-Za-z_][A-Za-z0-9_-]*$ && $remote_home == /* && ! $remote_home =~ [[:cntrl:]] ]] || _remote_die 'Could not determine the remote user and home.'
+  remote_path="$remote_home/.local/bin:$remote_home/.nix-profile/bin:/etc/profiles/per-user/$remote_user/bin:/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin:/usr/local/bin:/usr/bin:/bin"
+  printf 'Transfer %s credentials to %s as %s (%s).\n' "$kind" "$host" "$remote_user" "$remote_home"
+  case $kind in
+    all)
+      _remote_copy_exa || return
+      _remote_copy_aws || return
+      _remote_copy_gcloud || return
+      if _remote_has_azure_login; then _remote_copy_azure || return; fi
+      _remote_copy_infisical ;;
+    exa) _remote_copy_exa ;;
+    aws) _remote_copy_aws ;;
+    gcloud) _remote_copy_gcloud ;;
+    azure) _remote_copy_azure ;;
+    infisical) _remote_copy_infisical ;;
+  esac
+}
+
+_remote_runner() {
+  local encoded
+  encoded=$(printf '%s' "$1" | base64 | tr -d '\n') || return
+  printf 'encoded=%s; cmd=$(printf %%s "$encoded" | base64 -d); exec env %sbash -c "$cmd"' \
+    "$encoded" "$(_remote_quote "HOME=$remote_home" "USER=$remote_user" "LOGNAME=$remote_user" "PATH=$remote_path")"
+}
+
+_remote_check_jq() {
+  command -v jq >/dev/null 2>&1 || { printf 'remote auth requires jq locally\n' >&2; return 1; }
+  ssh "$host" "$(_remote_runner 'command -v jq >/dev/null 2>&1')" >/dev/null 2>&1 || {
+    printf 'remote auth requires jq on %s; run remote setup HOST first\n' "$host" >&2
+    return 1
+  }
+}
+
+_remote_read_secret_file() {
+  local file="$1"
+  [[ -n "$file" && -f "$file" ]] || return 1
+  local value
+  value=$(<"$file") || return 1
+  value="${value//$'\n'/}"
+  value="${value//$'\r'/}"
+  [[ -n "$value" ]] || return 1
+  printf '%s\n' "$value"
+}
+
+_remote_read_keychain_env() {
+  local name="$1"
+  [[ "$(uname -s)" == Darwin ]] || return 1
+  security find-generic-password -w -a "${USER}" -D "environment variable" -s "$name" 2>/dev/null
+}
+
+_remote_read_exa_key() {
+  if [[ -n "${EXA_API_KEY:-}" ]]; then printf '%s\n' "$EXA_API_KEY"; return 0; fi
+  if [[ -n "${EXA_API_TOKEN:-}" ]]; then printf '%s\n' "$EXA_API_TOKEN"; return 0; fi
+  if [[ -n "${EXA_API_KEY_FILE:-}" ]] && _remote_read_secret_file "$EXA_API_KEY_FILE"; then return 0; fi
+  if _remote_read_keychain_env EXA_API_KEY; then return 0; fi
+  if _remote_read_keychain_env EXA_API_TOKEN; then return 0; fi
+  _remote_read_secret_file "${XDG_CONFIG_HOME:-$HOME/.config}/exa/api_key"
+}
+
+_remote_copy_exa() {
+  local exa_key
+  exa_key=$(_remote_read_exa_key) || {
+    echo "No Exa API key found. Set EXA_API_KEY, EXA_API_TOKEN, EXA_API_KEY_FILE, keychain EXA_API_KEY, or ~/.config/exa/api_key." >&2
+    return 1
+  }
+
+  local remote_cmd='set -euo pipefail
+umask 077
+mkdir -p "$HOME/.config/exa"
+tmp=$(mktemp "$HOME/.config/exa/api_key.XXXXXX")
+trap '\''rm -f "$tmp"'\'' EXIT
+cat > "$tmp"
+if [ ! -s "$tmp" ]; then
+  echo "No Exa API key received on stdin" >&2
+  exit 1
+fi
+mv "$tmp" "$HOME/.config/exa/api_key"
+chmod 600 "$HOME/.config/exa/api_key"
+'
+  local runner
+  runner=$(_remote_runner "$remote_cmd") || return
+  printf '%s\n' "$exa_key" | ssh "$host" "$runner" || return
+  printf '%s\n' "Copied Exa API key to $host:$remote_user:$remote_home/.config/exa/api_key"
+}
+
+_remote_copy_aws() {
+  local local_aws_dir="$HOME/.aws"
+  [[ -d "$local_aws_dir" ]] || { echo "AWS auth directory not found: $local_aws_dir" >&2; return 1; }
+
+  local remote_cmd='set -euo pipefail
+umask 077
+tmp=$(mktemp -d)
+trap '\''rm -rf "$tmp"'\'' EXIT
+tar -xzf - -C "$tmp"
+if [ ! -d "$tmp/.aws" ]; then
+  echo "Archive did not contain .aws directory" >&2
+  exit 1
+fi
+rm -rf "$HOME/.aws"
+mkdir -p "$HOME/.aws"
+cp -R "$tmp/.aws/." "$HOME/.aws/"
+chmod -R go-rwx "$HOME/.aws"
+find "$HOME/.aws" -type d -exec chmod 700 {} +
+find "$HOME/.aws" -type f -exec chmod 600 {} +
+'
+  local runner
+  runner=$(_remote_runner "$remote_cmd") || return
+  COPYFILE_DISABLE=1 tar --no-xattrs -czf - -C "$HOME" .aws | ssh "$host" "$runner" || return
+  printf '%s\n' "Copied AWS auth to $host:$remote_user:$remote_home/.aws"
+}
+
+# Machine-specific state stays behind: the remote keeps its own logs, and gce caches whether
+# the machine itself runs on Google Compute Engine.
+_remote_copy_gcloud() {
+  local local_gcloud_dir="${CLOUDSDK_CONFIG:-$HOME/.config/gcloud}"
+  [[ -d "$local_gcloud_dir" ]] || { echo "gcloud config directory not found: $local_gcloud_dir. Run: gcloud auth login" >&2; return 1; }
+
+  local remote_cmd='set -euo pipefail
+umask 077
+tmp=$(mktemp -d)
+trap '\''rm -rf "$tmp"'\'' EXIT
+tar -xzf - -C "$tmp"
+if [ ! -f "$tmp/credentials.db" ] && [ ! -d "$tmp/configurations" ]; then
+  echo "Archive did not contain gcloud credentials or configurations" >&2
+  exit 1
+fi
+gcloud_dir="$HOME/.config/gcloud"
+mkdir -p "$gcloud_dir"
+find "$gcloud_dir" -mindepth 1 -maxdepth 1 ! -name logs -exec rm -rf {} +
+cp -R "$tmp/." "$gcloud_dir/"
+chmod -R go-rwx "$gcloud_dir"
+'
+  local runner
+  runner=$(_remote_runner "$remote_cmd") || return
+  COPYFILE_DISABLE=1 tar --no-xattrs -czf - -C "$local_gcloud_dir" \
+    --exclude ./logs --exclude ./gce --exclude ./virtenv --exclude ./.last_survey_prompt.yaml . \
+    | ssh "$host" "$runner" || return
+  printf '%s\n' "Copied gcloud auth to $host:$remote_user:$remote_home/.config/gcloud"
+}
+
+# Only the login state: az's caches, indexes, logs and installed extensions stay per machine.
+_remote_azure_dir() {
+  printf '%s\n' "${AZURE_CONFIG_DIR:-$HOME/.azure}"
+}
+
+_remote_has_azure_login() {
+  local dir
+  dir=$(_remote_azure_dir)
+  [[ -s "$dir/azureProfile.json" && -s "$dir/msal_token_cache.json" ]]
+}
+
+_remote_copy_azure() {
+  local local_azure_dir
+  local_azure_dir=$(_remote_azure_dir)
+  _remote_has_azure_login || { echo "No Azure CLI login found in $local_azure_dir. Run: az login" >&2; return 1; }
+
+  local -a files
+  local file
+  files=()
+  for file in azureProfile.json msal_token_cache.json service_principal_entries.json clouds.config config; do
+    [[ -f "$local_azure_dir/$file" ]] && files+=("$file")
+  done
+
+  # Login files the local machine lacks are removed too, so no stale remote login survives.
+  local remote_cmd='set -euo pipefail
+umask 077
+tmp=$(mktemp -d)
+trap '\''rm -rf "$tmp"'\'' EXIT
+tar -xzf - -C "$tmp"
+if [ ! -s "$tmp/azureProfile.json" ] || [ ! -s "$tmp/msal_token_cache.json" ]; then
+  echo "Archive did not contain an Azure CLI login" >&2
+  exit 1
+fi
+azure_dir="$HOME/.azure"
+mkdir -p "$azure_dir"
+chmod 700 "$azure_dir"
+for file in azureProfile.json msal_token_cache.json service_principal_entries.json clouds.config config; do
+  rm -f "$azure_dir/$file"
+  if [ -f "$tmp/$file" ]; then
+    cp "$tmp/$file" "$azure_dir/$file"
+    chmod 600 "$azure_dir/$file"
+  fi
+done
+'
+  local runner
+  runner=$(_remote_runner "$remote_cmd") || return
+  COPYFILE_DISABLE=1 tar --no-xattrs -czf - -C "$local_azure_dir" "${files[@]}" | ssh "$host" "$runner" || return
+  printf '%s\n' "Copied Azure CLI auth to $host:$remote_user:$remote_home/.azure"
+}
+
+# Infisical on macOS keeps its login in the Keychain via go-keyring; the
+# headless remote uses the CLI's encrypted file vault (~/infisical-keyring).
+_remote_read_infisical_payload() {
+  local config="${INFISICAL_CONFIG_FILE:-$HOME/.infisical/infisical-config.json}"
+  [[ -f "$config" ]] || return 1
+  [[ "$(uname -s)" == Darwin ]] && command -v security >/dev/null 2>&1 || return 1
+  local email domain stored credentials
+  email=$(jq -r '.loggedInUserEmail // empty' "$config") || return 1
+  domain=$(jq -r '.LoggedInUserDomain // empty' "$config") || return 1
+  [[ -n "$email" && -n "$domain" ]] || return 1
+  stored=$(security find-generic-password -s infisical-cli -a "$email" -w 2>/dev/null) || return 1
+  if [[ "$stored" == go-keyring-base64:* ]]; then
+    credentials=$(printf '%s' "${stored#go-keyring-base64:}" | base64 -d 2>/dev/null) || return 1
+  else
+    credentials="$stored"
+  fi
+  jq -ce --arg email "$email" --arg domain "$domain" '
+    select(.JTWToken | type == "string" and length > 0)
+    | {email: $email, domain: $domain, credentials: .}
+  ' <<<"$credentials"
+}
+
+_remote_infisical_expires_at() {
+  jq -r '
+    (.credentials.JTWToken | split(".")[1] | gsub("-"; "+") | gsub("_"; "/")) as $p
+    | ($p + ("==" | .[0:((4 - ($p | length) % 4) % 4)])) | @base64d | fromjson | .exp // 0
+  ' 2>/dev/null
+}
+
+_remote_copy_infisical() {
+  _remote_check_jq || return
+  local payload
+  payload=$(_remote_read_infisical_payload) || {
+    echo "No local Infisical login found in the macOS Keychain. Run: infisical login" >&2
+    return 1
+  }
+  local expires_at
+  expires_at=$(_remote_infisical_expires_at <<<"$payload")
+  if [[ ! "$expires_at" =~ ^[0-9]+$ ]] || (( expires_at <= $(date +%s) )); then
+    echo "Local Infisical login has expired. Run: infisical login" >&2
+    return 1
+  fi
+
+  local remote_cmd='set -euo pipefail
+if ! command -v node >/dev/null 2>&1; then
+  echo "remote auth infisical requires node on the remote; run remote setup HOST first" >&2
+  exit 1
+fi
+umask 077
+payload=$(mktemp)
+trap '\''rm -f "$payload"'\'' EXIT
+cat > "$payload"
+REMOTE_AUTH_PAYLOAD="$payload" node - <<"JS"
+const fs = require("fs"), path = require("path"), crypto = require("crypto");
+const home = process.env.HOME;
+const { email, domain, credentials } = JSON.parse(fs.readFileSync(process.env.REMOTE_AUTH_PAYLOAD, "utf8"));
+if (!/^[^/\0]+@[^/\0]+$/.test(email)) throw new Error("Invalid Infisical email");
+
+function writeAtomic(file, data) {
+  const tmp = `${file}.remote-auth-${process.pid}`;
+  fs.writeFileSync(tmp, data, { mode: 0o600 });
+  fs.renameSync(tmp, file);
+}
+
+const configDir = path.join(home, ".infisical");
+const configPath = path.join(configDir, "infisical-config.json");
+fs.mkdirSync(configDir, { recursive: true, mode: 0o700 });
+let config = {};
+try { config = JSON.parse(fs.readFileSync(configPath, "utf8")); }
+catch (error) { if (error.code !== "ENOENT") throw error; }
+// Reuse an existing file-vault passphrase: other vault entries depend on it.
+if (config.vaultBackendType !== "file" || !config.vaultBackendPassphrase) {
+  config.vaultBackendType = "file";
+  config.vaultBackendPassphrase = crypto.randomBytes(12).toString("base64");
+}
+
+// Same JWE (PBES2-HS256+A128KW / A256GCM) the CLI file vault writes; the
+// payload is the credential JSON encoded once more as a JSON string.
+const header = { alg: "PBES2-HS256+A128KW", created: new Date().toISOString(), enc: "A256GCM",
+  p2c: 8192, p2s: crypto.randomBytes(12).toString("base64url") };
+const protectedHeader = Buffer.from(JSON.stringify(header)).toString("base64url");
+const salt = Buffer.concat([Buffer.from(header.alg), Buffer.from([0]), Buffer.from(header.p2s, "base64url")]);
+const kek = crypto.pbkdf2Sync(Buffer.from(config.vaultBackendPassphrase, "base64"), salt, header.p2c, 16, "sha256");
+const cek = crypto.randomBytes(32);
+const wrap = crypto.createCipheriv("id-aes128-wrap", kek, Buffer.from("A6A6A6A6A6A6A6A6", "hex"));
+const encryptedKey = Buffer.concat([wrap.update(cek), wrap.final()]);
+const iv = crypto.randomBytes(12);
+const gcm = crypto.createCipheriv("aes-256-gcm", cek, iv);
+gcm.setAAD(Buffer.from(protectedHeader));
+const ciphertext = Buffer.concat([gcm.update(JSON.stringify(JSON.stringify(credentials))), gcm.final()]);
+const jwe = [protectedHeader, ...[encryptedKey, iv, ciphertext, gcm.getAuthTag()].map((part) => part.toString("base64url"))].join(".");
+
+const vaultDir = path.join(home, "infisical-keyring");
+fs.mkdirSync(vaultDir, { recursive: true, mode: 0o700 });
+writeAtomic(path.join(vaultDir, email), jwe);
+
+config.loggedInUserEmail = email;
+config.LoggedInUserDomain = domain;
+const users = Array.isArray(config.loggedInUsers) ? config.loggedInUsers : [];
+config.loggedInUsers = [...users.filter((user) => !(user.email === email && user.domain === domain)), { email, domain }];
+writeAtomic(configPath, JSON.stringify(config, null, 2));
+JS
+'
+  local runner
+  runner=$(_remote_runner "$remote_cmd") || return
+  printf '%s' "$payload" | ssh "$host" "$runner" || return
+  printf '%s\n' "Copied Infisical login for $(jq -r .email <<<"$payload") to $host:$remote_user:$remote_home/infisical-keyring"
+}
+
+
+_remote_main() {
+  case ${1:-} in
+    -h|--help) _remote_usage; return ;;
+    '') _remote_usage >&2; return 1 ;;
+  esac
+  local action=$1 host=${2:-} ref='' force=0 home_only=0 nixos_flake='' allow_t3_update=0
+  local kind server='' client=pi quoted
+  case $action in setup|deploy|status|connect|shell|auth) ;; *) _remote_die "Unknown command: $action" ;; esac
+  [[ $host =~ ^[A-Za-z0-9_][A-Za-z0-9_.@:-]*$ ]] || _remote_die 'Name an explicit SSH alias or user@host, not SSH flags or shell syntax.'
+  shift 2
+  if [[ $action == auth ]]; then
+    [[ $# -gt 0 ]] || _remote_die 'Auth requires gh, mcp SERVER, or a cloud/API-key kind.'
+    kind=$1; shift
+    case $kind in
+      mcp)
+        while [[ $# -gt 0 ]]; do
+          case $1 in
+            --client)
+              [[ $# -ge 2 ]] || _remote_die '--client requires pi, claude or codex.'
+              client=$2; shift 2 ;;
+            *)
+              [[ -z $server && $1 =~ ^[A-Za-z0-9_][A-Za-z0-9_-]*$ ]] || _remote_die 'MCP login requires one server name (e.g. executor).'
+              server=$1; shift ;;
+          esac
+        done
+        [[ -n $server ]] || _remote_die 'MCP login requires a server name (e.g. executor).'
+        case $client in pi|claude|codex) ;; *) _remote_die 'MCP client must be pi, claude or codex.' ;; esac
+        _remote_login "$host" "$client" "$server" ;;
+      gh)
+        [[ $# == 0 ]] || _remote_die 'Usage: remote auth HOST gh'
+        _remote_login "$host" gh '' ;;
+      exa|aws|gcloud|azure|infisical|all)
+        [[ $# == 0 ]] || _remote_die 'Supply one cloud/API-key kind, or all.'
+        _remote_auth_cloud "$host" "$kind" ;;
+      *) _remote_die 'Use gh or mcp SERVER for independent login; only cloud credentials/API keys can be copied.' ;;
+    esac
+    return
+  fi
+  while [[ $# -gt 0 ]]; do
+    case $action:$1 in
+      setup:--ref|deploy:--ref)
+        [[ $# -ge 2 && $2 =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ ]] || _remote_die '--ref requires a branch name.'
+        ref=$2; shift 2 ;;
+      setup:--force|deploy:--force) force=1; shift ;;
+      setup:--allow-t3-update|deploy:--allow-t3-update) allow_t3_update=1; shift ;;
+      setup:--home-manager)
+        [[ -z $nixos_flake ]] || _remote_die '--home-manager and --nixos-flake are mutually exclusive.'
+        home_only=1; shift ;;
+      setup:--nixos-flake)
+        [[ $home_only == 0 && $# -ge 2 && $2 =~ ^/[A-Za-z0-9_./-]+#[A-Za-z0-9_-]+$ ]] || _remote_die 'Use --nixos-flake /etc/nixos#HOST without --home-manager.'
+        nixos_flake=$2; shift 2 ;;
+      *) _remote_die "Unexpected argument for $action: $1" ;;
+    esac
+  done
+  case $action in
+    shell) ssh -t "$host" "${REMOTE_PATH}exec zsh -l" ;;
+    connect) ssh -t "$host" "${REMOTE_PATH}exec t3 pair" ;;
+    *)
+      quoted=$(_remote_quote bash -s -- "$action" "$ref" "$force" "$home_only" "$nixos_flake" "$allow_t3_update")
+      ssh "$host" "$quoted" < "$REMOTE_ROOT/scripts/remote-host.sh" ;;
+  esac
+}
+
+if [[ ${BASH_SOURCE[0]} == "$0" ]]; then
+  _remote_main "$@"
+fi

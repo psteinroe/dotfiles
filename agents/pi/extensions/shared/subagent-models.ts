@@ -18,7 +18,6 @@ type NativeProvider = NonNullable<
 
 const BASE_PROVIDER = "openai";
 const CLAUDE_BRIDGE_PROVIDER = "claude-bridge";
-const ACCOUNT_PROVIDER = /^openai-account-(\d+)$/u;
 const CLAUDE_BRIDGE_WRAPPER = ["extensions", "claude-bridge.ts"] as const;
 const CLAUDE_BRIDGE_PACKAGE_ENTRY = [
   "git",
@@ -60,17 +59,9 @@ function parseModelRef(modelRef: string): { provider: string; modelId: string } 
   };
 }
 
-function providerOrder(provider: string): [number, number, string] | undefined {
-  if (provider === BASE_PROVIDER) return [0, 0, provider];
-  const account = ACCOUNT_PROVIDER.exec(provider);
-  if (!account) return undefined;
-  return [1, Number(account[1]), provider];
-}
-
 /**
- * Select authenticated models for an exact provider/model reference. The base
- * OpenAI provider retains numeric account failover; every other provider is a
- * single exact candidate.
+ * Select one authenticated model for the requested provider. Account routing
+ * belongs to the server, never to a child session.
  *
  * Claude Bridge is deliberately not copied as a provider object. Its provider
  * depends on prompt-capture, compaction, session-sync, and shutdown hooks, so a
@@ -88,18 +79,10 @@ export async function createSubagentModelPlan(
   const byProvider = new Map<string, Model>();
   for (const model of ctx.modelRegistry.getAvailable()) {
     if (model.id !== selection.modelId || byProvider.has(model.provider)) continue;
-    const matches = selection.provider === BASE_PROVIDER
-      ? providerOrder(model.provider) !== undefined
-      : model.provider === selection.provider;
-    if (matches) byProvider.set(model.provider, model);
+    if (model.provider === selection.provider) byProvider.set(model.provider, model);
   }
 
-  const ordered = [...byProvider.entries()].sort((a, b) => {
-    if (selection.provider !== BASE_PROVIDER) return a[0].localeCompare(b[0]);
-    const left = providerOrder(a[0])!;
-    const right = providerOrder(b[0])!;
-    return left[0] - right[0] || left[1] - right[1] || left[2].localeCompare(right[2]);
-  });
+  const ordered = [...byProvider.entries()];
 
   const providers: NativeProvider[] = [];
   const models: Model[] = [];
@@ -112,9 +95,7 @@ export async function createSubagentModelPlan(
   }
 
   if (models.length === 0) {
-    const checked = selection.provider === BASE_PROVIDER
-      ? `${BASE_PROVIDER} and ${BASE_PROVIDER}-account-N providers`
-      : `${selection.provider}`;
+    const checked = selection.provider;
     throw new Error(
       `No authenticated candidate provider is available for model "${selection.provider}/${selection.modelId}" `
       + `(checked ${checked}).`,
@@ -164,8 +145,7 @@ export function resolveSubagentLifecycleExtensionPaths(
 /**
  * Snapshot the untrusted parent settings into an in-memory manager. Children
  * may change their model/thinking settings without writing parent defaults.
- * Keep the parent's global configuration, but let the bounded failover layer
- * own retries rather than competing with SDK and provider retries.
+ * Keep global configuration and use Pi's normal retry policy.
  */
 export function createSubagentSettings(cwd: string, agentDir: string): SettingsManager {
   const parentSettings = SettingsManager.create(cwd, agentDir, {
@@ -176,13 +156,6 @@ export function createSubagentSettings(cwd: string, agentDir: string): SettingsM
   // extensions or configured extension paths inside each background agent.
   settings.packages = [];
   settings.extensions = [];
-  settings.retry = {
-    ...settings.retry,
-    enabled: false,
-    provider: {
-      ...settings.retry?.provider,
-      maxRetries: 0,
-    },
-  };
+  delete settings.retry;
   return SettingsManager.inMemory(settings, { projectTrusted: false });
 }

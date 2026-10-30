@@ -30,7 +30,7 @@ import {
   reloadSubagentResources,
   resolveSubagentLifecycleExtensionPaths,
 } from "../shared/subagent-models.ts";
-import { promptSubagentWithFailover } from "../shared/subagent-failover.ts";
+import { promptSubagent } from "../shared/subagent-prompt.ts";
 import {
   createExecutorMcpIntegration,
   EXECUTOR_MCP_TOOLS,
@@ -255,7 +255,7 @@ export default function librarianExtension(pi: ExtensionAPI, registerSession?: S
         if (aborted) throw new Error("Aborted");
 
         executorMcp.assertOpen();
-        await promptSubagentWithFailover(
+        await promptSubagent(
           session,
           buildLibrarianUserPrompt(query, repos, owners, maxSearchResults),
           {

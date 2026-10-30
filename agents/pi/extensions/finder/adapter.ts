@@ -24,7 +24,7 @@ import {
   resolveSubagentLifecycleExtensionPaths,
   type Model,
 } from "../shared/subagent-models.ts";
-import { promptSubagentWithFailover } from "../shared/subagent-failover.ts";
+import { promptSubagent } from "../shared/subagent-prompt.ts";
 import {
   isolateSubagentExtensions,
   isolatedSubagentResourceDir,
@@ -230,7 +230,7 @@ export default function finderExtension(pi: ExtensionAPI, registerSession?: Suba
         });
         if (signal?.aborted) throw new Error("Mapper was aborted.");
 
-        await promptSubagentWithFailover(
+        await promptSubagent(
           child,
           buildFinderUserPrompt(query),
           {

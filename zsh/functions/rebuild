@@ -24,11 +24,29 @@ case "$(uname -s)" in
     '
     ;;
   Linux)
-    if [[ -e /etc/NIXOS ]]; then
-      local nixos_flake_attr="${NIXOS_FLAKE_ATTR:-hetzner-dev}"
-      sudo nixos-rebuild switch --flake "$dotfiles#$nixos_flake_attr"
+    if [[ -f "$HOME/.config/dotfiles/remote.env" ]]; then
+      # Deployed targets may be NixOS or Home Manager, on either architecture.
+      local mode target REMOTE_REF DEPLOYED_T3_VERSION
+      source "$HOME/.config/dotfiles/remote.env"
+      # T3 upgrades need remote deploy's service stop and state backup.
+      if [[ -n "$DEPLOYED_T3_VERSION" && "$(nix eval --raw "$dotfiles#lib.t3Version")" != "$DEPLOYED_T3_VERSION" ]]; then
+        echo "T3 version changes; run remote deploy HOST --allow-t3-update from the Mac." >&2
+        return 1
+      fi
+      if [[ -w "${target%%#*}" ]]; then
+        nix flake lock --update-input dotfiles "${target%%#*}" || return
+      else
+        sudo nix flake lock --update-input dotfiles "${target%%#*}" || return
+      fi
+      if [[ "$mode" == nixos ]]; then
+        sudo nixos-rebuild switch --impure --flake "$target"
+      else
+        home-manager switch --flake "$target"
+      fi
     else
-      home-manager switch --flake "$dotfiles#psteinroe@linux-x86_64"
+      local arch="$(uname -m)"
+      [[ "$arch" == aarch64 ]] || arch=x86_64
+      home-manager switch --flake "$dotfiles#psteinroe@linux-$arch"
     fi
     ;;
   *)
@@ -36,8 +54,3 @@ case "$(uname -s)" in
     return 1
     ;;
 esac
-
-if [[ -r "$dotfiles/zsh/functions/pireload" ]] && command -v herdr >/dev/null 2>&1; then
-  echo "Reloading idle Pi agents..."
-  (set --; source "$dotfiles/zsh/functions/pireload") || echo "Warning: safe Pi reload failed." >&2
-fi

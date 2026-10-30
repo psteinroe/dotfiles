@@ -2,19 +2,10 @@
   "compaction": {
     "enabled": true
   },
-  "retry": {
-    "enabled": true,
-    "maxRetries": 50,
-    "provider": {
-      "maxRetries": 0
-    }
-  },
   "hideThinkingBlock": true,
   "tuiMode": "regular",
   "shellPath": "/bin/zsh",
-  "shellCommandPrefix": "fpath=($HOME/Developer/dotfiles/zsh/functions $fpath); autoload -Uz gpr coffee",
   "packages": [
-    "git:github.com/HazAT/pi-ghostty",
     {
       "source": "git:github.com/elidickinson/pi-claude-bridge@227f5eb4450a070dfbc083a7fe75b8b35366b941",
       "extensions": []

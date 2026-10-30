@@ -34,7 +34,6 @@ export default function hostTest(pi: ExtensionAPI) {
   pi.on("session_start", async (_event, context) => {
     const root = os.homedir();
     assert.ok(path.basename(root).startsWith("pi-pr-monitor-host."), "use a fresh /tmp/pi-pr-monitor-host.XXXXXX HOME, never the real home");
-    process.env.HERDR_ENV = "0"; // fixture reporting must not touch the caller's real pane
     const tools = new Map<string, any>(), handlers = new Map<string, any[]>();
     const messages: any[] = [];
     let idle = false;

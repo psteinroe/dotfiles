@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import * as path from "node:path";
 import test from "node:test";
 import { createAssistantMessageEventStream, createProvider } from "@earendil-works/pi-ai";
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { SettingsManager, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import {
   createSubagentModelPlan,
   createSubagentSettings,
@@ -61,7 +61,7 @@ function registry(available: Model[], providers: Map<string, Provider>): Registr
   } as unknown as Registry;
 }
 
-test("plans exact model candidates in base then numeric account order", async () => {
+test("selects only the requested provider, ignoring local account aliases", async () => {
   const available = [
     model("unrelated"),
     model("openai-account-10"),
@@ -79,22 +79,17 @@ test("plans exact model candidates in base then numeric account order", async ()
 
   assert.deepEqual(
     plan.models.map((candidate) => candidate.provider),
-    ["openai", "openai-account-1", "openai-account-2", "openai-account-10"],
+    ["openai"],
   );
 
   const registered: Provider[] = [];
   plan.extensionFactory({
     registerProvider: (nativeProvider: Provider) => registered.push(nativeProvider),
   } as unknown as ExtensionAPI);
-  assert.deepEqual(registered.map((candidate) => candidate.id), [
-    "openai",
-    "openai-account-1",
-    "openai-account-2",
-    "openai-account-10",
-  ]);
+  assert.deepEqual(registered.map((candidate) => candidate.id), ["openai"]);
 });
 
-test("bridges effective native parent providers, including alias auth", async () => {
+test("bridges effective native parent provider authentication", async () => {
   const base = nativeProvider("openai");
   const alias = nativeProvider("openai-account-1");
   const providers = new Map([[base.id, base], [alias.id, alias]]);
@@ -105,12 +100,13 @@ test("bridges effective native parent providers, including alias auth", async ()
     registerProvider: (candidate: Provider) => childProviders.set(candidate.id, candidate),
   } as unknown as ExtensionAPI);
 
-  assert.strictEqual(childProviders.get(alias.id), alias);
-  const auth = await alias.auth.apiKey?.resolve({
+  assert.strictEqual(childProviders.get(base.id), base);
+  assert.equal(childProviders.has(alias.id), false);
+  const auth = await base.auth.apiKey?.resolve({
     ctx: { env: async () => undefined, fileExists: async () => false },
     signal: AbortSignal.timeout(1_000),
   });
-  assert.deepEqual(auth?.auth.apiKey, "synthetic-openai-account-1");
+  assert.deepEqual(auth?.auth.apiKey, "synthetic-openai");
 });
 
 test("OpenAI plans never fall back to Codex accounts", async () => {
@@ -184,15 +180,11 @@ test("model reference parser requires a non-empty exact provider/model reference
   }
 });
 
-test("an authenticated account alias remains usable when base is unavailable", async () => {
+test("an account alias cannot silently replace an unavailable requested provider", async () => {
   const alias = provider("openai-account-3");
-  const plan = await createSubagentModelPlan({
-    modelRegistry: registry(
-      [model("openai-account-3"), model("openai", "not-available")],
-      new Map([[alias.id, alias]]),
-    ),
-  }, "gpt-fixture");
-  assert.deepEqual(plan.models.map((candidate) => candidate.provider), ["openai-account-3"]);
+  await assert.rejects(createSubagentModelPlan({
+    modelRegistry: registry([model(alias.id)], new Map([[alias.id, alias]])),
+  }, "gpt-fixture"), /No authenticated candidate provider/);
 });
 
 test("unavailable models and non-account providers are not candidates", async () => {
@@ -227,13 +219,9 @@ test("settings are copied from untrusted global settings and never persisted", a
     assert.equal(settings.isProjectTrusted(), false);
     assert.equal(settings.getDefaultModel(), "parent-model");
     assert.equal(settings.getTheme(), "parent-theme");
-    assert.deepEqual(settings.getRetrySettings(), {
-      enabled: false,
-      maxRetries: 7,
-      baseDelayMs: 2000,
-      maxAgentDelayMs: 60000,
-    });
-    assert.deepEqual(settings.getProviderRetrySettings(), { timeoutMs: 1234, maxRetries: 0, maxRetryDelayMs: 60000 });
+    const defaults = SettingsManager.inMemory({});
+    assert.deepEqual(settings.getRetrySettings(), defaults.getRetrySettings());
+    assert.deepEqual(settings.getProviderRetrySettings(), defaults.getProviderRetrySettings());
 
     settings.setDefaultModel("child-model");
     settings.setDefaultThinkingLevel("high");

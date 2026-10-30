@@ -3,14 +3,12 @@
   lib,
   inputs,
   system,
-  isLinux ? false,
   ...
 }:
 
 let
   piAgent = lib.attrByPath [ system "pi" ] null inputs.llm-agents.packages;
   tuicr = lib.attrByPath [ system "tuicr" ] null inputs.llm-agents.packages;
-  herdr = lib.attrByPath [ system "herdr" ] null inputs.llm-agents.packages;
   # T3 Code's Claude and Codex providers run `claude` and `codex` from PATH
   claudeCode = lib.attrByPath [ system "claude-code" ] null inputs.llm-agents.packages;
   codex = lib.attrByPath [ system "codex" ] null inputs.llm-agents.packages;
@@ -74,7 +72,6 @@ in
         globalNode
         go
         lua
-        beamPackages.elixir
         # ruby  # conflicts with gotools (both have bin/bundle)
         (rust-bin.stable.latest.default.override {
           extensions = [
@@ -97,9 +94,6 @@ in
         postgresql
         just
         devenv
-        hugo
-        presenterm
-        cmake
         ffmpeg
         imagemagick
         awscli2
@@ -140,18 +134,11 @@ in
         # Debuggers
         # codelldb: run `uv tool install codelldb` or use Mason for now
 
-        # Rust tools
-        cargo-expand
-        cargo-insta
-        llvmPackages.lld # fast linker for Rust
-
         # Version control
         diffnav # GitHub-like diff pager for git/gh PR diffs
 
       ]
-      ++ lib.optional isLinux tmux
       ++ optionalPackage tuicr
-      ++ optionalPackage herdr
       ++ optionalPackage claudeCode
       ++ optionalPackage codex
       ++ optionalPackage piAgent;
@@ -171,7 +158,7 @@ in
           "$HOME/.pi/agent/extensions/web-tools/node_modules"
       fi
 
-      for extension in ask-user workflows; do
+      for extension in ask-user; do
         if [ -d "$HOME/.pi/agent/extensions/$extension" ]; then
           $DRY_RUN_CMD ln -sfn ${piExtensionNodeModules}/node_modules \
             "$HOME/.pi/agent/extensions/$extension/node_modules"

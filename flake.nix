@@ -18,17 +18,6 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    disko = {
-      url = "github:nix-community/disko";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
-    nixos-anywhere = {
-      url = "github:nix-community/nixos-anywhere";
-      inputs.nixpkgs.follows = "nixpkgs";
-      inputs.disko.follows = "disko";
-    };
-
     nix-homebrew.url = "github:zhaofengli/nix-homebrew";
 
     # Pi coding agent (from llm-agents.nix)
@@ -37,18 +26,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # Herdr/Neovim pane navigation plugin
-    vim-herdr-navigation = {
-      url = "github:paulbkim-dev/vim-herdr-navigation";
-      flake = false;
-    };
-
     # Remote skill sources
-    getsentry-skills = {
-      url = "github:getsentry/skills";
-      flake = false;
-    };
-
     gh-stack-skills = {
       url = "github:github/gh-stack";
       flake = false;
@@ -81,7 +59,6 @@
       hostname = "psteinroe";
       darwinSystem = "aarch64-darwin";
       linuxX86System = "x86_64-linux";
-      hetznerT3codeTransport = "tailscale-serve";
       darwinHomeDirectory = "/Users/${username}";
       darwinDotfilesPath = "${darwinHomeDirectory}/Developer/dotfiles";
       darwinSpecialArgs = {
@@ -97,9 +74,9 @@
         {
           system,
           homeDirectory,
+          username ? "psteinroe",
           isDarwin ? false,
           isLinux ? false,
-          t3codeTransport ? "tailscale-serve",
         }:
         home-manager.lib.homeManagerConfiguration {
           pkgs = import nixpkgs {
@@ -114,7 +91,6 @@
               homeDirectory
               isDarwin
               isLinux
-              t3codeTransport
               ;
             dotfilesPath = "${homeDirectory}/Developer/dotfiles";
           };
@@ -133,6 +109,13 @@
         };
     in
     {
+      lib = {
+        inherit mkHome;
+        t3Version = (import ./nix/t3code-release.nix).version;
+      };
+
+      nixosModules.remote = import ./nix/nixos/remote.nix { inherit inputs; };
+
       darwinConfigurations.${hostname} = nix-darwin.lib.darwinSystem {
         system = darwinSystem;
         specialArgs = darwinSpecialArgs;
@@ -168,54 +151,16 @@
         system = linuxX86System;
         homeDirectory = "/home/${username}";
         isLinux = true;
-        # Generic/standalone Linux includes exe.dev, whose Tailscale Serve path
-        # currently drops large post-quantum TLS handshakes. Bind directly to
-        # its tailnet address instead; traffic remains private to Tailscale.
-        t3codeTransport = "tailscale-direct";
       };
 
-      nixosConfigurations.hetzner-dev = nixpkgs.lib.nixosSystem {
-        system = linuxX86System;
-        specialArgs = {
-          inherit inputs self username;
-          t3codeTransport = hetznerT3codeTransport;
-          system = linuxX86System;
-          homeDirectory = "/home/${username}";
-          dotfilesPath = self;
-          isDarwin = false;
-          isLinux = true;
-        };
-        modules = [
-          inputs.disko.nixosModules.disko
-          ./nix/nixos/hosts/hetzner-dev
-          home-manager.nixosModules.home-manager
-          {
-            nixpkgs.overlays = [ rust-overlay.overlays.default ];
-            home-manager = {
-              useGlobalPkgs = true;
-              useUserPackages = true;
-              backupFileExtension = "hm-backup";
-              extraSpecialArgs = {
-                inherit inputs username;
-                system = linuxX86System;
-                homeDirectory = "/home/${username}";
-                dotfilesPath = self;
-                isDarwin = false;
-                isLinux = true;
-                t3codeTransport = hetznerT3codeTransport;
-              };
-              users.${username} = import ./nix/home;
-            };
-          }
-        ];
+      homeConfigurations."${username}@linux-aarch64" = mkHome {
+        system = "aarch64-linux";
+        homeDirectory = "/home/${username}";
+        isLinux = true;
       };
 
-      apps = nixpkgs.lib.genAttrs [ darwinSystem linuxX86System ] (system: {
-        nixos-anywhere = {
-          type = "app";
-          program = "${inputs.nixos-anywhere.packages.${system}.default}/bin/nixos-anywhere";
-        };
-      });
+      packages.x86_64-linux.home-manager = home-manager.packages.x86_64-linux.home-manager;
+      packages.aarch64-linux.home-manager = home-manager.packages.aarch64-linux.home-manager;
 
       # Raspberry Pi 3 running CLIProxyAPI (cliproxy-psteinroe). Build the SD image on an
       # aarch64-linux machine (.github/workflows/pi-images.yml). Nothing deploys or updates it
