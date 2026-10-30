@@ -109,10 +109,33 @@ ssh psteinroe@cliproxy-psteinroe.tail649856.ts.net \
   'cat /var/lib/cliproxyapi/management-key' | pbcopy
 ```
 
-Claude uses the server root; Codex uses `/v1`. Clients share the API access key,
-not the management key. **Client configuration/key deployment and Claude Bridge
-replacement remain a separate PR**; this cleanup does not cut clients over.
-Current Pi/Worker therefore retain Claude Bridge until that replacement lands.
+### Clients
+
+Clients use the API access key, never the management key. Each machine keeps it
+in `~/.config/cliproxy/access-key` (0600); no config file contains it. Put it on
+the Mac, then send it to each remote:
+
+```sh
+(umask 077; mkdir -p ~/.config/cliproxy && ssh psteinroe@cliproxy-psteinroe.tail649856.ts.net \
+  'cat /var/lib/cliproxyapi/access-key' > ~/.config/cliproxy/access-key)
+rebuild                          # Mac
+remote auth user@host cliproxy   # any remote, with or without Home Manager
+```
+
+`scripts/cliproxy-clients.sh` runs on every switch and through `remote auth`.
+It points the standard homes at the proxy and keeps everything else in them:
+
+- Claude Code (`~/.claude/settings.json`): `ANTHROPIC_BASE_URL` plus an
+  `apiKeyHelper`. T3, the CLI and Pi's Claude Bridge all use it, so Claude
+  subscriptions still run only through Claude Code.
+- Codex (`~/.codex/config.toml`): a `cliproxy` provider at `/v1`.
+- Pi (`~/.pi/agent/models.json`): the built-in `openai` provider at `/v1`, for
+  the OpenAI subagents. A stored Pi login wins, so run `/logout openai` in Pi
+  and switch again.
+
+T3 needs one Claude and one Codex instance on those standard homes; the proxy
+chooses the account. Bridge compaction summaries ignore user settings and use
+the existing Claude Code login directly, so keep that login.
 
 The Pi never updates itself or compiles locally. Edit the server version/hash in
 `nix/nixos/cliproxy/cliproxyapi.nix`, build elsewhere and switch manually,

@@ -10,4 +10,5 @@ printf '%s\n' \
   'remote auth HOST gh               Independent GitHub login' \
   'remote auth HOST mcp executor     Independent MCP login (default: Pi)' \
   'remote auth HOST aws              Transfer cloud auth (also gcloud/azure/infisical/exa)' \
+  'remote auth HOST cliproxy         Send the proxy key; point Claude Code/Codex/Pi at it' \
   'gclean / greset                   Clean merged branches / return to default branch'
