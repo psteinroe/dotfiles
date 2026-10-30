@@ -16,7 +16,7 @@ _remote_usage() {
     '       remote auth HOST exa|aws|gcloud|azure|infisical|all' \
     '       remote auth HOST cliproxy          # proxy key; points Claude Code/Codex/Pi at it' \
     '' \
-    'Update flags: --ref BRANCH --force --allow-t3-update' \
+    'Update flags: --ref BRANCH --force' \
     'HOST is an explicit SSH alias or user@host; setup never replaces an OS.' \
     'GitHub/MCP OAuth stays on each remote. Never copies provider, MCP, or GitHub OAuth.'
 }
@@ -496,8 +496,8 @@ _remote_main() {
     -h|--help) _remote_usage; return ;;
     '') _remote_usage >&2; return 1 ;;
   esac
-  local action=$1 host=${2:-} ref='' force=0 home_only=0 nixos_flake='' allow_t3_update=0
-  local kind server='' client=pi quoted
+  local action=$1 host=${2:-} ref='' force=0 home_only=0 nixos_flake='' t3_version=''
+  local kind server='' client=pi quoted app
   case $action in setup|deploy|status|connect|shell|auth) ;; *) _remote_die "Unknown command: $action" ;; esac
   [[ $host =~ ^[A-Za-z0-9_][A-Za-z0-9_.@:-]*$ ]] || _remote_die 'Name an explicit SSH alias or user@host, not SSH flags or shell syntax.'
   shift 2
@@ -535,7 +535,6 @@ _remote_main() {
         [[ $# -ge 2 && $2 =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ ]] || _remote_die '--ref requires a branch name.'
         ref=$2; shift 2 ;;
       setup:--force|deploy:--force) force=1; shift ;;
-      setup:--allow-t3-update|deploy:--allow-t3-update) allow_t3_update=1; shift ;;
       setup:--home-manager)
         [[ -z $nixos_flake ]] || _remote_die '--home-manager and --nixos-flake are mutually exclusive.'
         home_only=1; shift ;;
@@ -549,7 +548,13 @@ _remote_main() {
     shell) ssh -t "$host" "${REMOTE_PATH}exec zsh -l" ;;
     connect) ssh -t "$host" "${REMOTE_PATH}exec t3 pair" ;;
     *)
-      quoted=$(_remote_quote bash -s -- "$action" "$ref" "$force" "$home_only" "$nixos_flake" "$allow_t3_update")
+      # A first install matches the Mac app; afterwards the app updates the server itself.
+      for app in "${REMOTE_APPLICATIONS:-/Applications}/T3 Code.app" "${REMOTE_APPLICATIONS:-/Applications}/T3 Code (Beta).app"; do
+        [[ -z $t3_version && -f $app/Contents/Info.plist ]] || continue
+        t3_version=$(defaults read "$app/Contents/Info" CFBundleShortVersionString 2>/dev/null || true)
+      done
+      [[ $t3_version =~ ^[0-9][0-9A-Za-z.+-]*$ ]] || t3_version=''
+      quoted=$(_remote_quote bash -s -- "$action" "$ref" "$force" "$home_only" "$nixos_flake" "$t3_version")
       ssh "$host" "$quoted" < "$REMOTE_ROOT/scripts/remote-host.sh" ;;
   esac
 }

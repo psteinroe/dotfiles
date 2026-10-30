@@ -117,7 +117,6 @@
     {
       lib = {
         inherit mkHome;
-        t3Version = (import ./nix/t3code-release.nix).version;
       };
 
       nixosModules.remote = import ./nix/nixos/remote.nix { inherit inputs; };

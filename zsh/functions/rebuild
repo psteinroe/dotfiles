@@ -26,13 +26,8 @@ case "$(uname -s)" in
   Linux)
     if [[ -f "$HOME/.config/dotfiles/remote.env" ]]; then
       # Deployed targets may be NixOS or Home Manager, on either architecture.
-      local mode target REMOTE_REF DEPLOYED_T3_VERSION
+      local mode target REMOTE_REF
       source "$HOME/.config/dotfiles/remote.env"
-      # T3 upgrades need remote deploy's service stop and state backup.
-      if [[ -n "$DEPLOYED_T3_VERSION" && "$(nix eval --raw "$dotfiles#lib.t3Version")" != "$DEPLOYED_T3_VERSION" ]]; then
-        echo "T3 version changes; run remote deploy HOST --allow-t3-update from the Mac." >&2
-        return 1
-      fi
       if [[ -w "${target%%#*}" ]]; then
         nix flake lock --update-input dotfiles "${target%%#*}" || return
       else

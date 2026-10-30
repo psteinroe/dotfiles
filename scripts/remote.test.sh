@@ -53,9 +53,15 @@ test_payload() {
 }
 test_setup_modes() {
   auth_fixture
-  "$repo/bin/remote" setup user@box --home-manager --allow-t3-update
-  contains "$TEST_LOG" 'setup'
-  contains "$TEST_LOG" '0 1'
+  # The Mac app's version goes along for a first install; nothing else pins T3.
+  mkdir -p "$case_root/Applications/T3 Code (Beta).app/Contents"
+  : >"$case_root/Applications/T3 Code (Beta).app/Contents/Info.plist"
+  mock defaults 'printf "0.1.5\n"'
+  REMOTE_APPLICATIONS=$case_root/Applications "$repo/bin/remote" setup user@box --home-manager
+  contains "$TEST_LOG" "setup '' 0 1 '' 0.1.5"
+  REMOTE_APPLICATIONS=$case_root/none "$repo/bin/remote" deploy user@box
+  contains "$TEST_LOG" "deploy '' 0 0 '' ''"
+  expect_failure "$repo/bin/remote" deploy user@box --allow-t3-update
   "$repo/bin/remote" setup user@box --nixos-flake /etc/nixos#box
   contains "$TEST_LOG" '/etc/nixos'
   : >"$TEST_LOG"
@@ -151,7 +157,7 @@ host_fixture() {
   "$real_git" -C "$TEST_UPSTREAM" add .
   "$real_git" -C "$TEST_UPSTREAM" commit -qm initial
   "$real_git" clone -q "$TEST_UPSTREAM" "$checkout"
-  printf 'mode=home-manager\ntarget=%q/flake#remote\nREMOTE_REF=main\nDEPLOYED_T3_VERSION=0.1.0\n' "$state" >"$state/remote.env"
+  printf 'mode=home-manager\ntarget=%q/flake#remote\nREMOTE_REF=main\n' "$state" >"$state/remote.env"
   mock uname 'if [[ ${1:-} == -m ]]; then echo x86_64; else echo Linux; fi'
   mock id 'if [[ $1 == -u ]]; then echo 1000; else echo fixture; fi'
   mock git '
@@ -161,7 +167,7 @@ elif [[ $* == *"fetch origin"* ]]; then
   printf "fetch\n" >>"$TEST_LOG"
   exec "$TEST_GIT" -C "$2" fetch "$TEST_UPSTREAM" "${@: -1}"
 else exec "$TEST_GIT" "$@"; fi'
-  mock nix 'printf "nix %s\n" "$*" >>"$TEST_LOG"; if [[ $1 == eval ]]; then printf 0.1.0; fi'
+  mock nix 'printf "nix %s\n" "$*" >>"$TEST_LOG"'
   mock tailscale 'printf "%s\n" '\''{"BackendState":"Running"}'\'
   mock systemctl 'printf "systemctl %s\n" "$*" >>"$TEST_LOG"'
   mock sudo 'printf "sudo %s\n" "$*" >>"$TEST_LOG"'
@@ -169,14 +175,11 @@ else exec "$TEST_GIT" "$@"; fi'
   mock ssh 'echo "Unexpected SSH in host fixture" >&2; exit 99'
   export PATH=$mock_bin:$PATH
 }
-deploy() { bash "$repo/scripts/remote-host.sh" deploy '' "${1:-0}" 0 '' "${2:-0}" >"$case_root/out" 2>"$case_root/err"; }
+deploy() { bash "$repo/scripts/remote-host.sh" deploy '' "${1:-0}" 0 '' "${2:-}" >"$case_root/out" 2>"$case_root/err"; }
 advance_upstream() {
   printf 'new\n' >"$TEST_UPSTREAM/new-file"
   "$real_git" -C "$TEST_UPSTREAM" add .
   "$real_git" -C "$TEST_UPSTREAM" commit -qm advance
-}
-version_change() {
-  printf 'mode=home-manager\ntarget=%q/flake#remote\nREMOTE_REF=main\nDEPLOYED_T3_VERSION=0.0.9\n' "$state" >"$state/remote.env"
 }
 test_dirty_checkout() {
   host_fixture
@@ -206,7 +209,7 @@ test_no_sudo() {
 }
 test_nixos_switch() {
   host_fixture
-  printf 'mode=nixos\ntarget=%q/flake#remote\nREMOTE_REF=main\nDEPLOYED_T3_VERSION=0.1.0\n' "$state" >"$state/remote.env"
+  printf 'mode=nixos\ntarget=%q/flake#remote\nREMOTE_REF=main\n' "$state" >"$state/remote.env"
   mock nix 'printf "nix %s\n" "$*" >>"$TEST_LOG"; if [[ $1 == eval ]]; then if [[ $* == *config.dotfiles.remote.user* ]]; then printf fixture; else printf 0.1.0; fi; fi'
   deploy
   contains "$TEST_LOG" 'sudo -n env NIX_CONFIG='
@@ -217,7 +220,7 @@ test_host_owned_flake_locks_as_root() {
   host_fixture
   mkdir -p "$case_root/etc-nixos"
   chmod 555 "$case_root/etc-nixos"
-  printf 'mode=nixos\ntarget=%q#box\nREMOTE_REF=main\nDEPLOYED_T3_VERSION=0.1.0\n' "$case_root/etc-nixos" >"$state/remote.env"
+  printf 'mode=nixos\ntarget=%q#box\nREMOTE_REF=main\n' "$case_root/etc-nixos" >"$state/remote.env"
   mock nix 'printf "nix %s\n" "$*" >>"$TEST_LOG"; if [[ $1 == eval ]]; then if [[ $* == *config.dotfiles.remote.user* ]]; then printf fixture; else printf 0.1.0; fi; fi'
   deploy
   chmod 755 "$case_root/etc-nixos"
@@ -253,26 +256,28 @@ test_divergence() {
   not_contains "$TEST_LOG" 'nix run'
   [[ -f $checkout/local ]]
 }
-test_version_gate() {
-  host_fixture; version_change
-  if deploy; then fail 'Version change bypassed permission'; fi
-  contains "$case_root/err" --allow-t3-update
-  not_contains "$TEST_LOG" 'nix run'
+test_first_install_version() {
+  host_fixture
+  deploy 0 0.1.5
+  [[ $(<"$state/t3-install-version") == 0.1.5 ]]
+  rm "$state/t3-install-version"
+  mock t3 'echo "t3 0.1.5"'
+  deploy 0 0.1.9
+  [[ ! -e $state/t3-install-version ]]
 }
-test_version_backup() {
-  host_fixture; version_change
-  mkdir -p "$HOME/.t3"
-  printf 'preserve\n' >"$HOME/.t3/state"
-  deploy 0 1
-  local -a backups=("$HOME"/.local/state/dotfiles/backups/t3-0.0.9-*/state)
-  [[ ${#backups[@]} == 1 && $(<"${backups[0]}") == preserve ]]
-  local stop_line switch_line
-  stop_line=$(grep -n 'stop t3code' "$TEST_LOG" | head -1 | cut -d: -f1)
-  switch_line=$(grep -n 'nix run' "$TEST_LOG" | head -1 | cut -d: -f1)
-  [[ $stop_line -lt $switch_line ]]
+test_restart_only_on_change() {
+  host_fixture
+  deploy
+  contains "$TEST_LOG" 'systemctl --user start t3code'
+  not_contains "$TEST_LOG" 'restart t3code'
+  : >"$TEST_LOG"
+  # The switch writes a new tailnet address for T3's drop-in.
+  mock nix 'printf "nix %s\n" "$*" >>"$TEST_LOG"; if [[ $1 == run ]]; then printf "T3CODE_HOST=100.64.0.9\n" >"$HOME/.config/dotfiles/t3code.env"; fi'
+  deploy
+  contains "$TEST_LOG" 'systemctl --user restart t3code'
 }
 
-for test in test_missing_host test_bad_hosts test_payload test_setup_modes test_mcp_login test_bad_mcp test_github_login test_callback_validation test_native_failure_and_forward_fallback test_cancel_cleanup test_dirty_checkout test_untracked_checkout test_fast_forward test_no_sudo test_nixos_switch test_host_owned_flake_locks_as_root test_tailscale_enrollment test_force test_divergence test_version_gate test_version_backup; do
+for test in test_missing_host test_bad_hosts test_payload test_setup_modes test_mcp_login test_bad_mcp test_github_login test_callback_validation test_native_failure_and_forward_fallback test_cancel_cleanup test_dirty_checkout test_untracked_checkout test_fast_forward test_no_sudo test_nixos_switch test_host_owned_flake_locks_as_root test_tailscale_enrollment test_force test_divergence test_first_install_version test_restart_only_on_change; do
   (
     case_root=$fixture/$test
     mkdir -p "$case_root"
