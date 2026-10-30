@@ -99,20 +99,20 @@ in
         url="$2"
         path="${t3ProjectsDir}/$name"
 
-        if [ ! -d "$path/.git" ]; then
-          $DRY_RUN_CMD mkdir -p "${t3ProjectsDir}"
-          # Git's credential helper runs `gh`, which activation's PATH lacks
-          if ! PATH="${config.home.profileDirectory}/bin:$PATH" \
-            $DRY_RUN_CMD ${pkgs.git}/bin/git clone --quiet --recurse-submodules "$url" "$path"; then
-            echo "warning: could not clone $url for T3 Code" >&2
-            return 0
-          fi
+        # Existing clones are registered already; T3 keeps them even when renamed.
+        [ ! -d "$path/.git" ] || return 0
+        $DRY_RUN_CMD mkdir -p "${t3ProjectsDir}"
+        # Git's credential helper runs `gh`, which activation's PATH lacks
+        if ! PATH="${config.home.profileDirectory}/bin:$PATH" \
+          $DRY_RUN_CMD ${pkgs.git}/bin/git clone --quiet --recurse-submodules "$url" "$path"; then
+          echo "warning: could not clone $url for T3 Code" >&2
+          return 0
         fi
 
+        # `t3 project add` needs the database to itself, which the running service holds.
         if [ -z "''${DRY_RUN:-}" ] && [ -x "${t3}" ] &&
-          ! output=$(${t3} project add --title "$name" "$path" 2>&1) &&
-          ! grep -q "already exists" <<<"$output"; then
-          echo "warning: could not add $path to T3 Code: $output" >&2
+          ! ${t3} project add --title "$name" "$path" >/dev/null 2>&1; then
+          echo "Cloned $path; add it as a project in T3 (the running server blocks the CLI)." >&2
         fi
       }
 
