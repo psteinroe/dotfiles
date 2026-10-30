@@ -194,6 +194,26 @@ all_output=$(
 [[ "$all_output" == *"Copied Infisical login for dev@example.com"* ]]
 [[ "$(decrypt_infisical_vault "$remote_home")" == "$(infisical_credentials)" ]]
 
+# The proxy key is copied privately, then the remote's standard clients point at it.
+if (HOME="$fixture/no-azure-home" _remote_main auth fixture-host cliproxy) >/dev/null 2>&1; then
+  printf '%s\n' 'remote auth cliproxy succeeded without a local key' >&2
+  exit 1
+fi
+mkdir -p "$local_home/.config/cliproxy"
+printf 'proxy-fixture-key\n' > "$local_home/.config/cliproxy/access-key"
+cliproxy_output=$(HOME="$local_home" _remote_main auth fixture-host cliproxy)
+[[ "$cliproxy_output" == *"Copied the proxy access key"* && "$cliproxy_output" == *'Claude Code, Codex'*' use '* ]]
+cmp "$local_home/.config/cliproxy/access-key" "$remote_home/.config/cliproxy/access-key"
+if [[ "$OSTYPE" == darwin* ]]; then
+  [[ "$(stat -f '%Lp' "$remote_home/.config/cliproxy/access-key")" == 600 ]]
+else
+  [[ "$(stat -c '%a' "$remote_home/.config/cliproxy/access-key")" == 600 ]]
+fi
+jq -e --arg helper "cat '$remote_home/.config/cliproxy/access-key'" '.apiKeyHelper == $helper' \
+  "$remote_home/.claude/settings.json" >/dev/null
+grep -q '^model_provider = "cliproxy"' "$remote_home/.codex/config.toml"
+! grep -rq proxy-fixture-key "$remote_home/.claude" "$remote_home/.codex"
+
 # Provider, MCP and GitHub OAuth can never enter the copy path.
 for spec in pi pi:all claude bridge codex gh mcp mcp:executor; do
   if ( _remote_auth_cloud fixture-host "$spec" ) >/dev/null 2>&1; then

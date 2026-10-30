@@ -90,6 +90,7 @@ test_github_login() {
   export TEST_AUTH_URL='https://github.com/login/device'
   "$repo/bin/remote" auth fixture-host gh >"$case_root/out"
   contains "$TEST_LOG" 'gh auth login --hostname github.com --git-protocol https --web'
+  contains "$TEST_LOG" 'export GIT_CONFIG_GLOBAL='
   contains "$TEST_BROWSER_LOG" "$TEST_AUTH_URL"
   not_contains "$TEST_LOG" '-L '
   not_contains "$TEST_LOG" 'encoded='

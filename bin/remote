@@ -14,6 +14,7 @@ _remote_usage() {
     '       remote auth HOST gh' \
     '       remote auth HOST mcp SERVER [--client pi|claude|codex]' \
     '       remote auth HOST exa|aws|gcloud|azure|infisical|all' \
+    '       remote auth HOST cliproxy          # proxy key; points Claude Code/Codex/Pi at it' \
     '' \
     'Update flags: --ref BRANCH --force --allow-t3-update' \
     'HOST is an explicit SSH alias or user@host; setup never replaces an OS.' \
@@ -100,10 +101,12 @@ _remote_oauth_urls() {
 }
 
 _remote_login() {
-  local host=$1 client=$2 server=$3 temp control ssh_pid='' forwarded=0 line='' char status quoted
+  local host=$1 client=$2 server=$3 temp control ssh_pid='' forwarded=0 line='' char status quoted prefix=''
   local -a command opened_urls=()
   if [[ $client == gh ]]; then
     command=(gh auth login --hostname github.com --git-protocol https --web)
+    # gh rewrites the global credential helper; the linked gitconfig already has it.
+    prefix='git_config=$(mktemp); trap '\''rm -f "$git_config"'\'' EXIT; export GIT_CONFIG_GLOBAL="$git_config"; '
   else
     [[ $server =~ ^[A-Za-z0-9_][A-Za-z0-9_-]*$ ]] || _remote_die 'MCP login requires a server name (e.g. executor).'
     command=("$client" mcp login "$server")
@@ -131,7 +134,7 @@ _remote_login() {
   mkfifo "$temp/output"
   quoted=$(_remote_quote "${command[@]}")
   # Preserve stdin for native prompts; only stdout is scanned, never saved to a log.
-  ssh -tt "$host" "${REMOTE_PATH}export BROWSER=true; $quoted" <&0 > "$temp/output" &
+  ssh -tt "$host" "${REMOTE_PATH}export BROWSER=true; $prefix$quoted" <&0 > "$temp/output" &
   ssh_pid=$!
   while IFS= read -r -n 1 char; do
     if [[ -z $char ]]; then
@@ -157,7 +160,7 @@ _remote_login() {
 _remote_auth_cloud() {
   local host=$1 kind=$2 identity remote_user remote_home remote_path
   case $kind in
-    exa|aws|gcloud|azure|infisical|all) ;;
+    exa|aws|gcloud|azure|infisical|cliproxy|all) ;;
     *) _remote_die 'Cloud/API-key transfer does not accept provider, MCP or GitHub OAuth.' ;;
   esac
   identity=$(ssh "$host" 'printf "%s\n%s\n" "$(id -un)" "$HOME"') || return
@@ -178,6 +181,7 @@ _remote_auth_cloud() {
     gcloud) _remote_copy_gcloud ;;
     azure) _remote_copy_azure ;;
     infisical) _remote_copy_infisical ;;
+    cliproxy) _remote_copy_cliproxy ;;
   esac
 }
 
@@ -246,6 +250,30 @@ chmod 600 "$HOME/.config/exa/api_key"
   runner=$(_remote_runner "$remote_cmd") || return
   printf '%s\n' "$exa_key" | ssh "$host" "$runner" || return
   printf '%s\n' "Copied Exa API key to $host:$remote_user:$remote_home/.config/exa/api_key"
+}
+
+# The proxy access key only; provider accounts stay on the proxy. The same client
+# script as Home Manager activation then points the remote's clients at it.
+_remote_copy_cliproxy() {
+  local key_file="$HOME/.config/cliproxy/access-key" runner
+  [[ -s $key_file ]] || {
+    printf 'No proxy access key at %s. Fetch it from the proxy first (see README).\n' "$key_file" >&2
+    return 1
+  }
+  local remote_cmd='set -euo pipefail
+umask 077
+mkdir -p "$HOME/.config/cliproxy"
+tmp=$(mktemp "$HOME/.config/cliproxy/access-key.XXXXXX")
+trap '\''rm -f "$tmp"'\'' EXIT
+cat > "$tmp"
+[ -s "$tmp" ] || { echo "No proxy access key received on stdin" >&2; exit 1; }
+mv "$tmp" "$HOME/.config/cliproxy/access-key"
+'
+  runner=$(_remote_runner "$remote_cmd") || return
+  ssh "$host" "$runner" <"$key_file" || return
+  printf '%s\n' "Copied the proxy access key to $host:$remote_user:$remote_home/.config/cliproxy/access-key"
+  runner=$(_remote_runner "$(<"$REMOTE_ROOT/scripts/cliproxy-clients.sh")") || return
+  ssh "$host" "$runner" </dev/null
 }
 
 _remote_copy_aws() {
@@ -494,7 +522,7 @@ _remote_main() {
       gh)
         [[ $# == 0 ]] || _remote_die 'Usage: remote auth HOST gh'
         _remote_login "$host" gh '' ;;
-      exa|aws|gcloud|azure|infisical|all)
+      exa|aws|gcloud|azure|infisical|cliproxy|all)
         [[ $# == 0 ]] || _remote_die 'Supply one cloud/API-key kind, or all.'
         _remote_auth_cloud "$host" "$kind" ;;
       *) _remote_die 'Use gh or mcp SERVER for independent login; only cloud credentials/API keys can be copied.' ;;

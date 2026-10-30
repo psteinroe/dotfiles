@@ -162,4 +162,12 @@ in
       fi
     fi
   '';
+
+  # Point the standard client homes at the owner's CLIProxy once its access key exists.
+  home.activation.cliproxyClients = lib.hm.dag.entryAfter [ "agentMcpServers" ] ''
+    if [ -z "''${DRY_RUN:-}" ]; then
+      PATH="${pkgs.jq}/bin:${pkgs.gawk}/bin:${pkgs.coreutils}/bin:$PATH" \
+        ${pkgs.bash}/bin/bash ${../../scripts/cliproxy-clients.sh}
+    fi
+  '';
 }
