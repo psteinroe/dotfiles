@@ -101,10 +101,12 @@ _remote_oauth_urls() {
 }
 
 _remote_login() {
-  local host=$1 client=$2 server=$3 temp control ssh_pid='' forwarded=0 line='' char status quoted
+  local host=$1 client=$2 server=$3 temp control ssh_pid='' forwarded=0 line='' char status quoted prefix=''
   local -a command opened_urls=()
   if [[ $client == gh ]]; then
     command=(gh auth login --hostname github.com --git-protocol https --web)
+    # gh rewrites the global credential helper; the linked gitconfig already has it.
+    prefix='git_config=$(mktemp); trap '\''rm -f "$git_config"'\'' EXIT; export GIT_CONFIG_GLOBAL="$git_config"; '
   else
     [[ $server =~ ^[A-Za-z0-9_][A-Za-z0-9_-]*$ ]] || _remote_die 'MCP login requires a server name (e.g. executor).'
     command=("$client" mcp login "$server")
@@ -132,7 +134,7 @@ _remote_login() {
   mkfifo "$temp/output"
   quoted=$(_remote_quote "${command[@]}")
   # Preserve stdin for native prompts; only stdout is scanned, never saved to a log.
-  ssh -tt "$host" "${REMOTE_PATH}export BROWSER=true; $quoted" <&0 > "$temp/output" &
+  ssh -tt "$host" "${REMOTE_PATH}export BROWSER=true; $prefix$quoted" <&0 > "$temp/output" &
   ssh_pid=$!
   while IFS= read -r -n 1 char; do
     if [[ -z $char ]]; then
