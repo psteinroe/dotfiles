@@ -85,9 +85,10 @@ creates a host-local SSH signing key; register its public key with GitHub if nee
 
 [tstack](https://github.com/t3dotgg/tstack) is pinned as a flake input. Each
 switch copies its skills into the standard `~/.claude/skills` and
-`~/.codex/skills` directories, so T3 sessions get them. Skills dropped upstream
-are removed; unrelated skills in those directories stay. Update with
-`nix flake update tstack`.
+`~/.codex/skills` directories, so T3 sessions get them, together with the
+`clients` skills in `nix/home/remote-skills.nix` (currently gh-stack). Skills
+dropped upstream are removed; unrelated skills in those directories stay.
+Update with `nix flake update tstack`.
 
 T3 keeps itself up to date; dotfiles pins no version. The Mac app updates
 itself (or use Check for Updates), and T3's apps update a server on another

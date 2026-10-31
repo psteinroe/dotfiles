@@ -19,19 +19,37 @@ let
   piSkillSources = map (skill: skill // { groupName = "pi"; }) (
     remoteSkills.shared ++ remoteSkills.pi
   );
+  tstackSkills =
+    map
+      (name: {
+        inherit name;
+        path = "${inputs.tstack}/skills/${name}";
+      })
+      (
+        lib.attrNames (
+          lib.filterAttrs (_: type: type == "directory") (builtins.readDir "${inputs.tstack}/skills")
+        )
+      );
+  clientRemoteSkills = map (skill: skill // { groupName = "clients"; }) remoteSkills.clients;
+  clientSkills = tstackSkills ++ clientRemoteSkills;
+  # The trailing newline lets `read` see the last entry
+  clientSkillSpecs = pkgs.writeText "client-skill-specs" (serializeSkillSpecs clientSkills + "\n");
+  clientSkillNames = pkgs.writeText "client-skill-names" (
+    lib.concatMapStrings (skill: "${skill.name}\n") clientSkills
+  );
   # Called by the machine-wide actions in agents/t3/settings.json
   t3RepoAction = pkgs.writeShellApplication {
     name = "t3-repo-action";
     runtimeInputs = [ pkgs.jq ];
     text = builtins.readFile ../../agents/t3/t3-repo-action.sh;
   };
-  piSkillAssertions = map (skill: {
+  remoteSkillAssertions = map (skill: {
     assertion = builtins.pathExists skill.path && builtins.pathExists "${skill.path}/SKILL.md";
     message = "Remote ${skill.groupName} skill '${skill.name}' is missing or has no SKILL.md at ${skill.path}. Update nix/home/remote-skills.nix.";
-  }) piSkillSources;
+  }) (piSkillSources ++ clientRemoteSkills);
 in
 {
-  assertions = piSkillAssertions;
+  assertions = remoteSkillAssertions;
 
   home.packages = [ t3RepoAction ];
 
@@ -173,28 +191,32 @@ in
 
   # Each skills directory keeps a manifest so removed upstream skills are cleaned
   # up without deleting unrelated skills. Use the standard client homes only.
-  home.activation.tstackSkills = lib.hm.dag.entryAfter [ "agentConfigs" ] ''
-    deploy_tstack() {
+  home.activation.clientSkills = lib.hm.dag.entryAfter [ "agentConfigs" ] ''
+    deploy_client_skills() {
       dst="$1/skills"
-      manifest="$dst/.tstack-managed"
+      manifest="$dst/.dotfiles-managed"
       $DRY_RUN_CMD mkdir -p "$dst"
-      if [ -f "$manifest" ]; then
+      # .tstack-managed is the manifest from before gh-stack joined tstack's skills
+      for previous in "$dst/.tstack-managed" "$manifest"; do
+        [ -f "$previous" ] || continue
         while IFS= read -r old; do
-          [ -n "$old" ] && [ ! -d "${inputs.tstack}/skills/$old" ] && $DRY_RUN_CMD rm -rf "$dst/$old"
-        done <"$manifest"
-      fi
-      for skill in "${inputs.tstack}"/skills/*/; do
-        name=$(basename "$skill")
-        $DRY_RUN_CMD rm -rf "$dst/$name"
-        $DRY_RUN_CMD cp -R "$skill" "$dst/$name"
-        $DRY_RUN_CMD chmod -R u+w "$dst/$name"
+          [ -n "$old" ] && ! grep -qxF "$old" ${clientSkillNames} && $DRY_RUN_CMD rm -rf "$dst/$old"
+        done <"$previous"
       done
+      while IFS=$'\t' read -r name src; do
+        [ -n "$name" ] || continue
+        $DRY_RUN_CMD rm -rf "$dst/$name"
+        $DRY_RUN_CMD cp -R "$src" "$dst/$name"
+        $DRY_RUN_CMD chmod -R u+w "$dst/$name"
+      done <${clientSkillSpecs}
       if [ -z "''${DRY_RUN:-}" ]; then
-        ls "${inputs.tstack}/skills" >"$manifest"
+        cp ${clientSkillNames} "$manifest"
+        chmod u+w "$manifest"
+        rm -f "$dst/.tstack-managed"
       fi
     }
 
-    deploy_tstack "$HOME/.claude"
-    deploy_tstack "$HOME/.codex"
+    deploy_client_skills "$HOME/.claude"
+    deploy_client_skills "$HOME/.codex"
   '';
 }

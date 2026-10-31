@@ -291,11 +291,11 @@
     "tstack": {
       "flake": false,
       "locked": {
-        "lastModified": 1793089639,
-        "narHash": "sha256-p9iCzX1nYN/0bwukHQ/MyDKc9nm2noP8vZFAZt7WarE=",
+        "lastModified": 1793155082,
+        "narHash": "sha256-WpJgIBFphxPff89/CoPegyFQa8x3Orb/bkP7Nd+kMNk=",
         "owner": "t3dotgg",
         "repo": "tstack",
-        "rev": "92e38e2cf677a84a142e8df296861c588542135c",
+        "rev": "1085050f3baed1ac724caa4a8166145fb2ac88af",
         "type": "github"
       },
       "original": {
