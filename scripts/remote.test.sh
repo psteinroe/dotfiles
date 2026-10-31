@@ -39,6 +39,18 @@ esac'
 }
 
 test_missing_host() { auth_fixture; expect_failure "$repo/bin/remote" deploy; [[ ! -s $TEST_LOG ]]; }
+test_host_list() {
+  auth_fixture
+  export REMOTE_SSH_CONFIG=$case_root/ssh_config
+  printf '%s\n' 'Include other' 'Host exe.dev *.exe.xyz' '  User x' 'Host rdev rdev-alt' '  HostName box.ts.net' \
+    'Host github.com' '  IdentityFile k' 'Match host foo' '  HostName bar' 'host lab' '  hostname 10.0.0.2' >"$REMOTE_SSH_CONFIG"
+  expect_failure "$repo/bin/remote" deploy
+  contains "$case_root/err" 'Hosts in ~/.ssh/config: rdev rdev-alt lab'
+  "$repo/bin/remote" --help >"$case_root/out"
+  contains "$case_root/out" 'Hosts in ~/.ssh/config: rdev rdev-alt lab'
+  not_contains "$case_root/out" github.com
+  [[ ! -s $TEST_LOG ]]
+}
 test_bad_hosts() {
   auth_fixture
   local host
@@ -277,7 +289,7 @@ test_restart_only_on_change() {
   contains "$TEST_LOG" 'systemctl --user restart t3code'
 }
 
-for test in test_missing_host test_bad_hosts test_payload test_setup_modes test_mcp_login test_bad_mcp test_github_login test_callback_validation test_native_failure_and_forward_fallback test_cancel_cleanup test_dirty_checkout test_untracked_checkout test_fast_forward test_no_sudo test_nixos_switch test_host_owned_flake_locks_as_root test_tailscale_enrollment test_force test_divergence test_first_install_version test_restart_only_on_change; do
+for test in test_missing_host test_host_list test_bad_hosts test_payload test_setup_modes test_mcp_login test_bad_mcp test_github_login test_callback_validation test_native_failure_and_forward_fallback test_cancel_cleanup test_dirty_checkout test_untracked_checkout test_fast_forward test_no_sudo test_nixos_switch test_host_owned_flake_locks_as_root test_tailscale_enrollment test_force test_divergence test_first_install_version test_restart_only_on_change; do
   (
     case_root=$fixture/$test
     mkdir -p "$case_root"

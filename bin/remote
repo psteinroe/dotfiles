@@ -19,6 +19,27 @@ _remote_usage() {
     'Update flags: --ref BRANCH --force' \
     'HOST is an explicit SSH alias or user@host; setup never replaces an OS.' \
     'GitHub/MCP OAuth stays on each remote. Never copies provider, MCP, or GitHub OAuth.'
+  _remote_print_hosts
+}
+
+# Aliases are Host blocks in ~/.ssh/config that set a HostName; patterns and plain hosts are skipped.
+_remote_hosts() {
+  local config=${REMOTE_SSH_CONFIG:-$HOME/.ssh/config}
+  [[ -r $config ]] || return 0
+  awk '
+    function flush(   i) { if (has_name) for (i = 1; i <= n; i++) print names[i]; n = 0; has_name = 0 }
+    tolower($1) == "host" { flush(); for (i = 2; i <= NF; i++) if ($i !~ /[*?!]/) names[++n] = $i; next }
+    tolower($1) == "match" { flush(); next }
+    tolower($1) == "hostname" { has_name = 1 }
+    END { flush() }
+  ' "$config"
+}
+
+_remote_print_hosts() {
+  local hosts
+  hosts=$(_remote_hosts | tr '\n' ' ')
+  [[ -n $hosts ]] || return 0
+  printf '\nHosts in ~/.ssh/config: %s\n' "${hosts% }"
 }
 
 # Quote arguments for the remote login shell without eval or interpolating user input.
@@ -499,6 +520,11 @@ _remote_main() {
   local action=$1 host=${2:-} ref='' force=0 home_only=0 nixos_flake='' t3_version=''
   local kind server='' client=pi quoted app
   case $action in setup|deploy|status|connect|shell|auth) ;; *) _remote_die "Unknown command: $action" ;; esac
+  if [[ -z $host ]]; then
+    printf 'remote: %s requires HOST.\n' "$action" >&2
+    _remote_print_hosts >&2
+    exit 1
+  fi
   [[ $host =~ ^[A-Za-z0-9_][A-Za-z0-9_.@:-]*$ ]] || _remote_die 'Name an explicit SSH alias or user@host, not SSH flags or shell syntax.'
   shift 2
   if [[ $action == auth ]]; then
