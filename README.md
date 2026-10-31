@@ -12,8 +12,10 @@ rebuild       # apply checked-in configuration
 rebuild -u    # deliberately update pinned inputs first
 ```
 
-AeroSpace assigns T3 to workspace 1 (`alt-enter`), Chrome/Safari to 2 and
-floating Ghostty to 3 (`alt-shift-enter`), using native rules and layouts.
+AeroSpace assigns T3 to workspace 1 (`alt-enter`), Chrome/Safari to 2,
+floating Ghostty to 3 (`alt-shift-enter`), Slack to 4, Linear to 5,
+Mail/Calendar to 6 and Notes/Spotify to 7; everything else floats on 8. The
+Dock lists the same apps in that order.
 
 ## Existing remotes
 
