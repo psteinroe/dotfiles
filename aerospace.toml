@@ -107,9 +107,11 @@ k = ['join-with up', 'mode main']
 l = ['join-with right', 'mode main']
 
 # Auto-assign daily apps for a single-monitor workflow
+# T3 fills workspace 1 with AeroSpace's fullscreen, not macOS's: a natively
+# fullscreen window leaves for its own macOS Space and its workspace.
 [[on-window-detected]]
 if.app-id = 'com.t3tools.t3code'
-run = 'move-node-to-workspace 1'
+run = ['move-node-to-workspace 1', 'fullscreen on --no-outer-gaps']
 
 [[on-window-detected]]
 if.app-id = 'com.google.Chrome'

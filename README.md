@@ -12,10 +12,10 @@ rebuild       # apply checked-in configuration
 rebuild -u    # deliberately update pinned inputs first
 ```
 
-AeroSpace assigns T3 to workspace 1 (`alt-enter`), Chrome/Safari to 2,
+AeroSpace assigns T3 to workspace 1 (`alt-enter`, fullscreen), Chrome/Safari to 2,
 floating Ghostty to 3 (`alt-shift-enter`), Slack to 4, Linear to 5,
 Mail/Calendar to 6 and Notes/Spotify to 7; everything else floats on 8. The
-Dock lists the same apps in that order.
+Dock lists the same apps, with T3 after Safari and Ghostty.
 
 ## Existing remotes
 

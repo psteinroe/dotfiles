@@ -18,11 +18,10 @@
     autohide-delay = 0.0;
     autohide-time-modifier = 0.0;
     mru-spaces = false;
-    # Same order as the AeroSpace workspaces
     persistent-apps = [
-      "/Applications/T3 Code (Beta).app"
       "/Applications/Safari.app"
       "/Applications/Ghostty.app"
+      "/Applications/T3 Code (Beta).app"
       "/Applications/Slack.app"
       "/Applications/Linear.app"
       "/System/Applications/Mail.app"
