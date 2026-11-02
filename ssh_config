@@ -7,20 +7,21 @@ Host exe.dev *.exe.xyz
   IdentitiesOnly yes
   IdentityFile ~/.ssh/id_ed25519
 
-Host rdev-exe
-  HostName psteinroe-dev.exe.xyz
-  User exedev
+# Personal exe.dev VM, over Tailscale. exe.dev's own SSH (exedev@psteinroe-dev.exe.xyz)
+# reaches the same VM as another user, so it gets no alias.
+Host rdev
+  HostName psteinroe-dev.tail6aabd2.ts.net
+  User psteinroe
   IdentitiesOnly yes
   IdentityFile ~/.ssh/id_ed25519
   ControlMaster auto
   ControlPath ~/.ssh/cm-%r@%h:%p
   ControlPersist 10m
 
-Host rdev
-  HostName psteinroe-dev.tail6aabd2.ts.net
+# Work devbox from getmateo/devboxes. Tailscale SSH: no keys, a browser check now and then.
+Host devbox-psteinroe
+  HostName devbox-psteinroe.tail649856.ts.net
   User psteinroe
-  IdentitiesOnly yes
-  IdentityFile ~/.ssh/id_ed25519
   ControlMaster auto
   ControlPath ~/.ssh/cm-%r@%h:%p
   ControlPersist 10m
