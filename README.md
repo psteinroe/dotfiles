@@ -154,7 +154,7 @@ the existing Claude Code login directly, so keep that login.
 
 The Pi follows `main` without compiling anything. Every day, Actions →
 **cliproxy-deploy** bumps `nix/nixos/cliproxy/release.json` to the newest
-CLIProxyAPI release that is at least 7 days old, then builds the Pi's system. It
+CLIProxyAPI release that is at least 3 days old, then builds the Pi's system. It
 also builds after every push to `main` that touches the Pi. Paths that
 cache.nixos.org doesn't serve are signed with the `CLIPROXY_SIGNING_KEY` secret
 and published as the `cliproxy-pi` release. Every hour the Pi checks that

@@ -53,7 +53,7 @@ current() { printf '{"version":"%s","hash":"sha256-old"}\n' "$1" >"$tmp/release.
   release 8.0.9 2026-09-01T00:00:00Z
 } | releases
 current 8.0.44
-out=$(bash "$script" 2>/dev/null)
+out=$(bash "$script" 7 2>/dev/null)
 [ "$out" = 8.0.68 ] || fail "picked '$out', want 8.0.68"
 [ "$(jq -r .version "$tmp/release.json")" = 8.0.68 ] || fail "version not written"
 [ "$(jq -r .hash "$tmp/release.json")" = "$sri" ] || fail "hash not written"
@@ -70,7 +70,7 @@ for version in 8.0.68 8.0.76; do
   current "$version"
   rm -f "$tmp/prefetched"
   cp "$tmp/release.json" "$tmp/before"
-  out=$(bash "$script" 2>/dev/null)
+  out=$(bash "$script" 7 2>/dev/null)
   [ -z "$out" ] || fail "bumped $version to '$out'"
   cmp -s "$tmp/release.json" "$tmp/before" || fail "rewrote release.json on $version"
   [ ! -e "$tmp/prefetched" ] || fail "prefetched on $version"
@@ -80,7 +80,7 @@ done
 current 8.0.44
 cp "$tmp/release.json" "$tmp/before"
 "$nix" hash convert --hash-algo sha256 --to sri "${hex%?}0" | tr -d '\n' >"$tmp/prefetch-hash"
-if bash "$script" >/dev/null 2>"$tmp/err"; then fail "accepted a digest mismatch"; fi
+if bash "$script" 7 >/dev/null 2>"$tmp/err"; then fail "accepted a digest mismatch"; fi
 grep -q 'GitHub lists' "$tmp/err" || fail "unexpected error: $(cat "$tmp/err")"
 cmp -s "$tmp/release.json" "$tmp/before" || fail "rewrote release.json on a digest mismatch"
 

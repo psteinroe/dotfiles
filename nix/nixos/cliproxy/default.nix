@@ -2,7 +2,7 @@
 # behind Tailscale. Imported together with nixpkgs' sd-image-aarch64 module.
 #
 # Follows main by itself (./deploy.nix): CI builds every change, plus a daily bump to the
-# newest CLIProxyAPI release that is at least a week old, and the Pi switches to it.
+# newest CLIProxyAPI release that is at least 3 days old, and the Pi switches to it.
 # It never reboots by itself, so kernel updates wait for a manual reboot.
 let
   hostName = "cliproxy-psteinroe";

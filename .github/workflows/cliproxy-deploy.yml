@@ -1,6 +1,6 @@
 # Builds main's cliproxy Pi system and publishes it for the Pi to pull
 # (nix/nixos/cliproxy/deploy.nix). Daily, it first bumps CLIProxyAPI to the newest
-# release that is at least 7 days old and commits that to main once it builds.
+# release that is at least 3 days old and commits that to main once it builds.
 name: cliproxy-deploy
 
 on:
@@ -36,7 +36,7 @@ jobs:
       - name: Bump CLIProxyAPI
         id: bump
         if: github.event_name != 'push'
-        run: echo "version=$(scripts/cliproxy-bump.sh 7)" >>"$GITHUB_OUTPUT"
+        run: echo "version=$(scripts/cliproxy-bump.sh 3)" >>"$GITHUB_OUTPUT"
 
       - name: Check whether the published system is current
         id: check

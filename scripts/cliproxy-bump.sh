@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Moves the cliproxy Pi to the newest CLIProxyAPI release that has been out for at least
-# MIN_AGE_DAYS (default 7), so a broken release has had time to be noticed and replaced
+# MIN_AGE_DAYS (default 3), so a broken release has had time to be noticed and replaced
 # upstream. Never moves backwards. Prints the new version when it changed, nothing
 # otherwise. Needs gh, jq and nix.
 #
@@ -8,7 +8,7 @@
 set -euo pipefail
 repo=$(cd "$(dirname "$0")/.." && pwd)
 file=${CLIPROXY_RELEASE_FILE:-$repo/nix/nixos/cliproxy/release.json}
-min_age_days=${1:-7}
+min_age_days=${1:-3}
 now=${CLIPROXY_NOW:-$(date -u +%s)}
 upstream=router-for-me/CLIProxyAPI
 
