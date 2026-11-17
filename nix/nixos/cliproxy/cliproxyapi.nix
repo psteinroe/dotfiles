@@ -9,16 +9,17 @@
 }:
 
 let
-  cliproxyapiVersion = "8.0.44";
+  # Bumped daily by .github/workflows/cliproxy-deploy.yml (scripts/cliproxy-bump.sh)
+  release = lib.importJSON ./release.json;
   # The no-plugin build is a static Go binary; the plugin build links glibc
   # dynamically for Go plugins, which stay disabled here.
   cliproxyapi = pkgs.stdenvNoCC.mkDerivation {
     pname = "cliproxyapi";
-    version = cliproxyapiVersion;
+    inherit (release) version;
 
     src = pkgs.fetchurl {
-      url = "https://github.com/router-for-me/CLIProxyAPI/releases/download/v${cliproxyapiVersion}/CLIProxyAPI_${cliproxyapiVersion}_linux_aarch64_no-plugin.tar.gz";
-      hash = "sha256-gWl6KhShw+LLJ7szjJT63tSFXF3EGOUCzPP6mekX1Kw=";
+      url = "https://github.com/router-for-me/CLIProxyAPI/releases/download/v${release.version}/CLIProxyAPI_${release.version}_linux_aarch64_no-plugin.tar.gz";
+      inherit (release) hash;
     };
     sourceRoot = ".";
 
@@ -39,6 +40,9 @@ let
   configFile = "${stateDir}/config.yaml";
   port = 8317;
 
+  # Settings newer than the pinned release take effect once the daily bump reaches it
+  since = lib.versionAtLeast release.version;
+
   # Keys are filled in at service start from files in the state directory, so
   # neither Git nor the store holds them. Keys follow the upstream v8
   # config.example.yaml. The server rewrites secret-key as a bcrypt hash on load.
@@ -48,6 +52,11 @@ let
       host: "127.0.0.1"
       port: ${toString port}
       trusted-proxies: ["127.0.0.1", "::1"]
+    ${lib.optionalString (since "8.0.69") (
+      # Lets requests in flight finish when a deploy restarts the service, within
+      # systemd's 90 s stop timeout
+      "  shutdown-timeout: 60"
+    )}
     management:
       allow-remote: true
       secret-key: "@MANAGEMENT_KEY@"
@@ -57,6 +66,11 @@ let
       strategy: "round-robin"
       session-affinity: true
       session-affinity-ttl: "1h"
+    ${lib.optionalString (since "8.0.61") (
+      # Only quota and auth errors move a session to another account; a transient
+      # upstream error retries elsewhere without giving up its prompt cache
+      "  session-affinity-rebind-on: \"quota\""
+    )}
       retry:
         request-retry: 3
         max-retry-interval: 30

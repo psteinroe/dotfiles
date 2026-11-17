@@ -1,8 +1,9 @@
 # Raspberry Pi 3 (1 GB) cliproxy server: an always-on box at home that runs CLIProxyAPI
 # behind Tailscale. Imported together with nixpkgs' sd-image-aarch64 module.
 #
-# No automated updates: no CI deploys, no nightly updater, no reboots by itself.
-# Software and OS updates are occasional and manual (README, CLIProxy).
+# Follows main by itself (./deploy.nix): CI builds every change, plus a daily bump to the
+# newest CLIProxyAPI release that is at least a week old, and the Pi switches to it.
+# It never reboots by itself, so kernel updates wait for a manual reboot.
 let
   hostName = "cliproxy-psteinroe";
 in
@@ -10,6 +11,7 @@ in
   imports = [
     ../pi-base.nix
     ./cliproxyapi.nix
+    ./deploy.nix
   ];
 
   networking.hostName = hostName;

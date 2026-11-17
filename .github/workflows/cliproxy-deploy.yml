@@ -1,0 +1,72 @@
+# Builds main's cliproxy Pi system and publishes it for the Pi to pull
+# (nix/nixos/cliproxy/deploy.nix). Daily, it first bumps CLIProxyAPI to the newest
+# release that is at least 7 days old and commits that to main once it builds.
+name: cliproxy-deploy
+
+on:
+  schedule:
+    # 03:23 UTC, before the working day in Berlin
+    - cron: "23 3 * * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "nix/nixos/**"
+      - "flake.nix"
+      - "flake.lock"
+
+concurrency:
+  group: cliproxy-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04-arm
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: cachix/install-nix-action@v31
+
+      - name: Bump CLIProxyAPI
+        id: bump
+        if: github.event_name != 'push'
+        run: echo "version=$(scripts/cliproxy-bump.sh 7)" >>"$GITHUB_OUTPUT"
+
+      - name: Check whether the published system is current
+        id: check
+        run: |
+          want=$(nix eval --raw .#nixosConfigurations.cliproxy.config.system.build.toplevel.outPath)
+          published=$(curl -fsSL "https://github.com/$GITHUB_REPOSITORY/releases/download/cliproxy-pi/system" || true)
+          echo "Main: $want"
+          echo "Published: ${published:-none}"
+          if [ "$want" = "$published" ]; then
+            echo "current=true" >>"$GITHUB_OUTPUT"
+          fi
+
+      - name: Build the system
+        if: steps.check.outputs.current != 'true'
+        run: nix build -L .#nixosConfigurations.cliproxy.config.system.build.toplevel -o system
+
+      - name: Commit the bump
+        if: steps.bump.outputs.version != ''
+        env:
+          VERSION: ${{ steps.bump.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore(cliproxy): bump CLIProxyAPI to v$VERSION" \
+            -m "https://github.com/router-for-me/CLIProxyAPI/releases/tag/v$VERSION" \
+            nix/nixos/cliproxy/release.json
+          git push origin HEAD:main || { git pull --rebase origin main && git push origin HEAD:main; }
+
+      - name: Publish the system
+        if: steps.check.outputs.current != 'true'
+        env:
+          CLIPROXY_SIGNING_KEY: ${{ secrets.CLIPROXY_SIGNING_KEY }}
+        run: scripts/cliproxy-publish.sh system

@@ -152,10 +152,18 @@ T3 needs one Claude and one Codex instance on those standard homes; the proxy
 chooses the account. Bridge compaction summaries ignore user settings and use
 the existing Claude Code login directly, so keep that login.
 
-The Pi never updates itself or compiles locally. Edit the server version/hash in
-`nix/nixos/cliproxy/cliproxyapi.nix`, build elsewhere and switch manually,
-preserving `/var/lib/cliproxyapi` and `/var/lib/tailscale`. Reflashing loses both.
-Nix generates `config.yaml` on service start; change routing in Nix, not the UI.
+The Pi follows `main` without compiling anything. Every day, Actions →
+**cliproxy-deploy** bumps `nix/nixos/cliproxy/release.json` to the newest
+CLIProxyAPI release that is at least 7 days old, then builds the Pi's system. It
+also builds after every push to `main` that touches the Pi. Paths that
+cache.nixos.org doesn't serve are signed with the `CLIPROXY_SIGNING_KEY` secret
+and published as the `cliproxy-pi` release. Every hour the Pi checks that
+release, fetches the system and switches to it. If CLIProxyAPI then stops
+answering, it switches back and doesn't try that system again. Check with
+`journalctl -u cliproxy-deploy`. A manual switch lasts only until the next
+check. The Pi never reboots by itself. Keep `/var/lib/cliproxyapi` and
+`/var/lib/tailscale`; reflashing loses both. Nix generates `config.yaml` on
+service start; change routing in Nix, not the UI.
 Office routing stays until a separately verified client cutover.
 
 ## License

@@ -168,8 +168,8 @@
       packages.aarch64-linux.home-manager = home-manager.packages.aarch64-linux.home-manager;
 
       # Raspberry Pi 3 running CLIProxyAPI (cliproxy-psteinroe). Build the SD image on an
-      # aarch64-linux machine (.github/workflows/pi-images.yml). Nothing deploys or updates it
-      # automatically; updates are occasional and manual (README, CLIProxy).
+      # aarch64-linux machine (.github/workflows/pi-images.yml). CI builds main and the Pi
+      # pulls it (.github/workflows/cliproxy-deploy.yml, nix/nixos/cliproxy/deploy.nix).
       nixosConfigurations.cliproxy = mkPi ./nix/nixos/cliproxy;
 
       packages.aarch64-linux.cliproxy-sd-image =
