@@ -14,16 +14,20 @@ trap 'rm -rf "$work"' EXIT
 
 (umask 077 && printf '%s\n' "$CLIPROXY_SIGNING_KEY" >"$work/key")
 
+# A binary cache only accepts paths whose references it holds, so copy the whole
+# closure, then drop what cache.nixos.org serves; the Pi substitutes that from there.
+nix copy --to "file://$work/cache?compression=zstd&secret-key=$work/key" "$system"
 nix path-info --recursive "$system" >"$work/closure"
 # shellcheck disable=SC2016 # expanded by the inner sh
 xargs -P 32 -n 1 sh -c '
   h=${1#/nix/store/}
-  curl -fsI -o /dev/null "https://cache.nixos.org/${h%%-*}.narinfo" || echo "$1"
-' sh <"$work/closure" >"$work/missing"
-echo "$(wc -l <"$work/missing") of $(wc -l <"$work/closure") paths are not on cache.nixos.org"
-
-xargs nix copy --no-recursive --to "file://$work/cache?compression=zstd&secret-key=$work/key" \
-  <"$work/missing"
+  if curl -fsI -o /dev/null "https://cache.nixos.org/${h%%-*}.narinfo"; then echo "${h%%-*}"; fi
+' sh <"$work/closure" >"$work/upstream"
+while read -r h; do
+  nar=$(sed -n 's/^URL: //p' "$work/cache/$h.narinfo")
+  rm -f "$work/cache/$h.narinfo" "$work/cache/$nar"
+done <"$work/upstream"
+echo "$(($(wc -l <"$work/closure") - $(wc -l <"$work/upstream"))) of $(wc -l <"$work/closure") paths are not on cache.nixos.org"
 h=${system#/nix/store/}
 cache=cache-${h%%-*}.tar
 tar -cf "$work/$cache" -C "$work/cache" .
